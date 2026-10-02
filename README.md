@@ -57,8 +57,57 @@ checklist below, not a byte-level decompilation figure.
 ## 🛠️ What you need
 
 - **Rust**: the toolchain is pinned in `rust-toolchain.toml`
-- **H2Overdrive**: its `triton.lux` archive. Point Riptide at it with `RIPTIDE_LUX=/path/to/triton.lux`
-- **Hydro Thunder** _(optional)_: a Dreamcast GD-ROM dump, for its courses and boats
+- **A Vulkan-capable GPU and driver**
+- **On Linux**, Bevy's build dependencies. On Debian/Ubuntu:
+  `sudo apt install pkg-config libasound2-dev libudev-dev`
+- **Your own copies of the games**, see below
+
+## 💾 Game files
+
+Riptide needs **one file from H2Overdrive** and, optionally, **one disc image of Hydro Thunder**.
+Nothing else from either game is used.
+
+### H2Overdrive: `triton.lux` (required)
+
+| | |
+|---|---|
+| **Version** | The 2009 Raw Thrills **arcade** release (the PC-based cabinet) |
+| **File** | `triton.lux`, about **3.1 GB**, in the game's install folder next to `Settings.xml` and `Scores.xml` |
+| **Holds** | Every model, texture, level, collision mesh, sound bank and data table |
+| **Tell Riptide** | `RIPTIDE_LUX=/path/to/triton.lux` |
+| **Default** | `~/MEGA downloads/TRITON/TRITON/triton.lux` |
+
+Only `triton.lux` is read. The game's executable, DLLs, movies and loaders aren't needed.
+
+### Hydro Thunder: Dreamcast disc image (optional)
+
+| | |
+|---|---|
+| **Version** | **Hydro Thunder (USA)**, Sega Dreamcast |
+| **Format** | A **GDI dump**: `disc.gdi` plus its `track01.bin` … `track37.bin`, all in one folder, about **1.2 GB** in total (Redump-style raw 2352-byte sectors) |
+| **Holds** | `HYDRODC.R2` (boats, textures, fonts) and one `.R2` archive per course, read straight out of the image |
+| **Tell Riptide** | `RIPTIDE_GDI=/path/to/disc.gdi` |
+| **Default** | `~/Games/Dreamcast/Hydro Thunder (USA)/disc.gdi` |
+
+`.cdi`, `.chd` and `.iso` images aren't supported. Convert them to GDI first: for example,
+`chdman extractcd` turns a CHD back into GDI plus BIN files. Without a Hydro Thunder image, Riptide
+still runs, with H2Overdrive courses and boats only.
+
+### Setting the paths
+
+Export the variables in your shell, or put them in front of every command:
+
+```sh
+export RIPTIDE_LUX="$HOME/Games/H2Overdrive/triton.lux"
+export RIPTIDE_GDI="$HOME/Games/Dreamcast/Hydro Thunder (USA)/disc.gdi"
+```
+
+To check that both are found:
+
+```sh
+cargo run --release -p riptide-tool -- level wa       # prints Wild America's contents from triton.lux
+cargo run --release -p riptide-tool -- ht-track AMAZ.R2 HJTAMAZTRH0   # reads Lost Island from the disc image
+```
 
 ## 🚀 Build and run
 
