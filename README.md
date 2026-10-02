@@ -54,6 +54,47 @@ checklist below, not a byte-level decompilation figure.
 | Multiplayer | ❌ | |
 | Full front-end menus | ❌ | Minimal boat and track select for now |
 
+## 🚧 What still needs to be done
+
+Pick anything here. Each item says what's missing and where to start.
+
+**Gameplay**
+
+1. **Collision robustness.** Walls and ramps work, and Wild America finishes under the autopilot,
+   but some H2Overdrive courses still have spots that trap boats (Hong Kong Buoy after its 3rd
+   checkpoint). Run `scripts/race-all.sh`, find the DNFs, and look at `Collider` in
+   `crates/riptide/src/race.rs`. H2Overdrive's collision mesh (`coll4.wc_<level>`) has inconsistent
+   triangle winding, and giant invisible gate quads that the original's level scripts remove.
+2. **Boat part animations.** Wings, flaps and engines that move on boost and Hull Crusher. The
+   `anim4.BA_<boat>` entries in `triton.lux` start with an `ANIM` header followed by 0x2c-byte
+   per-node track records whose names are blanked. The boat definitions name the frames to play
+   (`Anim Boost Partition Frame`, `Anim Wing Deploy` / `Stow`).
+3. **Chaser boats.** H2Overdrive's AI-only chasers (Headhunter, Scotland Yard, Zodiac, Hong Kong
+   Phooey) have models and boat definitions but no AI behaviour (rows marked `n/a` in `sheets/boats.csv`).
+4. **Career mode and upgrades.** Experience, armour, engine and spoiler upgrades. The data is in
+   `data.global_Experience` and the boats' `_Armor`, `_Engine_Upgrade` and `_Spoiler_Upgrade` meshes.
+5. **Hydro Thunder checkpoint times.** Its courses have no arcade timer yet. The times are probably in the
+   game's executable (`1ST_READ.BIN`).
+6. **AI quality.** AI boats are slower than the arcade timer expects on some courses.
+
+**Presentation**
+
+7. **Hydro Thunder music.** It's in the Dreamcast's AICA sound banks, not decoded yet; its courses
+   play the H2Overdrive theme meanwhile.
+8. **Front-end menus.** Only a minimal boat and track select exists. The original menu layouts are in
+   `data.wr_Boat` and related `CSHudCard` data.
+9. **Hydro Thunder water.** The water ribbon spills over the banks where a river is narrower than
+   its course portal.
+10. **Hackworld polish.** Ramps render plain white, and floating props sit at sea level.
+11. **Radar.** The minimap still needs work on Hydro Thunder courses and Hackworld.
+
+**Verification**
+
+12. **Unverified guesses.** `sheets/evidence.csv` lists every claim about the original games still
+    marked _hypothesis_ (ramp launch speeds, flame and lightning parameters, collision barriers).
+    Confirming or correcting them against the original game's code or behaviour is valuable.
+13. **Multiplayer.** Split-screen or network play doesn't exist yet.
+
 ## 🛠️ What you need
 
 - **Rust**: the toolchain is pinned in `rust-toolchain.toml`
@@ -174,6 +215,46 @@ cheats, HUD cards), columns are properties, and every cell is checked before eac
 | `crates/riptide-tool` | Command-line tools: extract tables, dump assets, inspect tracks, generate Hackworld |
 | `sheets/` | The hand-written sheets |
 | `scripts/` | Test helpers (headless race runs) |
+
+## 🤖 One-shot prompt for your AI agent
+
+Using an AI coding agent (Claude Code or similar)? Clone the repo, open the agent in it, and paste:
+
+````text
+You're working on Riptide, a Rust (Bevy 0.18) boat racer that plays H2Overdrive and Hydro Thunder
+courses from the user's own game files. Read README.md first.
+
+Setup:
+1. My H2Overdrive triton.lux is at: <PATH>   (export RIPTIDE_LUX=<PATH>)
+   My Hydro Thunder disc.gdi is at: <PATH or "none">   (export RIPTIDE_GDI=<PATH>)
+2. Run: cargo run --release -p riptide-tool -- seed-sheets sheets/game
+3. Run: cargo build --release -p riptide   and fix nothing yet; just confirm it builds.
+
+Rules of this codebase:
+- The CSV sheets in sheets/ are the source of truth. Rows = objects, columns = properties.
+  Change behaviour in the sheets first; code is generated from them (crates/riptide-sheets).
+- Every build runs a preflight over every row x column. Never bypass it; fix the sheet it names
+  (report: target/sheets/preflight.txt).
+- Invent nothing about the original games. Every value comes from the game data, or is marked
+  "riptide design" in its sheet's source column. Claims about how the originals work go into
+  sheets/evidence.csv as observed / hypothesis / design.
+- Never commit sheets/game/ or any game asset. It's extracted from the user's own copy.
+
+Testing (headless, no GPU needed):
+  VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/lvp_icd.json RIPTIDE_TRACK=wa RIPTIDE_SIM_DT=0.05 \
+  RIPTIDE_SHOT=out/shot RIPTIDE_SHOT_FRAMES=200,400 RIPTIDE_SHOT_SIZE=960x540 RIPTIDE_DEBUG=1 \
+  target/release/riptide
+- The player boat is autopiloted; screenshots land at out/shot_<frame>.png; RIPTIDE_DEBUG
+  logs position, speed, wall contacts and checkpoints.
+- RIPTIDE_TRACK takes a track id from sheets/tracks.csv, an H2 level code or an HT file stem;
+  RIPTIDE_BOAT picks a boat by name. RIPTIDE_EXIT_ON_FINISH=1 quits at the finish.
+- RIPTIDE_TEST_LANE=0..1 holds a lane; RIPTIDE_TEST_BOOST / _JUMP / _BRAKE=<seconds> trigger
+  those inputs at that time.
+- scripts/race-all.sh races every playable course and reports FINISHED or DNF.
+
+Task: pick item <N> from "What still needs to be done" in README.md. Start by reproducing the
+problem headlessly, explain what you find, then fix it. Prove the fix with a before/after test run.
+````
 
 ## ⚖️ Legal
 
