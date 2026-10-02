@@ -1,0 +1,32 @@
+id,tripwire,lap,status,source
+@types,ref:h2_tripwires,i32,status,str
+du_CheckpointLap3,du.CheckpointLap3,3,ok,Script Name Checkpoint; name ends Lap/Loop3 so it counts when lap 3 starts
+du_CheckpointLap2,du.CheckpointLap2,2,ok,Script Name Checkpoint; name ends Lap/Loop2 so it counts when lap 2 starts
+hk_Checkpoint3,hk.Checkpoint3,0,ok,Script Name Checkpoint; seconds = int_data; counts once
+hk_Checkpoint2,hk.Checkpoint2,0,ok,Script Name Checkpoint; seconds = int_data; counts once
+hk_CheckPoint1,hk.CheckPoint1,0,ok,Script Name Checkpoint; seconds = int_data; counts once
+hk_Checkpoint5,hk.Checkpoint5,0,ok,Script Name Checkpoint; seconds = int_data; counts once
+hk_Checkpoint4,hk.Checkpoint4,0,ok,Script Name Checkpoint; seconds = int_data; counts once
+lo_Checkpoint3,lo.Checkpoint3,0,ok,Script Name Checkpoint; seconds = int_data; counts once
+lo_Checkpoint2,lo.Checkpoint2,0,ok,Script Name Checkpoint; seconds = int_data; counts once
+lo_Checkpoint1,lo.Checkpoint1,0,ok,Script Name Checkpoint; seconds = int_data; counts once
+lo_Checkpoint5,lo.Checkpoint5,0,ok,Script Name Checkpoint; seconds = int_data; counts once
+lo_Checkpoint4,lo.Checkpoint4,0,ok,Script Name Checkpoint; seconds = int_data; counts once
+qc_Checkpoint3,qc.Checkpoint3,0,ok,Script Name Checkpoint; seconds = int_data; counts once
+qc_Checkpoint2,qc.Checkpoint2,0,ok,Script Name Checkpoint; seconds = int_data; counts once
+qc_Checkpoint1,qc.Checkpoint1,0,ok,Script Name Checkpoint; seconds = int_data; counts once
+qc_Checkpoint4,qc.Checkpoint4,0,ok,Script Name Checkpoint; seconds = int_data; counts once
+rs_Checkpoint3,rs.Checkpoint3,3,ok,Script Name Checkpoint on a 3-lap circuit (rs Num Laps 3) like the Loop2/Loop3 ones: counts when lap 3 starts
+rs_Checkpoint2,rs.Checkpoint2,2,ok,Script Name Checkpoint on a 3-lap circuit (rs Num Laps 3) like the Loop2/Loop3 ones: counts when lap 2 starts
+rt_CheckpointLoop2,rt.CheckpointLoop2,2,ok,Script Name Checkpoint; name ends Lap/Loop2 so it counts when lap 2 starts
+rt_CheckpointLoop3,rt.CheckpointLoop3,3,ok,Script Name Checkpoint; name ends Lap/Loop3 so it counts when lap 3 starts
+tf_Checkpoint3,tf.Checkpoint3,0,ok,Script Name Checkpoint; seconds = int_data; counts once
+tf_Checkpoint2,tf.Checkpoint2,0,ok,Script Name Checkpoint; seconds = int_data; counts once
+tf_Checkpoint1,tf.Checkpoint1,0,ok,Script Name Checkpoint; seconds = int_data; counts once
+tf_Checkpoint4,tf.Checkpoint4,0,ok,Script Name Checkpoint; seconds = int_data; counts once
+tl_CheckpointLoop2,tl.CheckpointLoop2,2,ok,Script Name Checkpoint; name ends Lap/Loop2 so it counts when lap 2 starts
+tl_CheckpointLoop3,tl.CheckpointLoop3,3,ok,Script Name Checkpoint; name ends Lap/Loop3 so it counts when lap 3 starts
+wa_Checkpoint3,wa.Checkpoint3,0,ok,Script Name Checkpoint; seconds = int_data; counts once
+wa_Checkpoint2,wa.Checkpoint2,0,ok,Script Name Checkpoint; seconds = int_data; counts once
+wa_Checkpoint1,wa.Checkpoint1,0,ok,Script Name Checkpoint; seconds = int_data; counts once
+wa_Checkpoint4,wa.Checkpoint4,0,ok,Script Name Checkpoint; seconds = int_data; counts once

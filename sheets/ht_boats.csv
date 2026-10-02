@@ -1,0 +1,15 @@
+id,code,display_name,type_index,name_source
+@types,str,str,i32,str
+bans,BANS,Banshee,0,1ST_READ.BIN string @0x97898 BANSHEE + BWWBANSLS11 select image
+tida,TIDA,Tidal Blade,1,1ST_READ.BIN string @0x978ac TIDAL BLADE + BWWTIDALS11
+radh,RADH,Rad Hazard,2,1ST_READ.BIN string @0x978c4 RAD HAZARD + BWWRADHLS11
+miss,MISS,Miss Behave,3,1ST_READ.BIN string @0x978dc MISS BEHAVE + BWWMISSLS11
+damn,DAMN,Damn the Torpedoes,4,1ST_READ.BIN string @0x978f4 DAMN THE TORPEDOES + BWWDAMNLS11
+cutt,CUTT,Cut Throat,5,1ST_READ.BIN string @0x97914 CUT THROAT + BWWCUTTLS11
+razr,RAZR,Razorback,6,1ST_READ.BIN string @0x9792c RAZORBACK + BWWRAZRLS11
+thre,THRE,Thresher,7,1ST_READ.BIN string @0x97944 THRESHER + BWWTHRELS11
+midw,MIDW,Midway,8,1ST_READ.BIN string @0x9795c MIDWAY + BWWMIDWLS11
+sead,SEAD,Chumdinger,9,1ST_READ.BIN string @0x97970 CHUMDINGER + BWWSEADLS11 (internal alias Sea Dog @0x97a38)
+copb,COPB,Armed Response,10,1ST_READ.BIN string @0x97988 ARMED RESPONSE + BWWCOPBLS11
+hovr,HOVR,Blowfish,11,1ST_READ.BIN string @0x979a4 BLOWFISH + BWWHOVRLS11 (internal alias Hovercraft @0x97a48)
+tiny,TINY,Tinytanic,12,1ST_READ.BIN string @0x979bc TINYTANIC + BWWTINYLS11 (internal alias Tiny Tanic @0x97a54)

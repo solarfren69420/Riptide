@@ -1,0 +1,8 @@
+id,engine_type,ht_geometry,fuel_global,fills_super,model,status,source
+@types,i32,str,ref:h2_globals,bool,asset,status,str
+blue,0,-,Boost Fuel Blue,false,lux:mesh32.pg_com_boostblue,ok,CBooster Type 0 in <code>_worldobs
+red,1,-,Boost Fuel Red,false,lux:mesh32.pg_com_boostred,ok,CBooster Type 1
+gold,2,-,Boost Fuel Gold,true,lux:mesh32.pg_com_boostgold,ok,CBooster Type 2 (super boost)
+hullcrush_crate,-1,-,HullCrush Time Active,false,-,n/a: crates are spawned by HullCrush Crate Nearest/Farthest rules - not implemented (use the cheat),global HullCrush Crate Game Mesh Def = CrateHullCrusher
+ht_small,-1,G_XHYDRSMH0,Boost Fuel Blue,false,-,ok,HT track instance G_XHYDRSMH0 (small hydro boost); fuel = H2 blue
+ht_large,-1,G_XHYDRLAH0,Boost Fuel Red,false,-,ok,HT track instance G_XHYDRLAH0 (large hydro boost); fuel = H2 red

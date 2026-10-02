@@ -1,0 +1,100 @@
+id,type,value,unit,source
+@types,str,dyn,str,str
+gravity,f32,260,units/s^2,riptide engine (pre-sheet GRAVITY)
+speed_norm,f32,705,units/s,riptide engine (pre-sheet BASE_TOP_SPEED) - only for lean/camera scaling
+accel_per_thrust,f32,1200,units/s^2 per boatdef Thrust,riptide calibration: pre-sheet ACCEL 210 / H2 Thrust L1 0.175
+start_room_bias,f32,0.35,-,riptide engine (thrust taper: thrust x (bias + headroom))
+water_drag,f32,0.18,1/s,riptide engine
+overspeed_drag,f32,1.6,1/s,riptide engine
+reverse_max,f32,120,units/s,riptide engine
+brake_mult,f32,1.4,x accel,riptide engine
+turn_full_speed,f32,240,units/s,riptide engine (steering reaches full rate at this speed)
+turn_falloff_speed,f32,2100,units/s,riptide engine
+turn_falloff_max,f32,0.35,-,riptide engine
+air_grip,f32,0.25,-,riptide engine
+slide_water,f32,4.4,1/s,riptide engine (pre-sheet 3.2 + 1.2 x handling 1.0)
+slide_air,f32,0.4,1/s,riptide engine
+wall_margin,f32,0.035,track width fraction,riptide engine
+wall_bounce,f32,1.3,-,riptide engine
+wall_scrape_drag,f32,1.5,1/s,riptide engine (pre-sheet wall slowdown; H2 impacts use Hit Wall Speed Penalty Mult)
+boat_radius,f32,26,units,riptide engine
+racers,f32,8,boats,riptide engine
+countdown,f32,3.5,s,riptide engine
+fuel_burn,f32,1.0,fuel s per s,H2 fuel is seconds of boost (Boost Fuel * globals)
+start_fuel,f32,5.4,s,riptide engine (pre-sheet 60/100 of a 9 s tank)
+pickup_radius,f32,75,units,riptide engine
+pickup_respawn,f32,6,s,riptide engine
+wipeout_time,f32,1.5,s,riptide design (H2 wipeout animation length not decoded)
+hullcrush_scale,f32,1.5,x model,riptide design (visual only; H2 HullCrush Dim Ratio drives collision)
+cam_back,f32,150,units,riptide engine
+cam_back_speed,f32,40,units,riptide engine
+cam_up,f32,52,units,riptide engine
+cam_up_speed,f32,10,units,riptide engine
+cam_look_ahead,f32,90,units,riptide engine
+cam_fov,f32,68,degrees,riptide engine
+ai_look,f32,220,units,riptide engine
+ai_look_per_speed,f32,0.9,s,riptide engine
+ai_look_max,f32,900,units,riptide engine
+ai_skill_min,f32,0.90,-,riptide engine
+ai_skill_spread,f32,0.08,-,riptide engine
+ht_world_scale,f32,1.6,x HT units,riptide calibration: same factor as HT boat models (boats.csv scale)
+ht_water_fps,f32,10,frames/s,riptide design: HT water animation rate not decoded (12 frames T?TWAT1nn90)
+wall_probe_height,f32,15,units above the waterline,riptide design: terrain walls are tested at this height (hull level)
+wall_steepness,f32,0.3,max |normal y|,riptide design: H2 collision faces closer to vertical than this are walls; steeper upward faces are ramps (H2 jump ramps are steep)
+sun_illuminance,f32,9000,lux,riptide engine (pre-sheet sun strength); colour and direction come from h2_levels
+ambient_brightness,f32,900,-,riptide engine (pre-sheet ambient); H2 levels scale it by ambient_scale and tint it ambient_color
+fx_max_particles,f32,700,particles,riptide design: cap on live wake/spray particles
+wake_rate,f32,40,per s at top speed,riptide design: foam patches dropped behind each boat
+wake_life,f32,1.6,s,riptide design
+wake_size_start,f32,25,units,riptide design
+wake_size_end,f32,85,units,riptide design
+wake_min_speed,f32,60,units/s,riptide design: no wake below this speed
+spray_rate,f32,30,per s,riptide design: rooster-tail spray while boosting (scaled by speed)
+spray_life,f32,0.9,s,riptide design
+spray_size_start,f32,14,units,riptide design
+spray_size_end,f32,50,units,riptide design
+spray_up,f32,220,units/s,riptide design: upward throw of rooster spray
+splash_count,f32,24,particles,riptide design: burst when landing from a jump
+water_subdiv,f32,6,cells per quad side,riptide design: water mesh subdivision for waves
+wave_amplitude,f32,3.5,units,riptide design: water surface wave height (visual only)
+wave_length,f32,240,units,riptide design
+wave_speed,f32,1.8,rad/s,riptide design
+env_intensity,f32,900,cd/m2,riptide design: sky cubemap reflections and fill light
+env_zenith,vec,0.18 0.32 0.62,linear rgb,riptide design: sky colour overhead in the reflection cubemap
+env_horizon,vec,0.62 0.70 0.78,linear rgb,riptide design: sky colour at the horizon (matches the fog)
+env_ground,vec,0.08 0.09 0.08,linear rgb,riptide design: below-horizon colour in the reflection cubemap
+sky_radius,f32,350000,units,riptide design: HT sky cylinder radius (beyond distant scenery like the Lost Island volcano)
+fog_start,f32,9000,units,riptide engine (pre-sheet H2 fog start)
+fog_end,f32,70000,units,riptide engine (pre-sheet H2 fog end)
+ht_fog_start,f32,40000,units,riptide design: HT courses have far backdrop scenery (volcano / skylines)
+ht_fog_end,f32,260000,units,riptide design
+ht_wall_steepness,f32,0.6,max |normal y|,riptide design: HT collides with its visual terrain so only near-vertical faces are walls
+ht_wall_probe_height,f32,48,units above the waterline,riptide design: above HT jumpable mounds (Far East MCTMOUNDT10 tops out ~35 world units) so only real obstacles block
+radar_range,f32,180,map texels,riptide design: half-width of the radar map window around the player
+ai_stuck_speed,f32,60,units/s,riptide design: an AI boat slower than this is a stuck candidate
+ai_stuck_time,f32,1.5,s,riptide design: how long before an AI boat backs off an obstacle
+ai_reverse_time,f32,0.9,s,riptide design: how long it reverses (steering away) to get free
+floor_step_up,f32,24,units,riptide design: a boat climbs onto terrain floors up to this far above its hull (ramps / mounds)
+floor_min_normal,f32,0.75,normal y,riptide design: triangles facing up at least this much are floors a boat can ride
+speed_scale,f32,1.5,world units/s per boatdef speed unit,riptide calibration from the cabinet Scores.xml: default top-10 times 150-158 s need ~1.45x; HUD and impact thresholds divide it back out
+floor_max_above_water,f32,250,units,riptide design: terrain higher than this above the water is never ridden (stops climbing rock faces at waterfalls)
+ai_probe_time,f32,0.6,s of travel,riptide design: AI looks this far ahead (at its speed) for obstacles
+ai_probe_min,f32,250,units,riptide design: shortest obstacle look-ahead
+ai_probe_angle,f32,0.45,rad,riptide design: side probes used to pick the clearer way round an obstacle
+floor_corridor_margin,f32,0.12,track width fraction,riptide design: terrain floors only count this far inside the corridor (ramps sit in the river; banks are at its edges)
+waterfall_drop,f32,40,units,riptide design: a cross-section this much lower than the previous one is a waterfall - the upper level holds until the edge so boats fly off it
+gate_window,f32,1500,units,riptide design: a checkpoint plane only counts within this race distance before its gate (so lap gates near the line wait for their lap)
+cam_radius,f32,45,units,riptide design: the chase camera keeps this far from walls (no faces filling the view)
+h2_floor_min_normal,f32,0.3,normal y,riptide design: H2 collision faces facing up at least this much are floors (steep jump ramps included; winding is reliable there)
+barrier_height,f32,900,units,riptide design: H2 collision faces taller than this are scripted invisible barriers (dams / gates the game opens); ones facing along the course are ignored
+music_volume,f32,0.55,linear,riptide design: race music level under the engine and effects
+rocket_size,f32,16,units per layer scale,riptide design: boost-flame particle size for a Scale value of 1 (layer Scale0/1/2 multiply it)
+rocket_rate,f32,60,particles/s per layer,riptide design: boost-flame emission rate
+rocket_nozzle_height,f32,10,units,riptide design: exhaust height above the boat origin at the stern (rooster offset Z)
+bolt_joints,f32,8,segments,riptide design: lightning segments per Hull Crusher bolt
+bolt_glow_scale,f32,3,x thickness,riptide design: glow ribbon width = thickness x (1 + Glow Width x this)
+fx_near_fade,f32,160,units,riptide design: spray and flame particles fade out inside this distance of the camera (the chase camera drives through rooster tails)
+hackworld_ring_radius,f32,14000,units,riptide design: Hackworld's AI ring (matches riptide-tool hackworld-seed)
+hackworld_ring_width,f32,5000,units,riptide design: Hackworld ring width
+hackworld_water_half,f32,30000,units,riptide design: Hackworld water extends this far each way from the centre
+hackworld_laps,f32,99,laps,riptide design: Hackworld never really ends

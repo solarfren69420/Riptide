@@ -1,0 +1,21 @@
+id,context,keys,pad,description
+@types,enum:menu|race|cheats|global,keys,pad,str
+throttle,race,ArrowUp KeyW,RightTrigger2 South,Accelerate
+brake,race,ArrowDown KeyS,LeftTrigger2,Brake / reverse
+steer_left,race,ArrowLeft KeyA,DPadLeft,Steer left
+steer_right,race,ArrowRight KeyD,DPadRight,Steer right
+boost,race,Space ShiftLeft ShiftRight,East RightTrigger,Boost (starts Hull Crusher with that cheat on)
+restart,race,KeyR,Select,Restart race
+leave_race,race,Escape,-,Back to menu
+menu_prev_boat,menu,ArrowUp,DPadUp,Previous boat
+menu_next_boat,menu,ArrowDown,DPadDown,Next boat
+menu_prev_track,menu,ArrowLeft,DPadLeft,Previous track
+menu_next_track,menu,ArrowRight,DPadRight,Next track
+menu_start,menu,Enter Space,Start South,Start race
+menu_view,menu,KeyV,North,View: press 3x on a parent boat to reveal its secret boat
+menu_quit,menu,Escape,-,Quit
+cheats_menu,global,Tab,-,Open/close the cheats menu
+cheats_all,global,F8,-,Toggle every cheat on/off
+cheats_up,cheats,ArrowUp,DPadUp,Cheats menu: previous cheat
+cheats_down,cheats,ArrowDown,DPadDown,Cheats menu: next cheat
+cheats_toggle,cheats,Enter Space,South,Cheats menu: switch the highlighted cheat on/off

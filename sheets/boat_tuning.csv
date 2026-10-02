@@ -1,0 +1,3 @@
+id,boat,speed_mult,thrust_mult,turn_mult,grip_mult,note
+@types,ref:boats,f32,f32,f32,f32,str
+hackboat_tuning,hackboat,0.75,2.5,2.8,3.0,user-requested test boat (2026-10-02 2nd pass): half the previous top speed (x0.75 of the boat def = about a normal boat after speed_scale) / x2.5 acceleration / x2.8 turning / x3 grip

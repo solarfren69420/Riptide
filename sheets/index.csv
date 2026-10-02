@@ -1,0 +1,31 @@
+id,group,file,doc
+@types,enum:content|tuning|interface,str,str
+boats,content,boats.csv,Playable roster for both games: one row per boat in the boat-select menu
+tracks,content,tracks.csv,Every level of both games; a row races in Riptide when racing_line and geometry are ok
+h2_boatdefs,content,game/h2_boatdefs.csv,H2Overdrive CBoatDef objects (data.global_boatdef) with every property incl. engine defaults
+h2_levels,content,game/h2_levels.csv,H2Overdrive level table (data.triton_levels) joined with each CLevelInfo
+ht_boats,content,ht_boats.csv,Hydro Thunder boat name table from 1ST_READ.BIN
+ht_tracks,content,ht_tracks.csv,Hydro Thunder track table from 1ST_READ.BIN
+h2_globals,tuning,game/h2_globals.csv,H2Overdrive CTritonGameDef + CExpData globals
+physics,tuning,physics.csv,Riptide engine constants that have no H2Overdrive equivalent
+pickups,tuning,pickups.csv,Boost pickups: what each CBooster type gives
+controls,interface,controls.csv,Input bindings per screen
+cheats,interface,cheats.csv,Cheats menu entries
+cheat_overrides,interface,cheat_overrides.csv,Global values a cheat replaces while it is on
+h2_tripwires,content,game/h2_tripwires.csv,H2Overdrive CSTripwire objects of every level (checkpoints / lines / triggers)
+checkpoints,tuning,checkpoints.csv,Arcade checkpoints: which tripwire adds time and on which lap
+evidence,content,evidence.csv,Evidence ledger (RustPorts spreadsheet method): status and source for claims behind sheet cells
+h2_samples,content,game/h2_samples.csv,Every sample in the FSB4 sound banks (fbnk.*): bank and encoding
+h2_sounddefs,content,game/h2_sounddefs.csv,H2Overdrive CSSoundDef: sample variants with volume and pitch ranges
+h2_enginedefs,content,game/h2_enginedefs.csv,H2Overdrive CEngineDef: layered engine loops by RPM
+h2_globalsounds,content,game/h2_globalsounds.csv,H2Overdrive CTritonGlobalSound: which sound def each game event plays
+sound_events,interface,sound_events.csv,Riptide game events and the H2Overdrive global sound each plays
+h2_hud,interface,game/h2_hud.csv,H2Overdrive CSHudCard layout (1360x768 virtual screen; X Anchor 0 left 1 centre 2 right)
+h2_font_glyphs,interface,game/h2_font_glyphs.csv,Bitmap font glyph tables (data.<font>) for fonts whose atlas ships
+hud,interface,hud.csv,Which H2Overdrive HUD cards Riptide draws (in this order) and what drives each
+boat_tuning,tuning,boat_tuning.csv,Per-boat stat multipliers on top of the boat def (test boats)
+h2_motifs,content,game/h2_motifs.csv,H2Overdrive CSMotifDef colours (data.global_Motifs)
+h2_rocket_layers,content,game/h2_rocket_layers.csv,H2Overdrive CRocketFlameLayerDef particle layers (data.global_RocketLayerDefs)
+h2_rocket_flames,content,game/h2_rocket_flames.csv,H2Overdrive CRocketFlameDef: up to four layers each (data.global_RocketFlameDefs)
+h2_bolts,content,game/h2_bolts.csv,H2Overdrive CSBoltDef lightning (data.global_bolts): Hull Crusher aura and zaps
+hackworld,content,hackworld.csv,Hackworld sandbox layout: H2 ramps / props from every level / boosts (riptide-tool hackworld-seed)

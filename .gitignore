@@ -1,0 +1,5 @@
+/target
+/out
+/target-dev
+# Extracted from the games: generate locally with riptide-tool seed-sheets
+/sheets/game/

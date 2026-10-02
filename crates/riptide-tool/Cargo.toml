@@ -1,0 +1,9 @@
+[package]
+name = "riptide-tool"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+riptide-assets = { path = "../riptide-assets" }
+png = "0.18"

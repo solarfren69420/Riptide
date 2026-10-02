@@ -1,0 +1,542 @@
+//! `riptide-tool`: inspect and export H2Overdrive / Hydro Thunder assets.
+//!
+//! ```text
+//! riptide-tool lux-list [filter]          riptide-tool ht-list [filter]
+//! riptide-tool lux-cat <kind.name>        (raw entry bytes to stdout)
+//! riptide-tool lux-tex <name> <out.png>   riptide-tool ht-tex <name> <out.png>
+//! riptide-tool lux-mesh <name> <out.obj>  riptide-tool ht-geom <name> <out.obj>
+//! riptide-tool lux-render <name> <out.png> [yaw]
+//! riptide-tool ht-render <name> <out.png> [yaw]
+//! riptide-tool coll <code>               (collision triangle count + bounds vs visible terrain)
+//! riptide-tool level <code> [out.png]     (summary + top-down render of the track)
+//! riptide-tool seed-sheets <dir>        (dump game tables to raw CSV sheets: <dir>/raw_*.csv)
+//! ```
+
+use anyhow::{bail, Context, Result};
+use riptide_assets::image::RgbaImage;
+use riptide_assets::model::Model;
+use riptide_assets::{h2coll, h2level, h2mesh, ht, image, lux};
+use std::collections::HashMap;
+use std::path::Path;
+
+mod hackworld;
+mod seed;
+
+fn main() -> Result<()> {
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    let a = |i: usize| args.get(i).map(String::as_str).context("missing argument");
+    match args.first().map(String::as_str) {
+        Some("lux-list") => {
+            let l = open_lux()?;
+            for e in l.entries() {
+                if args.len() < 2 || e.name.contains(a(1)?) {
+                    println!("{:>10} {}", e.size, e.name);
+                }
+            }
+        }
+        Some("lux-cat") => {
+            let l = open_lux()?;
+            let b = l.get(a(1)?).context("no such entry")?;
+            std::io::Write::write_all(&mut std::io::stdout(), b)?;
+        }
+        Some("lux-tex") => {
+            let l = open_lux()?;
+            let img = image::decode_txtr(l.get(&format!("txtr1.{}", a(1)?)).context("no such texture")?)?;
+            write_png(Path::new(a(2)?), &img)?;
+        }
+        Some("lux-mesh") => {
+            let l = open_lux()?;
+            let m = lux_model(&l, a(1)?)?;
+            describe(&m);
+            std::fs::write(a(2)?, m.to_obj())?;
+        }
+        Some("lux-render") => {
+            let l = open_lux()?;
+            let m = lux_model(&l, a(1)?)?;
+            describe(&m);
+            let mut tex = HashMap::new();
+            for p in &m.parts {
+                if let Some(t) = &p.texture {
+                    if let Some(b) = l.get(&format!("txtr1.{t}")) {
+                        if let Ok(img) = image::decode_txtr(b) {
+                            tex.insert(t.clone(), img);
+                        }
+                    }
+                }
+            }
+            let yaw: f32 = args.get(3).and_then(|s| s.parse().ok()).unwrap_or(35.0);
+            write_png(Path::new(a(2)?), &render(&m, &tex, yaw, 25.0, 768))?;
+        }
+        Some("ht-file") => {
+            let g = riptide_assets::gdi::GdRom::open(&riptide_assets::default_gdi_path())?;
+            if args.len() < 2 { for (n, f) in g.files() { eprintln!("{n} {f:?}"); } } else { use std::io::Write; std::io::stdout().write_all(&g.read(a(1)?)?)?; }
+        }
+        Some("ht-r2") => {
+            // List the entries of any R2 on the disc: size, relocations, kind, name.
+            let g = riptide_assets::gdi::GdRom::open(&riptide_assets::default_gdi_path())?;
+            let r2 = riptide_assets::r2::R2Archive::parse(g.read(a(1)?)?)?;
+            for e in r2.entries() {
+                if args.len() < 3 || e.name.contains(a(2)?) {
+                    let kind = r2.object(&e.name).map(|o| o.kind as char).unwrap_or('?');
+                    println!("{:>9} {:>6} {kind} {}", e.size, e.relocations, e.name);
+                }
+            }
+        }
+        Some("ht-obj") => {
+            // Dump one R2 entry body to a file and print its pointer table.
+            let g = riptide_assets::gdi::GdRom::open(&riptide_assets::default_gdi_path())?;
+            let r2 = riptide_assets::r2::R2Archive::parse(g.read(a(1)?)?)?;
+            let o = r2.object(a(2)?)?;
+            std::fs::write(a(3)?, o.body)?;
+            println!("kind {} body {} bytes, {} internal, {} external", o.kind as char, o.body.len(), o.internal.len(), o.external.len());
+            let mut ints = o.internal.clone();
+            ints.sort();
+            for s in &ints {
+                println!("int {s:#x} -> {:#x}", o.u32(*s).unwrap_or(0));
+            }
+            for (s, n) in &o.external {
+                println!("ext {s:#x} -> {n}");
+            }
+        }
+        Some("ht-dump") => {
+            // ht-dump FILE ENTRY OFF STRIDE COUNT: rows of u32 words, shown as float when plausible.
+            let g = riptide_assets::gdi::GdRom::open(&riptide_assets::default_gdi_path())?;
+            let r2 = riptide_assets::r2::R2Archive::parse(g.read(a(1)?)?)?;
+            let o = r2.object(a(2)?)?;
+            let num = |s: &str| usize::from_str_radix(s.trim_start_matches("0x"), if s.starts_with("0x") { 16 } else { 10 });
+            let (off, stride, count) = (num(a(3)?)?, num(a(4)?)?, num(a(5)?)?);
+            for i in 0..count {
+                let b = off + i * stride;
+                let mut line = format!("{i:>4} {b:#08x}:");
+                for w in (0..stride).step_by(4) {
+                    let Some(v) = o.u32(b + w) else { break };
+                    let f = f32::from_bits(v);
+                    let ext = o.external_at(b + w);
+                    if let Some(n) = ext {
+                        line += &format!(" [{n}]");
+                    } else if o.internal.contains(&(b + w)) {
+                        line += &format!(" ->{v:x}");
+                    } else if v == 0 {
+                        line += " 0";
+                    } else if f.is_finite() && f.abs() > 1e-4 && f.abs() < 1e7 {
+                        line += &format!(" {f:.3}");
+                    } else {
+                        line += &format!(" #{v:x}");
+                    }
+                }
+                println!("{line}");
+            }
+        }
+        Some("ht-track") => {
+            // ht-track FILE ENTRY [out.obj]: decode a Hydro Thunder track and summarise it.
+            let h = ht::HydroThunder::open(&riptide_assets::default_gdi_path())?;
+            let t = h.load_track(a(1)?, a(2)?)?;
+            let len: f32 = t.path.windows(2).map(|w| {
+                let m = |e: &riptide_assets::h2level::Edge| [(e.start[0] + e.end[0]) / 2.0, (e.start[2] + e.end[2]) / 2.0];
+                let (p, q) = (m(&w[0]), m(&w[1]));
+                ((p[0] - q[0]).powi(2) + (p[1] - q[1]).powi(2)).sqrt()
+            }).sum();
+            println!("{}: {} tris, {} parts, path {} edges ({len:.0} units, looped {}), {} instances, {} starts", a(2)?, t.terrain.triangle_count(), t.terrain.parts.len(), t.path.len(), t.looped, t.instances.len(), t.starts.len());
+            if let Some((lo, hi)) = t.terrain.bounds() { println!("  bounds {lo:?} .. {hi:?}"); }
+            if let (Some(f), Some(l)) = (t.path.first(), t.path.last()) { println!("  path first {:?}..{:?} last {:?}", f.start, f.end, l.start); }
+            if let Some(s) = t.starts.first() { println!("  start {:?}", s); }
+            for (i, e) in t.path.iter().enumerate().take(std::env::var("N").ok().and_then(|n| n.parse().ok()).unwrap_or(0)) {
+                println!("  edge {i}: [{:.0},{:.0}]-[{:.0},{:.0}] mid [{:.0}, {:.0}] width {:.0} water {}", e.start[0], e.start[2], e.end[0], e.end[2], (e.start[0] + e.end[0]) / 2.0, (e.start[2] + e.end[2]) / 2.0, ((e.end[0] - e.start[0]).powi(2) + (e.end[2] - e.start[2]).powi(2)).sqrt(), e.water);
+            }
+            // Surfaces straight above/below each start slot: height and texture.
+            let mut probes: Vec<[f32; 3]> = t.starts.iter().take(1).map(|s| s.0).collect();
+            probes.extend(t.starts.iter().take(1).map(|s| [s.0[0], s.0[1], -s.0[2]]));
+            probes.extend(t.path.iter().step_by(10).map(|e| [(e.start[0] + e.end[0]) / 2.0, e.water, (e.start[2] + e.end[2]) / 2.0]));
+            for sp in &probes {
+                println!("  probe {:?}", [sp[0] as i32, sp[2] as i32]);
+                for part in &t.terrain.parts {
+                    for tri in part.indices.chunks(3) {
+                        let p: Vec<[f32; 3]> = tri.iter().map(|&i| part.positions[i as usize]).collect();
+                        let s = |a: [f32; 3], b: [f32; 3], c: [f32; 3]| (b[0] - a[0]) * (c[2] - a[2]) - (b[2] - a[2]) * (c[0] - a[0]);
+                        let q = *sp;
+                        let (d1, d2, d3) = (s(p[0], p[1], q), s(p[1], p[2], q), s(p[2], p[0], q));
+                        let inside = (d1 >= 0.0 && d2 >= 0.0 && d3 >= 0.0) || (d1 <= 0.0 && d2 <= 0.0 && d3 <= 0.0);
+                        if inside {
+                            println!("  under start {:?}: y {:.1} {:.1} {:.1} tex {:?}", [q[0] as i32, q[2] as i32], p[0][1], p[1][1], p[2][1], part.texture);
+                        }
+                    }
+                }
+            }
+            // PROBE="x,z" (Riptide world units, HT scale 1.6 applied): steep triangles near that point.
+            if let Some((px, pz)) = std::env::var("PROBE").ok().and_then(|s| { let (a, b) = s.split_once(',')?; Some((a.parse::<f32>().ok()? / 1.6, b.parse::<f32>().ok()? / 1.6)) }) {
+                for part in &t.terrain.parts {
+                    for tri in part.indices.chunks(3) {
+                        let p: Vec<[f32; 3]> = tri.iter().map(|&i| part.positions[i as usize]).collect();
+                        let c = [(p[0][0] + p[1][0] + p[2][0]) / 3.0, (p[0][2] + p[1][2] + p[2][2]) / 3.0];
+                        let (ymin, ymax) = (p.iter().map(|v| v[1]).fold(f32::MAX, f32::min), p.iter().map(|v| v[1]).fold(f32::MIN, f32::max));
+                        if ((c[0] - px).powi(2) + (c[1] - pz).powi(2)).sqrt() < 120.0 && ymin < 15.0 && ymax > 0.0 {
+                            println!("  near: tex {:?} y {ymin:.0}..{ymax:.0} centre {:?}", part.texture, c);
+                        }
+                    }
+                }
+            }
+            if let Ok(out) = a(3) {
+                if out.ends_with(".png") {
+                    // Top-down map: course, racing line (cyan to magenta), start slots (yellow).
+                    let lvl = h2level::H2Level { path: t.path.clone(), starts: t.starts.iter().map(|(p, _)| (*p, [0.0, 0.0, 0.0, 1.0])).collect(), ..Default::default() };
+                    write_png(Path::new(out), &render_top(&t.terrain, &lvl, 1024))?;
+                } else {
+                    std::fs::write(out, t.terrain.to_obj())?;
+                }
+            }
+        }
+        Some("ht-r2-tex") => {
+            // ht-r2-tex FILE.R2 TEXTURE out.png: a texture from any R2 on the disc.
+            let g = riptide_assets::gdi::GdRom::open(&riptide_assets::default_gdi_path())?;
+            let r2 = riptide_assets::r2::R2Archive::parse(g.read(a(1)?)?)?;
+            let img = riptide_assets::pvr::decode_pvrt_in(r2.raw(a(2)?).context("no such texture")?)?;
+            write_png(Path::new(a(3)?), &img)?;
+        }
+        Some("fsb-list") => {
+            // fsb-list <bank> (e.g. wa_mp3): samples of an FSB4 bank in triton.lux.
+            let l = open_lux()?;
+            let bank = l.get(&format!("fbnk.{}", a(1)?)).context("no such bank")?;
+            for s in riptide_assets::fsb::parse(bank)? {
+                println!("{:<30} {:>9} {:>5}Hz {}ch {:<9} loop {} {:>8} bytes", s.name, s.samples, s.frequency, s.channels, s.codec(), s.looped(), s.size);
+            }
+        }
+        Some("fsb-get") => {
+            // fsb-get <bank> <sample> <out-without-extension>
+            let l = open_lux()?;
+            let bank = l.get(&format!("fbnk.{}", a(1)?)).context("no such bank")?;
+            let s = riptide_assets::fsb::parse(bank)?.into_iter().find(|s| s.name == a(2).unwrap_or("")).context("no such sample")?;
+            let (bytes, ext) = riptide_assets::fsb::extract(bank, &s)?;
+            let path = format!("{}.{ext}", a(3)?);
+            std::fs::write(&path, bytes)?;
+            println!("wrote {path}");
+        }
+        Some("lux-wide") => {
+            // lux-wide <table> <class> : that class's objects as a sheet (all properties, defaults filled).
+            let l = open_lux()?;
+            let mut objs = seed::objects(&l, a(1)?)?;
+            objs.retain(|o| o.class == a(2).unwrap_or(""));
+            print!("{}", seed::wide(&objs));
+        }
+        Some("ht-list") => {
+            let h = ht::HydroThunder::open(&riptide_assets::default_gdi_path())?;
+            for e in h.main.entries() {
+                if args.len() < 2 || e.name.contains(a(1)?) {
+                    println!("{:>9} {:>6} {}", e.size, e.relocations, e.name);
+                }
+            }
+        }
+        Some("ht-tex") => {
+            let h = ht::HydroThunder::open(&riptide_assets::default_gdi_path())?;
+            write_png(Path::new(a(2)?), &h.texture(a(1)?)?)?;
+        }
+        Some("ht-geom") => {
+            let h = ht::HydroThunder::open(&riptide_assets::default_gdi_path())?;
+            let m = h.geometry(a(1)?)?;
+            describe(&m);
+            std::fs::write(a(2)?, m.to_obj())?;
+        }
+        Some("ht-render") => {
+            let h = ht::HydroThunder::open(&riptide_assets::default_gdi_path())?;
+            let mut m = Model::default();
+            for name in a(1)?.split(',') {
+                m.parts.extend(h.geometry(name)?.parts);
+            }
+            describe(&m);
+            let mut tex = HashMap::new();
+            for p in &m.parts {
+                if let Some(t) = &p.texture {
+                    match h.texture(t) {
+                        Ok(img) => {
+                            tex.insert(t.clone(), img);
+                        }
+                        Err(e) => eprintln!("texture {t}: {e:#}"),
+                    }
+                }
+            }
+            let yaw: f32 = args.get(3).and_then(|s| s.parse().ok()).unwrap_or(35.0);
+            write_png(Path::new(a(2)?), &render(&m, &tex, yaw, 25.0, 768))?;
+        }
+        Some("hackworld-seed") => {
+            let l = open_lux()?;
+            hackworld::seed(&l, Path::new(a(1)?), |m| lux_model(&l, m).ok()?.bounds())?
+        }
+        Some("seed-sheets") => seed::seed_sheets(&open_lux()?, Path::new(a(1)?))?,
+        Some("coll") => {
+            let l = open_lux()?;
+            let code = a(1)?;
+            let name = format!("coll4.wc_{code}");
+            let tris = h2coll::decode_collision(l.get(&name).with_context(|| format!("no {name}"))?)?;
+            // Flags histogram, and PROBE="x,z" (Riptide coords: z mirrored) lists nearby triangles.
+            let flagged = h2coll::decode_collision_flags(l.get(&name).context("coll")?)?;
+            let mut hist: std::collections::BTreeMap<u32, usize> = Default::default();
+            for (_, f) in &flagged { *hist.entry(*f).or_default() += 1; }
+            println!("flags {hist:x?}");
+            if let Some((px, pz)) = std::env::var("PROBE").ok().and_then(|s| { let (a, b) = s.split_once(',')?; Some((a.parse::<f32>().ok()?, -b.parse::<f32>().ok()?)) }) {
+                for (t, f) in &flagged {
+                    let c = [(t[0][0] + t[1][0] + t[2][0]) / 3.0, (t[0][2] + t[1][2] + t[2][2]) / 3.0];
+                    if ((c[0] - px).powi(2) + (c[1] - pz).powi(2)).sqrt() < 250.0 {
+                        let ys: Vec<i32> = t.iter().map(|v| v[1] as i32).collect();
+                        println!("  near: flags {f:#x} centre [{:.0}, {:.0}] y {ys:?}", c[0], -c[1]);
+                    }
+                }
+            }
+            let bb = |pts: &mut dyn Iterator<Item = [f32; 3]>| {
+                let mut b: Option<([f32; 3], [f32; 3])> = None;
+                for p in pts {
+                    let (lo, hi) = b.get_or_insert((p, p));
+                    for k in 0..3 {
+                        lo[k] = lo[k].min(p[k]);
+                        hi[k] = hi[k].max(p[k]);
+                    }
+                }
+                b
+            };
+            println!("{name}: {} triangles, bounds {:?}", tris.len(), bb(&mut tris.iter().flatten().copied()));
+            let lvl = h2level::load_level(&l, code)?;
+            let mut world = Model::default();
+            for s in &lvl.sector_meshes {
+                if let Ok(m) = lux_model(&l, s) {
+                    world.parts.extend(m.parts);
+                }
+            }
+            // visible meshes are Z-mirrored on load; undo for comparison
+            let mut it = world.parts.iter().flat_map(|p| p.positions.iter().map(|p| [p[0], p[1], -p[2]]));
+            println!("visible terrain (unmirrored): bounds {:?}", bb(&mut it));
+        }
+        Some("level") => {
+            let l = open_lux()?;
+            if args.len() < 2 {
+                for (c, t) in h2level::race_levels(&l) {
+                    println!("{c}  {t}");
+                }
+                return Ok(());
+            }
+            let lvl = h2level::load_level(&l, a(1)?)?;
+            println!(
+                "{} '{}': {} sector meshes, {} props, {} boosters, {} starts, {} path edges, {} water quads, skyboxes {:?}",
+                lvl.code,
+                lvl.title,
+                lvl.sector_meshes.len(),
+                lvl.props.len(),
+                lvl.boosters.len(),
+                lvl.starts.len(),
+                lvl.path.len(),
+                lvl.water.len(),
+                lvl.skyboxes.iter().map(|s| &s.mesh).collect::<Vec<_>>()
+            );
+            let mut missing: Vec<&str> =
+                lvl.props.iter().map(|p| p.mesh.as_str()).filter(|m| !l.contains(&format!("mesh32.{m}"))).collect();
+            missing.sort();
+            missing.dedup();
+            println!("props with no mesh32: {missing:?}");
+            if let Some(out) = args.get(2) {
+                let mut world = Model::default();
+                for s in &lvl.sector_meshes {
+                    match lux_model(&l, s) {
+                        Ok(m) => world.parts.extend(m.parts),
+                        Err(e) => eprintln!("{s}: {e:#}"),
+                    }
+                }
+                write_png(Path::new(out), &render_top(&world, &lvl, 1024))?;
+            }
+        }
+        _ => bail!("usage: see the doc comment in crates/riptide-tool/src/main.rs"),
+    }
+    Ok(())
+}
+
+fn open_lux() -> Result<lux::LuxArchive> {
+    lux::LuxArchive::open(&riptide_assets::default_lux_path())
+}
+
+fn lux_model(l: &lux::LuxArchive, name: &str) -> Result<Model> {
+    h2mesh::decode_mesh(name, l.get(&format!("mesh32.{name}")).with_context(|| format!("no mesh32.{name}"))?)
+}
+
+fn describe(m: &Model) {
+    let b = m.bounds();
+    println!("{}: {} parts, {} tris, bounds {:?}", m.name, m.parts.len(), m.triangle_count(), b);
+    for p in &m.parts {
+        println!(
+            "  {} verts {} tris tex={:?} shader={:?} uv={} col={} mean rgba {:?}",
+            p.positions.len(),
+            p.indices.len() / 3,
+            p.texture,
+            p.shader,
+            p.uvs.len(),
+            p.colors.len(),
+            {
+                let n = p.colors.len().max(1) as f32;
+                let s = p.colors.iter().fold([0.0f32; 4], |a, c| [a[0] + c[0], a[1] + c[1], a[2] + c[2], a[3] + c[3]]);
+                s.map(|v| (v / n * 100.0).round() / 100.0)
+            }
+        );
+    }
+}
+
+fn write_png(path: &Path, img: &RgbaImage) -> Result<()> {
+    let f = std::fs::File::create(path)?;
+    let mut enc = png::Encoder::new(std::io::BufWriter::new(f), img.width, img.height);
+    enc.set_color(png::ColorType::Rgba);
+    enc.set_depth(png::BitDepth::Eight);
+    enc.write_header()?.write_image_data(&img.rgba)?;
+    println!("wrote {} ({}x{})", path.display(), img.width, img.height);
+    Ok(())
+}
+
+/// Minimal perspective rasteriser: textured, vertex-coloured, z-buffered.
+fn render(m: &Model, tex: &HashMap<String, RgbaImage>, yaw_deg: f32, pitch_deg: f32, size: usize) -> RgbaImage {
+    let (lo, hi) = m.bounds().unwrap_or(([-1.0; 3], [1.0; 3]));
+    let c = [(lo[0] + hi[0]) / 2.0, (lo[1] + hi[1]) / 2.0, (lo[2] + hi[2]) / 2.0];
+    let r = ((hi[0] - lo[0]).powi(2) + (hi[1] - lo[1]).powi(2) + (hi[2] - lo[2]).powi(2)).sqrt() / 2.0;
+    let (sy, cy) = yaw_deg.to_radians().sin_cos();
+    let (sp, cp) = pitch_deg.to_radians().sin_cos();
+    let dist = r * 2.6;
+    let project = |p: [f32; 3]| -> [f32; 3] {
+        let x = p[0] - c[0];
+        let y = p[1] - c[1];
+        let z = p[2] - c[2];
+        // yaw around Y, then pitch around X; camera looks down -Z.
+        let x1 = x * cy - z * sy;
+        let z1 = x * sy + z * cy;
+        let y2 = y * cp - z1 * sp;
+        let z2 = y * sp + z1 * cp;
+        let depth = dist - z2;
+        let f = size as f32 * 0.9;
+        [size as f32 / 2.0 + x1 * f / depth, size as f32 / 2.0 - y2 * f / depth, depth]
+    };
+    raster(m, tex, size, size, project, [40, 44, 52])
+}
+
+fn render_top(world: &Model, lvl: &h2level::H2Level, size: usize) -> RgbaImage {
+    let mut lo = [f32::MAX; 3];
+    let mut hi = [f32::MIN; 3];
+    for e in &lvl.path {
+        for p in [e.start, e.end] {
+            for k in 0..3 {
+                lo[k] = lo[k].min(p[k]);
+                hi[k] = hi[k].max(p[k]);
+            }
+        }
+    }
+    let span = (hi[0] - lo[0]).max(hi[2] - lo[2]) * 1.15;
+    let cx = (lo[0] + hi[0]) / 2.0;
+    let cz = (lo[2] + hi[2]) / 2.0;
+    let project = |p: [f32; 3]| -> [f32; 3] {
+        [
+            size as f32 / 2.0 + (p[0] - cx) / span * size as f32,
+            size as f32 / 2.0 + (p[2] - cz) / span * size as f32,
+            100000.0 - p[1],
+        ]
+    };
+    let mut img = raster(world, &HashMap::new(), size, size, project, [20, 20, 30]);
+    let mut dot = |p: [f32; 3], col: [u8; 3]| {
+        let q = project(p);
+        for dy in -2i32..=2 {
+            for dx in -2i32..=2 {
+                let x = q[0] as i32 + dx;
+                let y = q[1] as i32 + dy;
+                if x >= 0 && y >= 0 && (x as usize) < size && (y as usize) < size {
+                    img.rgba[(y as usize * size + x as usize) * 4..][..3].copy_from_slice(&col);
+                }
+            }
+        }
+    };
+    for e in &lvl.path {
+        dot(e.start, [0, 200, 0]);
+        dot(e.end, [220, 40, 40]);
+    }
+    for (i, e) in lvl.path.iter().enumerate() {
+        let mid = [(e.start[0] + e.end[0]) / 2.0, e.water, (e.start[2] + e.end[2]) / 2.0];
+        let t = i as f32 / lvl.path.len().max(1) as f32;
+        dot(mid, [(255.0 * t) as u8, (255.0 * (1.0 - t)) as u8, 255]);
+    }
+    for (p, _) in &lvl.starts {
+        dot(*p, [255, 255, 0]);
+    }
+    for b in &lvl.boosters {
+        dot(b.placement.position, [255, 0, 0]);
+    }
+    img
+}
+
+fn raster(
+    m: &Model,
+    tex: &HashMap<String, RgbaImage>,
+    w: usize,
+    h: usize,
+    project: impl Fn([f32; 3]) -> [f32; 3],
+    bg: [u8; 3],
+) -> RgbaImage {
+    let mut color = vec![0u8; w * h * 4];
+    for px in color.chunks_exact_mut(4) {
+        px.copy_from_slice(&[bg[0], bg[1], bg[2], 255]);
+    }
+    let mut zbuf = vec![f32::MAX; w * h];
+    let light = {
+        let l = [0.4f32, 0.8, 0.45];
+        let n = (l[0] * l[0] + l[1] * l[1] + l[2] * l[2]).sqrt();
+        [l[0] / n, l[1] / n, l[2] / n]
+    };
+    for p in &m.parts {
+        let t = p.texture.as_ref().and_then(|t| tex.get(t));
+        let pts: Vec<[f32; 3]> = p.positions.iter().map(|&v| project(v)).collect();
+        for tri in p.indices.chunks_exact(3) {
+            let [i0, i1, i2] = [tri[0] as usize, tri[1] as usize, tri[2] as usize];
+            let (a, b, c) = (pts[i0], pts[i1], pts[i2]);
+            if a[2] <= 0.0 || b[2] <= 0.0 || c[2] <= 0.0 {
+                continue;
+            }
+            let area = (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]);
+            if area.abs() < 1e-6 {
+                continue;
+            }
+            let minx = a[0].min(b[0]).min(c[0]).max(0.0) as usize;
+            let maxx = (a[0].max(b[0]).max(c[0]).ceil() as usize).min(w.saturating_sub(1));
+            let miny = a[1].min(b[1]).min(c[1]).max(0.0) as usize;
+            let maxy = (a[1].max(b[1]).max(c[1]).ceil() as usize).min(h.saturating_sub(1));
+            let nrm = p.normals.get(i0).copied().unwrap_or([0.0, 1.0, 0.0]);
+            let shade = 0.45 + 0.55 * (nrm[0] * light[0] + nrm[1] * light[1] + nrm[2] * light[2]).abs();
+            for y in miny..=maxy {
+                for x in minx..=maxx {
+                    let (fx, fy) = (x as f32 + 0.5, y as f32 + 0.5);
+                    let w0 = ((b[0] - fx) * (c[1] - fy) - (b[1] - fy) * (c[0] - fx)) / area;
+                    let w1 = ((c[0] - fx) * (a[1] - fy) - (c[1] - fy) * (a[0] - fx)) / area;
+                    let w2 = 1.0 - w0 - w1;
+                    if w0 < 0.0 || w1 < 0.0 || w2 < 0.0 {
+                        continue;
+                    }
+                    let z = w0 * a[2] + w1 * b[2] + w2 * c[2];
+                    let zi = y * w + x;
+                    if z >= zbuf[zi] {
+                        continue;
+                    }
+                    let mut rgba = [200.0f32, 200.0, 200.0, 255.0];
+                    if let (Some(img), true) = (t, p.uvs.len() == p.positions.len()) {
+                        let u = w0 * p.uvs[i0][0] + w1 * p.uvs[i1][0] + w2 * p.uvs[i2][0];
+                        let v = w0 * p.uvs[i0][1] + w1 * p.uvs[i1][1] + w2 * p.uvs[i2][1];
+                        let tx = ((u.rem_euclid(1.0)) * img.width as f32) as usize % img.width as usize;
+                        let ty = ((v.rem_euclid(1.0)) * img.height as f32) as usize % img.height as usize;
+                        let s = &img.rgba[(ty * img.width as usize + tx) * 4..][..4];
+                        rgba = [s[0] as f32, s[1] as f32, s[2] as f32, s[3] as f32];
+                    }
+                    if rgba[3] < 64.0 {
+                        continue;
+                    }
+                    if p.colors.len() == p.positions.len() && t.is_none() {
+                        let cc = p.colors[i0];
+                        rgba[0] *= cc[0].powf(1.0 / 2.2) * 1.2;
+                        rgba[1] *= cc[1].powf(1.0 / 2.2) * 1.2;
+                        rgba[2] *= cc[2].powf(1.0 / 2.2) * 1.2;
+                    }
+                    zbuf[zi] = z;
+                    let o = &mut color[zi * 4..zi * 4 + 4];
+                    o[0] = (rgba[0] * shade).min(255.0) as u8;
+                    o[1] = (rgba[1] * shade).min(255.0) as u8;
+                    o[2] = (rgba[2] * shade).min(255.0) as u8;
+                }
+            }
+        }
+    }
+    RgbaImage { width: w as u32, height: h as u32, rgba: color }
+}

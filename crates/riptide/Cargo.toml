@@ -1,0 +1,12 @@
+[package]
+name = "riptide"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+bevy.workspace = true
+riptide-assets = { path = "../riptide-assets" }
+
+[build-dependencies]
+riptide-sheets = { path = "../riptide-sheets" }

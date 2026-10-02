@@ -1,0 +1,9 @@
+[package]
+name = "riptide-sheets"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+riptide-assets = { path = "../riptide-assets" }
+serde_json = "1.0.151"

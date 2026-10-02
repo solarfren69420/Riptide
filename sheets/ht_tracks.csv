@@ -1,0 +1,17 @@
+id,code,display_name,table_order,asset_prefix,track,water,sky,laps,laps_source,name_source
+@types,str,str,i32,str,asset,asset,asset,i32,str,str
+grav,GRAV,Ship Graveyard,0,HGTGRAVTRH0,httrack:GRAV.R2/HGTGRAVTRH0,httrack:GRAV.R2/TGTWAT10090,ht:TGTSKY__A11,1,point to point (decoder: course does not close),1ST_READ.BIN string @0xa107c; track table entry 0 (tracks.c) with grav.r2
+amaz,AMAZ,Lost Island,1,HJTAMAZTRH0,httrack:AMAZ.R2/HJTAMAZTRH0,httrack:AMAZ.R2/TJTWAT10090,ht:TJTSKY__A11,1,point to point (decoder: course does not close),1ST_READ.BIN string @0xa10a4; table entry 1; amaz.r2
+veni,VENI,Venice Canals,2,HVTVENITRH0,httrack:VENI.R2/HVTVENITRH0,httrack:VENI.R2/TVTWAT10090,ht:TVTSKY__A11,1,point to point (decoder: course does not close),1ST_READ.BIN string @0xa10c8; table entry 2; veni.r2
+pwel,PWEL,Lake Powell,3,HPTPWELTRH0,httrack:POWE.R2/HPTPWELTRH0,httrack:POWE.R2/TPTWAT10090,ht:TPTSKY__A11,1,point to point (decoder: course does not close),1ST_READ.BIN string @0xa10f0; table entry 3; powe.r2
+arct,ARCT,Arctic Circle,4,HATARCTTRH0,httrack:ARCT.R2/HATARCTTRH0,httrack:ARCT.R2/TATWAT10090,ht:TATSKY__A11,1,point to point (decoder: course does not close),1ST_READ.BIN string @0xa1114; table entry 4; arct.r2
+nile,NILE,Nile Adventure,5,HNTNILETRH0,httrack:NILE.R2/HNTNILETRH0,httrack:NILE.R2/TNTWAT10090,ht:TNTSKY__A11,1,point to point (decoder: course does not close),1ST_READ.BIN string @0xa113c; table entry 5; nile.r2
+newy,NEWY,New York Disaster,6,HYTNEWYTRH0,httrack:NEWY.R2/HYTNEWYTRH0,httrack:NEWY.R2/TYTWAT10090,ht:TYTSKY__A11,1,point to point (decoder: course does not close),1ST_READ.BIN string @0xa1164; table entry 6; newy.r2
+gree,GREE,Greek Isles,7,HRTGREETRH0,httrack:GREE.R2/HRTGREETRH0,httrack:GREE.R2/TRTWAT10090,ht:TRTSKY__A11,1,point to point (decoder: course does not close),1ST_READ.BIN string @0xa1190; table entry 7; gree.r2
+chin,CHIN,Far East,8,HCTCHINTRH0,httrack:CHIN.R2/HCTCHINTRH0,httrack:CHIN.R2/TCTWAT10090,ht:TCTSKY__A11,1,point to point (decoder: course does not close),1ST_READ.BIN string @0xa11b4; table entry 8; chin.r2
+losa,LOSA,TEST,9,HLTLOSATRH0,-,-,-,1,debug entry - no track file,1ST_READ.BIN string @0xa11d8 "TEST" debug entry (not a real track); test.r2 not on disc
+loo1,LOO1,Thunder Park,10,HXTLOO1TRH0,httrack:LOO1.R2/HXTLOO1TRH0,httrack:LOO1.R2/TXTWAT10090,ht:TXTSKY__A11,3,riptide design: HT lap count not decoded (decoder: course closes),1ST_READ.BIN string @0xa11f8; table entry 10; loo1.r2
+loo2,LOO2,Hydro Speedway,11,HZTLOO2TRH0,httrack:LOO2.R2/HZTLOO2TRH0,httrack:LOO2.R2/TZTWAT10090,ht:TZTSKY__A11,3,riptide design: HT lap count not decoded (decoder: course closes),1ST_READ.BIN string @0xa1220; table entry 11; loo2.r2
+loo3,LOO3,Castle Von Dandy,12,HMTLOO3TRH0,httrack:LOO3.R2/HMTLOO3TRH0,httrack:LOO3.R2/TMTWAT10090,ht:TMTSKY__A11,3,riptide design: HT lap count not decoded (decoder: course closes),table entry 12 is internal "LOOP3" (@0xa1248); mapping to Castle inferred from GWWCAST__H1 select icon + BRWCSTLLS10
+cata,CATA,Catacomb,13,HDTXTR1TRH0,httrack:CATA.R2/HDTXTR1TRH0,httrack:CATA.R2/TPTWAT10090,-,3,riptide design: HT lap count not decoded (decoder: course closes),table entry 13 is internal "CAVERN" (@0xa1268) w/ BTWCAVELS10; cata.r2; Catacomb name from web
+prac,PRAC,Practice,14,HFTXTR3TRH0,httrack:PRAC.R2/HFTXTR3TRH0,httrack:PRAC.R2/TGTWAT10090,-,1,point to point (decoder: course does not close),1ST_READ.BIN string @0xa1288 "PRACTICE" + prac.r2

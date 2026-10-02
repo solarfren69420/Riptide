@@ -1,0 +1,12 @@
+id,label,hotkey,effect,params,description,source
+@types,str,keys,enum:fuel_full|super_full|hullcrush_hold|no_wipeout|overrides|unlock_secrets|camera_zoom|no_time_limit|speed_mult,vec,str,str
+infinite_boost,Infinite Boost,F1,fuel_full,-,Regular boost fuel never runs out,h2o-cheats.py boost()
+infinite_gold,Infinite Gold Boost,F2,super_full,-,Gold (super) boost stays on,h2o-cheats.py gold()
+infinite_hullcrusher,Infinite Hull Crusher,F3,hullcrush_hold,-,Boost starts Hull Crusher; holding Boost keeps it active,h2o-cheats.py hullcrush()
+no_wipeout,No Wipeout,F4,no_wipeout,-,Impacts never wipe out your boat,h2o-cheats.py nowipeout()
+no_catchup,No Catch-up,F5,overrides,-,AI boats get no catch-up speed or drafting help,h2o-cheats.py nocatchup()
+sturdy,Sturdy,F6,overrides,-,No wall or speed-loss penalties,h2o-cheats.py sturdy()
+unlock_secrets,Unlock Secret Boats,F7,unlock_secrets,-,Big Buckaneer / The Frying Dutchman / Down the Hatch selectable without View x3,cabinet unlock (View x3) shortcut
+camera_zoom,Camera Zoom,F9,camera_zoom,1 1.6 2.5 4,Cycles chase camera distance,h2o-cheats.py zoom (F9)
+no_time_limit,No Time Limit,F10,no_time_limit,-,The checkpoint timer never runs out,riptide (H2Overdrive arcade timer)
+boat_speed,Boat Speed,F11,speed_mult,0.5 0.75 1.25 1.5 2 3,Cycles your boat's top speed multiplier (handy to tame or crank the Hackboat),riptide (user request)

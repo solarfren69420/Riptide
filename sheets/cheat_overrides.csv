@@ -1,0 +1,11 @@
+id,cheat,global,value
+@types,ref:cheats,ref:h2_globals,f32
+nocatchup_speed,no_catchup,Catchup Max Speed Factor,1.0
+nocatchup_thrust,no_catchup,Catchup Unit Thrust Help,0
+nocatchup_boost,no_catchup,Catchup Unit Boost Help,0
+nocatchup_suck,no_catchup,Catchup Unit Suck Help,0
+sturdy_impact_min,sturdy,Player Impact Speed Min,100000
+sturdy_impact_max,sturdy,Player Impact Speed Max,100001
+sturdy_wall,sturdy,Hit Wall Speed Penalty Mult,1.0
+sturdy_speed_loss,sturdy,Player Speed Loss,0
+sturdy_ai_bonus,sturdy,AI Speed Bonus,0

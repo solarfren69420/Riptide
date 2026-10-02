@@ -1,0 +1,510 @@
+id,kind,model,pickup,x,y,z,yaw,scale,solid,status,source
+@types,enum:ramp|prop|booster,asset,ref:pickups,f32,f32,f32,f32,f32,bool,status,str
+hw0001,ramp,lux:mesh32.pg_com_ramp_lo,-,12250,0,-2500,180,1.00,true,ok,ramp park
+hw0002,ramp,lux:mesh32.pg_com_ramp_lo,-,12250,0,-4300,180,2.00,true,ok,ramp park
+hw0003,ramp,lux:mesh32.pg_com_ramp_lo,-,12250,0,-6100,180,3.50,true,ok,ramp park
+hw0004,ramp,lux:mesh32.pg_com_ramp_med,-,12950,0,-2500,180,1.00,true,ok,ramp park
+hw0005,ramp,lux:mesh32.pg_com_ramp_med,-,12950,0,-4300,180,2.00,true,ok,ramp park
+hw0006,ramp,lux:mesh32.pg_com_ramp_med,-,12950,0,-6100,180,3.50,true,ok,ramp park
+hw0007,ramp,lux:mesh32.pg_com_ramp_high,-,13650,0,-2500,180,1.00,true,ok,ramp park
+hw0008,ramp,lux:mesh32.pg_com_ramp_high,-,13650,0,-4300,180,2.00,true,ok,ramp park
+hw0009,ramp,lux:mesh32.pg_com_ramp_high,-,13650,0,-6100,180,3.50,true,ok,ramp park
+hw0010,ramp,lux:mesh32.pg_com_ramp_insane,-,14350,0,-2500,180,1.00,true,ok,ramp park
+hw0011,ramp,lux:mesh32.pg_com_ramp_insane,-,14350,0,-4300,180,2.00,true,ok,ramp park
+hw0012,ramp,lux:mesh32.pg_com_ramp_insane,-,14350,0,-6100,180,3.50,true,ok,ramp park
+hw0013,ramp,lux:mesh32.pg_wa_ramp1,-,15050,0,-2500,180,1.00,true,ok,ramp park
+hw0014,ramp,lux:mesh32.pg_wa_ramp1,-,15050,0,-4300,180,2.00,true,ok,ramp park
+hw0015,ramp,lux:mesh32.pg_wa_ramp1,-,15050,0,-6100,180,3.50,true,ok,ramp park
+hw0016,ramp,lux:mesh32.pg_qc_RoofRamp,-,15750,0,-2500,180,1.00,true,ok,ramp park
+hw0017,ramp,lux:mesh32.pg_qc_RoofRamp,-,15750,0,-4300,180,2.00,true,ok,ramp park
+hw0018,ramp,lux:mesh32.pg_qc_RoofRamp,-,15750,0,-6100,180,3.50,true,ok,ramp park
+hw0019,ramp,lux:mesh32.pg_com_ramp_lo,-,15421,0,218,179,1.80,true,ok,ring ramp
+hw0020,ramp,lux:mesh32.pg_com_ramp_high,-,13814,0,2290,171,1.45,true,ok,ring ramp
+hw0021,ramp,lux:mesh32.pg_com_ramp_insane,-,13153,0,4725,160,1.68,true,ok,ring ramp
+hw0022,ramp,lux:mesh32.pg_com_ramp_insane,-,13605,0,7763,150,1.46,true,ok,ring ramp
+hw0023,ramp,lux:mesh32.pg_com_ramp_insane,-,10369,0,7960,142,2.27,true,ok,ring ramp
+hw0024,ramp,lux:mesh32.pg_com_ramp_high,-,8667,0,9199,133,2.62,true,ok,ring ramp
+hw0025,ramp,lux:mesh32.pg_com_ramp_high,-,8081,0,11448,125,2.65,true,ok,ring ramp
+hw0026,ramp,lux:mesh32.pg_com_ramp_med,-,6192,0,12474,116,1.97,true,ok,ring ramp
+hw0027,ramp,lux:mesh32.pg_com_ramp_high,-,3666,0,13037,106,1.28,true,ok,ring ramp
+hw0028,ramp,lux:mesh32.pg_com_ramp_lo,-,2006,0,15134,98,2.72,true,ok,ring ramp
+hw0029,ramp,lux:mesh32.pg_com_ramp_lo,-,-443,0,14795,88,2.73,true,ok,ring ramp
+hw0030,ramp,lux:mesh32.pg_com_ramp_lo,-,-2663,0,15333,80,1.20,true,ok,ring ramp
+hw0031,ramp,lux:mesh32.pg_com_ramp_lo,-,-4406,0,13310,72,1.50,true,ok,ring ramp
+hw0032,ramp,lux:mesh32.pg_com_ramp_lo,-,-7247,0,13332,61,2.61,true,ok,ring ramp
+hw0033,ramp,lux:mesh32.pg_com_ramp_med,-,-9187,0,12514,54,1.85,true,ok,ring ramp
+hw0034,ramp,lux:mesh32.pg_com_ramp_med,-,-10340,0,9993,44,1.48,true,ok,ring ramp
+hw0035,ramp,lux:mesh32.pg_com_ramp_high,-,-12060,0,8205,34,1.42,true,ok,ring ramp
+hw0036,ramp,lux:mesh32.pg_com_ramp_insane,-,-11460,0,5821,27,1.93,true,ok,ring ramp
+hw0037,ramp,lux:mesh32.pg_com_ramp_med,-,-13899,0,4344,17,1.24,true,ok,ring ramp
+hw0038,ramp,lux:mesh32.pg_com_ramp_lo,-,-12609,0,1618,7,1.27,true,ok,ring ramp
+hw0039,ramp,lux:mesh32.pg_com_ramp_lo,-,-12319,0,-358,-2,1.03,true,ok,ring ramp
+hw0040,ramp,lux:mesh32.pg_com_ramp_high,-,-15019,0,-2912,-11,1.93,true,ok,ring ramp
+hw0041,ramp,lux:mesh32.pg_com_ramp_med,-,-12153,0,-4367,-20,1.06,true,ok,ring ramp
+hw0042,ramp,lux:mesh32.pg_com_ramp_high,-,-11983,0,-6443,-28,2.20,true,ok,ring ramp
+hw0043,ramp,lux:mesh32.pg_com_ramp_lo,-,-10434,0,-7721,-36,2.97,true,ok,ring ramp
+hw0044,ramp,lux:mesh32.pg_com_ramp_high,-,-9916,0,-10058,-45,1.83,true,ok,ring ramp
+hw0045,ramp,lux:mesh32.pg_com_ramp_lo,-,-8431,0,-11791,-54,2.06,true,ok,ring ramp
+hw0046,ramp,lux:mesh32.pg_com_ramp_lo,-,-5380,0,-11795,-65,1.11,true,ok,ring ramp
+hw0047,ramp,lux:mesh32.pg_com_ramp_high,-,-4169,0,-14252,-74,2.07,true,ok,ring ramp
+hw0048,ramp,lux:mesh32.pg_com_ramp_med,-,-2308,0,-15090,-81,1.70,true,ok,ring ramp
+hw0049,ramp,lux:mesh32.pg_com_ramp_lo,-,244,0,-15683,-91,2.33,true,ok,ring ramp
+hw0050,ramp,lux:mesh32.pg_com_ramp_med,-,2948,0,-14805,-101,1.90,true,ok,ring ramp
+hw0051,ramp,lux:mesh32.pg_com_ramp_med,-,4545,0,-12294,-110,1.96,true,ok,ring ramp
+hw0052,ramp,lux:mesh32.pg_com_ramp_high,-,6926,0,-13398,-117,2.66,true,ok,ring ramp
+hw0053,ramp,lux:mesh32.pg_com_ramp_med,-,8880,0,-12071,-126,2.74,true,ok,ring ramp
+hw0054,ramp,lux:mesh32.pg_com_ramp_insane,-,10190,0,-9451,-137,2.56,true,ok,ring ramp
+hw0055,ramp,lux:mesh32.pg_com_ramp_lo,-,12177,0,-8486,-145,2.45,true,ok,ring ramp
+hw0056,ramp,lux:mesh32.pg_com_ramp_high,-,11886,0,-5594,-155,2.96,true,ok,ring ramp
+hw0057,ramp,lux:mesh32.pg_com_ramp_lo,-,12877,0,-3699,-164,1.32,true,ok,ring ramp
+hw0058,ramp,lux:mesh32.pg_com_ramp_lo,-,14065,0,-1825,-173,1.55,true,ok,ring ramp
+hw0059,ramp,lux:mesh32.pg_com_ramp_med,-,-22093,0,4565,345,4.95,true,ok,scatter
+hw0060,ramp,lux:mesh32.pg_com_ramp_high,-,-5364,0,-4573,211,1.69,true,ok,scatter
+hw0061,ramp,lux:mesh32.pg_com_ramp_med,-,10866,0,-21524,83,3.52,true,ok,scatter
+hw0062,ramp,lux:mesh32.pg_wa_ramp1,-,10681,0,15237,108,2.11,true,ok,scatter
+hw0063,ramp,lux:mesh32.pg_com_ramp_lo,-,1862,0,-16016,164,2.80,true,ok,scatter
+hw0064,ramp,lux:mesh32.pg_com_ramp_insane,-,11502,0,-21443,121,2.31,true,ok,scatter
+hw0065,ramp,lux:mesh32.pg_com_ramp_lo,-,-1674,0,-11322,213,1.15,true,ok,scatter
+hw0066,ramp,lux:mesh32.pg_com_ramp_lo,-,20512,0,9636,60,2.65,true,ok,scatter
+hw0067,ramp,lux:mesh32.pg_com_ramp_lo,-,22544,0,-15646,286,2.81,true,ok,scatter
+hw0068,ramp,lux:mesh32.pg_wa_ramp1,-,14222,0,15548,253,2.68,true,ok,scatter
+hw0069,ramp,lux:mesh32.pg_com_ramp_insane,-,21321,0,17652,347,4.37,true,ok,scatter
+hw0070,ramp,lux:mesh32.pg_qc_RoofRamp,-,-396,0,14037,139,1.48,true,ok,scatter
+hw0071,ramp,lux:mesh32.pg_qc_RoofRamp,-,-19547,0,7732,87,4.07,true,ok,scatter
+hw0072,ramp,lux:mesh32.pg_com_ramp_lo,-,-22347,0,17623,43,2.22,true,ok,scatter
+hw0073,ramp,lux:mesh32.pg_com_ramp_med,-,-9837,0,4570,298,4.75,true,ok,scatter
+hw0074,ramp,lux:mesh32.pg_com_ramp_insane,-,-3901,0,9225,201,4.17,true,ok,scatter
+hw0075,ramp,lux:mesh32.pg_qc_RoofRamp,-,-15810,0,591,168,3.37,true,ok,scatter
+hw0076,ramp,lux:mesh32.pg_com_ramp_med,-,5034,0,5649,125,1.32,true,ok,scatter
+hw0077,ramp,lux:mesh32.pg_com_ramp_lo,-,-1597,0,-17702,25,2.59,true,ok,scatter
+hw0078,ramp,lux:mesh32.pg_com_ramp_insane,-,-22511,0,-18993,53,1.47,true,ok,scatter
+hw0079,ramp,lux:mesh32.pg_com_ramp_high,-,-18983,0,-9992,274,2.79,true,ok,scatter
+hw0080,ramp,lux:mesh32.pg_com_ramp_insane,-,15487,0,-21377,156,3.36,true,ok,scatter
+hw0081,ramp,lux:mesh32.pg_com_ramp_high,-,23429,0,-14147,348,3.10,true,ok,scatter
+hw0082,ramp,lux:mesh32.pg_com_ramp_med,-,-10819,0,-14044,237,3.28,true,ok,scatter
+hw0083,ramp,lux:mesh32.pg_com_ramp_insane,-,14983,0,12839,293,2.19,true,ok,scatter
+hw0084,ramp,lux:mesh32.pg_com_ramp_lo,-,2615,0,-17186,86,4.28,true,ok,scatter
+hw0085,ramp,lux:mesh32.pg_com_ramp_high,-,-2732,0,-14989,167,4.98,true,ok,scatter
+hw0086,ramp,lux:mesh32.pg_com_ramp_lo,-,5781,0,1428,308,3.49,true,ok,scatter
+hw0087,ramp,lux:mesh32.pg_com_ramp_med,-,7360,0,-10836,340,2.53,true,ok,scatter
+hw0088,ramp,lux:mesh32.pg_com_ramp_insane,-,13451,0,20598,174,1.84,true,ok,scatter
+hw0089,ramp,lux:mesh32.pg_com_ramp_high,-,-16036,0,-9546,321,4.15,true,ok,scatter
+hw0090,ramp,lux:mesh32.pg_qc_RoofRamp,-,-2929,0,-14247,298,1.05,true,ok,scatter
+hw0091,ramp,lux:mesh32.pg_com_ramp_high,-,19021,0,-16276,216,2.48,true,ok,scatter
+hw0092,ramp,lux:mesh32.pg_wa_ramp1,-,-21348,0,17255,139,4.59,true,ok,scatter
+hw0093,ramp,lux:mesh32.pg_wa_ramp1,-,-16264,0,-17610,2,3.88,true,ok,scatter
+hw0094,ramp,lux:mesh32.pg_com_ramp_lo,-,-17178,0,1903,360,4.48,true,ok,scatter
+hw0095,ramp,lux:mesh32.pg_com_ramp_lo,-,-664,0,13441,148,1.31,true,ok,scatter
+hw0096,ramp,lux:mesh32.pg_com_ramp_insane,-,19709,0,8640,142,1.31,true,ok,scatter
+hw0097,ramp,lux:mesh32.pg_com_ramp_insane,-,1916,0,20724,64,1.52,true,ok,scatter
+hw0098,ramp,lux:mesh32.pg_com_ramp_lo,-,-2686,0,21752,100,1.46,true,ok,scatter
+hw0099,ramp,lux:mesh32.pg_wa_ramp1,-,-2295,0,-12589,32,2.59,true,ok,scatter
+hw0100,ramp,lux:mesh32.pg_wa_ramp1,-,19451,0,-20266,251,1.64,true,ok,scatter
+hw0101,ramp,lux:mesh32.pg_qc_RoofRamp,-,-13319,0,16896,269,1.28,true,ok,scatter
+hw0102,ramp,lux:mesh32.pg_com_ramp_med,-,-22001,0,23682,78,1.02,true,ok,scatter
+hw0103,ramp,lux:mesh32.pg_qc_RoofRamp,-,-3938,0,-6535,337,3.75,true,ok,scatter
+hw0104,ramp,lux:mesh32.pg_com_ramp_med,-,-18396,0,13852,139,2.84,true,ok,scatter
+hw0105,ramp,lux:mesh32.pg_qc_RoofRamp,-,12670,0,-21294,274,1.53,true,ok,scatter
+hw0106,ramp,lux:mesh32.pg_com_ramp_insane,-,15518,0,-23341,50,4.57,true,ok,scatter
+hw0107,ramp,lux:mesh32.pg_com_ramp_med,-,-8588,0,-16039,219,2.54,true,ok,scatter
+hw0108,ramp,lux:mesh32.pg_com_ramp_med,-,-6433,0,-9840,216,1.43,true,ok,scatter
+hw0109,ramp,lux:mesh32.pg_com_ramp_insane,-,-5008,0,533,224,4.12,true,ok,scatter
+hw0110,ramp,lux:mesh32.pg_com_ramp_insane,-,-15189,0,11172,254,4.15,true,ok,scatter
+hw0111,ramp,lux:mesh32.pg_com_ramp_insane,-,-18926,0,-16985,160,3.83,true,ok,scatter
+hw0112,ramp,lux:mesh32.pg_com_ramp_med,-,-12791,0,-20294,64,4.28,true,ok,scatter
+hw0113,ramp,lux:mesh32.pg_com_ramp_insane,-,9299,0,7956,105,4.19,true,ok,scatter
+hw0114,ramp,lux:mesh32.pg_com_ramp_high,-,-10557,0,-3793,274,4.96,true,ok,scatter
+hw0115,ramp,lux:mesh32.pg_com_ramp_high,-,-23878,0,-18087,156,4.43,true,ok,scatter
+hw0116,ramp,lux:mesh32.pg_com_ramp_insane,-,14347,0,-1599,40,4.84,true,ok,scatter
+hw0117,ramp,lux:mesh32.pg_com_ramp_lo,-,17401,0,-18393,204,3.61,true,ok,scatter
+hw0118,ramp,lux:mesh32.pg_wa_ramp1,-,-16068,0,845,79,4.20,true,ok,scatter
+hw0119,ramp,lux:mesh32.pg_wa_ramp1,-,-10183,0,-9150,106,2.10,true,ok,scatter
+hw0120,ramp,lux:mesh32.pg_com_ramp_high,-,-13783,0,22202,193,1.65,true,ok,scatter
+hw0121,ramp,lux:mesh32.pg_com_ramp_high,-,18920,0,4589,285,2.24,true,ok,scatter
+hw0122,ramp,lux:mesh32.pg_qc_RoofRamp,-,-14839,0,14155,326,3.45,true,ok,scatter
+hw0123,ramp,lux:mesh32.pg_com_ramp_lo,-,17763,0,13678,114,2.03,true,ok,scatter
+hw0124,ramp,lux:mesh32.pg_qc_RoofRamp,-,21595,0,-14388,109,2.47,true,ok,scatter
+hw0125,ramp,lux:mesh32.pg_com_ramp_med,-,-21772,0,-73,161,2.56,true,ok,scatter
+hw0126,ramp,lux:mesh32.pg_wa_ramp1,-,12158,0,-8904,133,1.24,true,ok,scatter
+hw0127,ramp,lux:mesh32.pg_com_ramp_lo,-,16442,0,10041,49,1.56,true,ok,scatter
+hw0128,ramp,lux:mesh32.pg_com_ramp_high,-,-3633,0,22838,117,4.17,true,ok,scatter
+hw0129,ramp,lux:mesh32.pg_com_ramp_lo,-,23575,0,21988,331,2.21,true,ok,scatter
+hw0130,ramp,lux:mesh32.pg_com_ramp_med,-,4105,0,18471,347,1.10,true,ok,scatter
+hw0131,ramp,lux:mesh32.pg_com_ramp_insane,-,9131,0,-2825,199,1.97,true,ok,scatter
+hw0132,ramp,lux:mesh32.pg_qc_RoofRamp,-,10364,0,15517,168,3.15,true,ok,scatter
+hw0133,ramp,lux:mesh32.pg_com_ramp_high,-,-17842,0,21022,269,1.89,true,ok,scatter
+hw0134,ramp,lux:mesh32.pg_com_ramp_lo,-,-9347,0,5042,244,2.40,true,ok,scatter
+hw0135,ramp,lux:mesh32.pg_com_ramp_high,-,7903,0,22643,332,3.80,true,ok,scatter
+hw0136,ramp,lux:mesh32.pg_com_ramp_insane,-,-17262,0,-5391,87,3.52,true,ok,scatter
+hw0137,ramp,lux:mesh32.pg_qc_RoofRamp,-,10225,0,-7413,297,1.24,true,ok,scatter
+hw0138,ramp,lux:mesh32.pg_wa_ramp1,-,-9125,0,-22662,226,3.12,true,ok,scatter
+hw0139,ramp,lux:mesh32.pg_com_ramp_insane,-,14686,0,15897,136,1.50,true,ok,scatter
+hw0140,ramp,lux:mesh32.pg_com_ramp_lo,-,-15232,0,-6554,31,3.48,true,ok,scatter
+hw0141,ramp,lux:mesh32.pg_qc_RoofRamp,-,-11029,0,10396,145,2.39,true,ok,scatter
+hw0142,ramp,lux:mesh32.pg_qc_RoofRamp,-,3709,0,21741,144,2.22,true,ok,scatter
+hw0143,ramp,lux:mesh32.pg_com_ramp_high,-,4764,0,-4422,74,2.16,true,ok,scatter
+hw0144,ramp,lux:mesh32.pg_com_ramp_insane,-,19691,0,-4115,247,4.99,true,ok,scatter
+hw0145,ramp,lux:mesh32.pg_qc_RoofRamp,-,-7111,0,5922,145,2.65,true,ok,scatter
+hw0146,ramp,lux:mesh32.pg_com_ramp_lo,-,20547,0,-22574,97,1.71,true,ok,scatter
+hw0147,ramp,lux:mesh32.pg_com_ramp_lo,-,10929,0,2114,351,1.77,true,ok,scatter
+hw0148,ramp,lux:mesh32.pg_com_ramp_med,-,-21829,0,-12665,63,3.61,true,ok,scatter
+hw0149,ramp,lux:mesh32.pg_wa_ramp1,-,-17789,0,5267,31,4.84,true,ok,scatter
+hw0150,ramp,lux:mesh32.pg_wa_ramp1,-,9861,0,-12682,300,3.14,true,ok,scatter
+hw0151,ramp,lux:mesh32.pg_com_ramp_high,-,20278,0,-11575,164,2.30,true,ok,scatter
+hw0152,ramp,lux:mesh32.pg_qc_RoofRamp,-,5861,0,-17303,163,2.10,true,ok,scatter
+hw0153,ramp,lux:mesh32.pg_com_ramp_med,-,1879,0,856,232,2.73,true,ok,scatter
+hw0154,ramp,lux:mesh32.pg_com_ramp_lo,-,4987,0,20193,204,1.60,true,ok,scatter
+hw0155,ramp,lux:mesh32.pg_com_ramp_high,-,-9830,0,-19944,202,3.84,true,ok,scatter
+hw0156,ramp,lux:mesh32.pg_com_ramp_insane,-,-10127,0,-2360,33,4.76,true,ok,scatter
+hw0157,ramp,lux:mesh32.pg_com_ramp_lo,-,-3790,0,-6822,300,4.30,true,ok,scatter
+hw0158,ramp,lux:mesh32.pg_wa_ramp1,-,8985,0,-7505,237,4.39,true,ok,scatter
+hw0159,ramp,lux:mesh32.pg_com_ramp_lo,-,-15631,0,17410,346,2.10,true,ok,scatter
+hw0160,ramp,lux:mesh32.pg_wa_ramp1,-,-6833,0,-15119,167,4.66,true,ok,scatter
+hw0161,ramp,lux:mesh32.pg_com_ramp_lo,-,-10596,0,-10193,262,3.71,true,ok,scatter
+hw0162,ramp,lux:mesh32.pg_wa_ramp1,-,13510,0,20192,236,3.82,true,ok,scatter
+hw0163,ramp,lux:mesh32.pg_com_ramp_insane,-,-19663,0,-678,40,4.30,true,ok,scatter
+hw0164,ramp,lux:mesh32.pg_qc_RoofRamp,-,-12556,0,9976,262,2.73,true,ok,scatter
+hw0165,ramp,lux:mesh32.pg_com_ramp_high,-,-16669,0,22039,187,3.29,true,ok,scatter
+hw0166,ramp,lux:mesh32.pg_com_ramp_med,-,-10333,0,-17847,156,2.69,true,ok,scatter
+hw0167,ramp,lux:mesh32.pg_com_ramp_insane,-,5445,0,-7282,290,2.46,true,ok,scatter
+hw0168,ramp,lux:mesh32.pg_com_ramp_insane,-,-5911,0,-11938,64,1.04,true,ok,scatter
+hw0169,ramp,lux:mesh32.pg_com_ramp_med,-,-16358,0,8431,340,1.19,true,ok,scatter
+hw0170,ramp,lux:mesh32.pg_wa_ramp1,-,-16734,0,2230,101,3.88,true,ok,scatter
+hw0171,ramp,lux:mesh32.pg_qc_RoofRamp,-,2974,0,-20831,133,3.00,true,ok,scatter
+hw0172,ramp,lux:mesh32.pg_com_ramp_high,-,13484,0,-23412,214,3.50,true,ok,scatter
+hw0173,ramp,lux:mesh32.pg_qc_RoofRamp,-,-16565,0,6623,174,3.73,true,ok,scatter
+hw0174,ramp,lux:mesh32.pg_com_ramp_high,-,5889,0,-8046,197,1.43,true,ok,scatter
+hw0175,ramp,lux:mesh32.pg_qc_RoofRamp,-,21990,0,-23243,191,1.58,true,ok,scatter
+hw0176,ramp,lux:mesh32.pg_com_ramp_insane,-,22127,0,-6054,91,3.90,true,ok,scatter
+hw0177,ramp,lux:mesh32.pg_wa_ramp1,-,-10513,0,-264,333,1.02,true,ok,scatter
+hw0178,ramp,lux:mesh32.pg_com_ramp_insane,-,-12703,0,-10559,107,1.44,true,ok,scatter
+hw0179,ramp,lux:mesh32.pg_wa_ramp1,-,23172,0,17594,266,2.50,true,ok,scatter
+hw0180,ramp,lux:mesh32.pg_com_ramp_med,-,20014,0,-8395,324,3.71,true,ok,scatter
+hw0181,ramp,lux:mesh32.pg_wa_ramp1,-,5131,0,14946,338,1.85,true,ok,scatter
+hw0182,ramp,lux:mesh32.pg_com_ramp_high,-,-6285,0,6789,304,3.79,true,ok,scatter
+hw0183,ramp,lux:mesh32.pg_qc_RoofRamp,-,4353,0,-12079,308,1.13,true,ok,scatter
+hw0184,ramp,lux:mesh32.pg_com_ramp_insane,-,-19483,0,20867,29,3.38,true,ok,scatter
+hw0185,ramp,lux:mesh32.pg_com_ramp_insane,-,8641,0,-19084,341,1.30,true,ok,scatter
+hw0186,ramp,lux:mesh32.pg_qc_RoofRamp,-,-15124,0,-22774,115,3.70,true,ok,scatter
+hw0187,ramp,lux:mesh32.pg_com_ramp_lo,-,22541,0,7553,291,3.20,true,ok,scatter
+hw0188,ramp,lux:mesh32.pg_com_ramp_high,-,-23072,0,-21923,319,2.41,true,ok,scatter
+hw0189,ramp,lux:mesh32.pg_qc_RoofRamp,-,-11191,0,-9234,197,1.03,true,ok,scatter
+hw0190,ramp,lux:mesh32.pg_com_ramp_insane,-,22542,0,-22588,334,2.77,true,ok,scatter
+hw0191,ramp,lux:mesh32.pg_qc_RoofRamp,-,-13232,0,-23625,31,3.77,true,ok,scatter
+hw0192,ramp,lux:mesh32.pg_com_ramp_insane,-,14408,0,17684,242,4.45,true,ok,scatter
+hw0193,ramp,lux:mesh32.pg_com_ramp_insane,-,-7877,0,-7438,86,2.88,true,ok,scatter
+hw0194,ramp,lux:mesh32.pg_com_ramp_med,-,3918,0,-7873,115,2.85,true,ok,scatter
+hw0195,ramp,lux:mesh32.pg_qc_RoofRamp,-,-10566,0,-16010,187,4.09,true,ok,scatter
+hw0196,ramp,lux:mesh32.pg_qc_RoofRamp,-,-7079,0,1725,119,4.52,true,ok,scatter
+hw0197,ramp,lux:mesh32.pg_wa_ramp1,-,-6568,0,-5860,168,1.51,true,ok,scatter
+hw0198,ramp,lux:mesh32.pg_com_ramp_lo,-,3245,0,12127,238,4.48,true,ok,scatter
+hw0199,prop,lux:mesh32.pg_wa_motorboat_green,-,4828,0,19339,289,1.76,true,ok,prop from wa
+hw0200,prop,lux:mesh32.pg_hk_boomboat,-,-1582,0,22714,263,0.86,true,ok,prop from hk
+hw0201,prop,lux:mesh32.pg_du_JetJumbo,-,-6033,0,15379,156,1.57,false,ok,prop from du
+hw0202,prop,lux:mesh32.pg_hk_junk1,-,9840,0,-20456,235,3.00,true,ok,prop from hk
+hw0203,prop,lux:mesh32.pg_qc_dock_ramp,-,-18630,0,23859,0,1.42,true,ok,prop from qc
+hw0204,prop,lux:mesh32.pg_qc_houseboat,-,-21467,0,18194,119,2.44,true,ok,prop from qc
+hw0205,prop,lux:mesh32.pg_hk_jetplane01,-,8343,0,-22518,249,2.91,true,ok,prop from hk
+hw0206,prop,lux:mesh32.pg_lo_ContainBlu,-,11689,0,22255,165,1.63,true,ok,prop from du
+hw0207,prop,lux:mesh32.pg_wa_baloons,-,2024,0,-1582,63,1.14,true,ok,prop from wa
+hw0208,prop,lux:mesh32.pg_du_FerrisWheelON,-,19988,0,199,235,0.91,true,ok,prop from rs
+hw0209,prop,lux:mesh32.pg_hk_boomboat,-,-5517,0,2696,349,1.38,true,ok,prop from hk
+hw0210,prop,lux:mesh32.pg_wa_Claw,-,-21995,0,-9354,12,1.00,true,ok,prop from wa
+hw0211,prop,lux:mesh32.pg_hk_paperdoors00,-,20411,0,-4612,246,1.75,true,ok,prop from hk
+hw0212,prop,lux:mesh32.pg_lo_van,-,-4281,0,16926,155,3.00,true,ok,prop from lo
+hw0213,prop,lux:mesh32.pg_wa_balloon_e,-,-502,0,1902,230,0.83,true,ok,prop from qc
+hw0214,prop,lux:mesh32.pg_wa_balloon_c,-,-11525,0,-20556,264,0.86,true,ok,prop from qc
+hw0215,prop,lux:mesh32.pg_qc_slide06,-,-23038,0,-21959,276,1.46,false,ok,prop from qc
+hw0216,prop,lux:mesh32.pg_hk_boomboat,-,-18352,0,10150,147,0.83,true,ok,prop from hk
+hw0217,prop,lux:mesh32.pg_hk_jetplane01,-,19904,0,-23252,156,1.67,true,ok,prop from hk
+hw0218,prop,lux:mesh32.pg_qc_blue_raft,-,-8388,0,138,52,2.33,true,ok,prop from qc
+hw0219,prop,lux:mesh32.pg_wa_Big_sawblade01,-,7593,0,6996,344,1.31,true,ok,prop from wa
+hw0220,prop,lux:mesh32.pg_qc_slide04,-,23450,0,1364,107,1.38,false,ok,prop from qc
+hw0221,prop,lux:mesh32.pg_hk_tiltawhirl,-,13694,0,-16016,249,1.29,true,ok,prop from hk
+hw0222,prop,lux:mesh32.pg_qc_sailboat_red,-,13581,0,18295,177,1.94,true,ok,prop from qc
+hw0223,prop,lux:mesh32.pg_hk_paperdoors00,-,21809,0,17145,17,1.84,true,ok,prop from hk
+hw0224,prop,lux:mesh32.pg_tf_Spike_Block,-,20043,0,5747,77,1.38,true,ok,prop from tf
+hw0225,prop,lux:mesh32.pg_tf_SpikePole,-,14655,0,20029,98,0.82,true,ok,prop from tf
+hw0226,prop,lux:mesh32.pg_tl_BoatRusty,-,13852,0,10490,46,1.01,true,ok,prop from rt
+hw0227,prop,lux:mesh32.pg_hk_jetplane01,-,19360,0,-22238,219,2.12,true,ok,prop from hk
+hw0228,prop,lux:mesh32.pg_wa_log_burned,-,695,0,-19278,232,2.06,true,ok,prop from wa
+hw0229,prop,lux:mesh32.pg_lo_TheEye,-,10967,0,-2404,54,1.18,true,ok,prop from lo
+hw0230,prop,lux:mesh32.pg_wa_log_burned,-,6027,0,-876,177,2.39,true,ok,prop from wa
+hw0231,prop,lux:mesh32.pg_du_FerrisWheelOFF,-,5343,0,-6874,290,0.94,true,ok,prop from du
+hw0232,prop,lux:mesh32.pg_hk_jetplane01,-,340,0,8192,333,2.84,true,ok,prop from hk
+hw0233,prop,lux:mesh32.pg_tf_SpikePole,-,2935,0,-6616,21,0.90,true,ok,prop from tf
+hw0234,prop,lux:mesh32.pg_wa_balloon_e,-,16639,0,-17790,103,1.38,true,ok,prop from qc
+hw0235,prop,lux:mesh32.pg_lo_van,-,23387,0,-18819,212,2.25,true,ok,prop from lo
+hw0236,prop,lux:mesh32.pg_du_FerrisWheelON,-,5505,0,-7152,347,0.87,true,ok,prop from rs
+hw0237,prop,lux:mesh32.pg_qc_PlanksBreak00,-,1893,0,23258,276,1.55,true,ok,prop from qc
+hw0238,prop,lux:mesh32.pg_hk_paperdoors00,-,-22197,0,-6921,142,2.78,true,ok,prop from hk
+hw0239,prop,lux:mesh32.pg_du_FerrisWheelOFF,-,5594,0,-17351,150,1.12,true,ok,prop from du
+hw0240,prop,lux:mesh32.pg_hk_junk1,-,20549,0,6386,312,1.90,true,ok,prop from hk
+hw0241,prop,lux:mesh32.pg_qc_sailboat_red,-,22292,0,-18501,214,2.21,true,ok,prop from qc
+hw0242,prop,lux:mesh32.pg_tl_fishboat,-,1928,0,23338,359,0.99,true,ok,prop from rt
+hw0243,prop,lux:mesh32.pg_wa_SawArm_down02,-,9065,0,-21097,32,2.68,true,ok,prop from wa
+hw0244,prop,lux:mesh32.pg_lo_TheEye,-,-14438,0,8620,248,0.89,true,ok,prop from lo
+hw0245,prop,lux:mesh32.pg_du_JetJumbo_LM,-,136,0,-22616,155,1.45,false,ok,prop from rs
+hw0246,prop,lux:mesh32.pg_hk_junk1,-,8200,0,-20588,347,2.30,true,ok,prop from hk
+hw0247,prop,lux:mesh32.pg_tf_SnakeBind,-,3525,0,5177,353,1.39,true,ok,prop from tf
+hw0248,prop,lux:mesh32.pg_qc_PlanksBreak00,-,16907,0,7987,297,1.50,true,ok,prop from qc
+hw0249,prop,lux:mesh32.pg_qc_slide04,-,3039,0,-10645,255,1.43,false,ok,prop from qc
+hw0250,prop,lux:mesh32.pg_wa_balloon_b,-,616,0,-11464,252,1.42,true,ok,prop from qc
+hw0251,prop,lux:mesh32.pg_du_JetJumbo,-,15232,0,-11080,351,0.92,false,ok,prop from du
+hw0252,prop,lux:mesh32.pg_du_FerrisWheelOFF,-,22742,0,-12307,291,1.48,true,ok,prop from du
+hw0253,prop,lux:mesh32.pg_hk_motorboat01,-,-19258,0,-7271,267,3.00,true,ok,prop from hk
+hw0254,prop,lux:mesh32.pg_qc_helicopter,-,20479,0,-22755,3,1.26,true,ok,prop from qc
+hw0255,prop,lux:mesh32.pg_wa_sawblade,-,3680,0,-5939,336,2.03,true,ok,prop from wa
+hw0256,prop,lux:mesh32.pg_qc_gas_prices,-,-2872,0,7177,237,2.60,true,ok,prop from qc
+hw0257,prop,lux:mesh32.pg_du_seamonkey,-,7746,0,2343,285,2.76,true,ok,prop from du
+hw0258,prop,lux:mesh32.pg_wa_Claw,-,7225,0,-6824,271,1.31,true,ok,prop from wa
+hw0259,prop,lux:mesh32.pg_wa_SawArm_down02,-,22012,0,-16653,297,2.15,true,ok,prop from wa
+hw0260,prop,lux:mesh32.pg_hk_paperdoors00,-,-4341,0,2044,261,2.55,true,ok,prop from hk
+hw0261,prop,lux:mesh32.pg_lo_van,-,-3883,0,-1481,132,1.76,true,ok,prop from lo
+hw0262,prop,lux:mesh32.pg_qc_rock04,-,9096,0,13914,243,2.52,true,ok,prop from qc
+hw0263,prop,lux:mesh32.pg_du_seamonkey,-,-15350,0,-13945,58,3.00,true,ok,prop from du
+hw0264,prop,lux:mesh32.pg_wa_balloon_e,-,-22933,0,8345,319,1.25,true,ok,prop from qc
+hw0265,prop,lux:mesh32.pg_qc_spaceship,-,-8885,0,-20844,128,1.33,true,ok,prop from qc
+hw0266,prop,lux:mesh32.pg_hk_tiltawhirl,-,11801,0,-18833,349,1.39,true,ok,prop from hk
+hw0267,prop,lux:mesh32.pg_du_FerrisWheelON,-,18138,0,-14846,233,0.89,true,ok,prop from rs
+hw0268,prop,lux:mesh32.pg_wa_motorboat_green,-,-19013,0,-11584,51,2.62,true,ok,prop from wa
+hw0269,prop,lux:mesh32.pg_hk_junk1,-,16181,0,-21220,241,1.92,true,ok,prop from hk
+hw0270,prop,lux:mesh32.pg_hk_ferrishwheel,-,15719,0,-8395,167,1.48,true,ok,prop from hk
+hw0271,prop,lux:mesh32.pg_lo_TheEye,-,-22003,0,17125,52,1.52,true,ok,prop from lo
+hw0272,prop,lux:mesh32.pg_qc_sailboat_red,-,-23823,0,-9047,231,2.24,true,ok,prop from qc
+hw0273,prop,lux:mesh32.pg_du_sailboat_blue,-,2800,0,22615,328,2.19,true,ok,prop from du
+hw0274,prop,lux:mesh32.pg_hk_Cboat01,-,-6571,0,8030,308,2.49,true,ok,prop from hk
+hw0275,prop,lux:mesh32.pg_tl_fishboat,-,-18386,0,-7929,149,1.31,true,ok,prop from rt
+hw0276,prop,lux:mesh32.pg_tl_fishboat,-,-7877,0,-19903,193,1.46,true,ok,prop from rt
+hw0277,prop,lux:mesh32.pg_wa_Claw,-,13870,0,20040,184,0.85,true,ok,prop from wa
+hw0278,prop,lux:mesh32.pg_hk_tiltawhirl,-,14242,0,-18935,40,1.05,true,ok,prop from hk
+hw0279,prop,lux:mesh32.pg_tl_BoatRusty,-,-15554,0,-13606,149,1.03,true,ok,prop from rt
+hw0280,prop,lux:mesh32.pg_hk_tiltawhirl,-,477,0,23456,74,1.25,true,ok,prop from hk
+hw0281,prop,lux:mesh32.pg_qc_spaceship,-,21851,0,5618,132,1.04,true,ok,prop from qc
+hw0282,prop,lux:mesh32.pg_qc_slide01,-,-16585,0,-187,198,1.11,false,ok,prop from qc
+hw0283,prop,lux:mesh32.pg_hk_jetplane01,-,-3659,0,5139,121,3.00,true,ok,prop from hk
+hw0284,prop,lux:mesh32.pg_wa_Big_sawblade01,-,-18802,0,-19413,101,1.15,true,ok,prop from wa
+hw0285,prop,lux:mesh32.pg_wa_Claw,-,4475,0,18434,145,1.51,true,ok,prop from wa
+hw0286,prop,lux:mesh32.pg_tl_PlankFlat,-,-4814,0,22007,153,2.37,true,ok,prop from rt
+hw0287,prop,lux:mesh32.pg_wa_SawArm_down02,-,-9891,0,4207,46,2.75,true,ok,prop from wa
+hw0288,prop,lux:mesh32.pg_wa_sawblade,-,18904,0,-1276,98,2.33,true,ok,prop from wa
+hw0289,prop,lux:mesh32.pg_qc_van,-,-20265,0,-22523,9,2.65,false,ok,prop from qc
+hw0290,prop,lux:mesh32.pg_lo_ContainBlu,-,900,0,10354,176,1.92,true,ok,prop from du
+hw0291,prop,lux:mesh32.pg_hk_junk1,-,-12101,0,-12672,61,1.82,true,ok,prop from hk
+hw0292,prop,lux:mesh32.pg_du_JetJumbo_LM,-,-11276,0,21414,261,1.33,false,ok,prop from rs
+hw0293,prop,lux:mesh32.pg_hk_boomboat,-,-17911,0,17390,70,0.88,true,ok,prop from hk
+hw0294,prop,lux:mesh32.pg_wa_baloons,-,15422,0,10532,112,0.99,true,ok,prop from wa
+hw0295,prop,lux:mesh32.pg_wa_balloon_b,-,-5167,0,-20936,258,1.49,true,ok,prop from qc
+hw0296,prop,lux:mesh32.pg_qc_rescuePolice,-,-439,0,-8770,5,2.91,true,ok,prop from qc
+hw0297,prop,lux:mesh32.pg_qc_spaceship,-,-11412,0,-592,173,1.21,true,ok,prop from qc
+hw0298,prop,lux:mesh32.pg_hk_tiltawhirl,-,-8116,0,20187,177,1.51,true,ok,prop from hk
+hw0299,prop,lux:mesh32.pg_qc_PlanksBreak00,-,629,0,17031,112,1.08,true,ok,prop from qc
+hw0300,prop,lux:mesh32.pg_com_H20SignSpin,-,2391,0,7211,23,1.04,true,ok,prop from du
+hw0301,prop,lux:mesh32.pg_wa_balloon_b,-,-113,0,-20431,306,1.52,true,ok,prop from qc
+hw0302,prop,lux:mesh32.pg_qc_PlanksBreak00,-,-14968,0,18644,304,1.47,true,ok,prop from qc
+hw0303,prop,lux:mesh32.pg_du_JetJumbo_LM,-,19787,0,14480,88,1.35,false,ok,prop from rs
+hw0304,prop,lux:mesh32.pg_tl_PlankFlat,-,20452,0,2982,184,2.55,true,ok,prop from rt
+hw0305,prop,lux:mesh32.pg_lo_TheEye,-,-19575,0,22290,98,1.27,true,ok,prop from lo
+hw0306,prop,lux:mesh32.pg_hk_ferrishwheel,-,14102,0,9377,198,1.35,true,ok,prop from hk
+hw0307,prop,lux:mesh32.pg_hk_ferrishwheel,-,4675,0,-8745,350,1.39,true,ok,prop from hk
+hw0308,prop,lux:mesh32.pg_qc_gas_prices,-,12473,0,14618,102,2.35,true,ok,prop from qc
+hw0309,prop,lux:mesh32.pg_qc_PlankFlat,-,-15303,0,12337,270,2.87,true,ok,prop from hk
+hw0310,prop,lux:mesh32.pg_wa_SawArm02,-,-3584,0,18508,340,2.98,true,ok,prop from wa
+hw0311,prop,lux:mesh32.pg_lo_ContainBlu,-,-12727,0,-18387,144,1.83,true,ok,prop from du
+hw0312,prop,lux:mesh32.pg_hk_rocketride,-,9264,0,22088,283,1.35,true,ok,prop from hk
+hw0313,prop,lux:mesh32.pg_hk_Cboat01,-,9397,0,6400,161,2.31,true,ok,prop from hk
+hw0314,prop,lux:mesh32.pg_tl_PontoonPlane,-,-16752,0,-16576,71,1.23,true,ok,prop from rt
+hw0315,prop,lux:mesh32.pg_qc_spaceship,-,21180,0,4507,136,1.24,true,ok,prop from qc
+hw0316,prop,lux:mesh32.pg_tl_PontoonPlane,-,18507,0,-13164,231,1.08,true,ok,prop from rt
+hw0317,prop,lux:mesh32.pg_du_seamonkey,-,-10046,0,-1052,166,1.85,true,ok,prop from du
+hw0318,prop,lux:mesh32.pg_hk_tiltawhirl,-,12613,0,-15002,252,1.21,true,ok,prop from hk
+hw0319,prop,lux:mesh32.pg_lo_TheEye,-,21531,0,-22127,320,1.36,true,ok,prop from lo
+hw0320,prop,lux:mesh32.pg_hk_jetplane01,-,2405,0,-3824,114,2.03,true,ok,prop from hk
+hw0321,prop,lux:mesh32.pg_hk_tiltawhirl,-,1794,0,4689,256,1.41,true,ok,prop from hk
+hw0322,prop,lux:mesh32.pg_du_sailboat_blue,-,5641,0,-16431,225,3.00,true,ok,prop from du
+hw0323,prop,lux:mesh32.pg_qc_blue_raft,-,-17300,0,-2654,182,2.69,true,ok,prop from qc
+hw0324,prop,lux:mesh32.tl_com_LapCounter,-,18005,0,19462,359,1.33,true,ok,prop from du
+hw0325,prop,lux:mesh32.pg_tf_WallBroken00,-,-9764,0,-1218,19,3.00,true,ok,prop from tf
+hw0326,prop,lux:mesh32.pg_hk_Cboat01,-,-2268,0,2892,16,2.28,true,ok,prop from hk
+hw0327,prop,lux:mesh32.pg_qc_Privy,-,-9812,0,-13971,21,2.82,true,ok,prop from qc
+hw0328,prop,lux:mesh32.pg_wa_balloon_c,-,-11423,0,14417,160,1.26,true,ok,prop from qc
+hw0329,prop,lux:mesh32.pg_qc_houseboat,-,-18351,0,-20342,119,3.00,true,ok,prop from qc
+hw0330,prop,lux:mesh32.pg_wa_baloons,-,20980,0,19340,358,1.10,true,ok,prop from wa
+hw0331,prop,lux:mesh32.pg_du_seamonkey,-,-9205,0,14565,339,1.74,true,ok,prop from du
+hw0332,prop,lux:mesh32.pg_qc_houseboat,-,-5517,0,-8978,87,2.79,true,ok,prop from qc
+hw0333,prop,lux:mesh32.pg_tl_fishboat,-,-21545,0,9950,15,1.17,true,ok,prop from rt
+hw0334,prop,lux:mesh32.pg_wa_balloon_c,-,-13949,0,21597,171,1.55,true,ok,prop from qc
+hw0335,prop,lux:mesh32.pg_du_seamonkey,-,20879,0,-4647,93,2.87,true,ok,prop from du
+hw0336,prop,lux:mesh32.pg_tl_PlankFlat,-,10821,0,768,52,2.00,true,ok,prop from rt
+hw0337,prop,lux:mesh32.pg_qc_turbo_prop,-,4598,0,-471,34,0.97,true,ok,prop from qc
+hw0338,prop,lux:mesh32.pg_hk_tiltawhirl,-,18019,0,1996,189,1.16,true,ok,prop from hk
+hw0339,prop,lux:mesh32.pg_lo_TheEye,-,15443,0,13448,199,1.38,true,ok,prop from lo
+hw0340,prop,lux:mesh32.pg_du_JetJumbo,-,-3115,0,-17700,69,0.92,false,ok,prop from du
+hw0341,prop,lux:mesh32.pg_tl_fishboat,-,-3859,0,-694,155,1.26,true,ok,prop from rt
+hw0342,prop,lux:mesh32.pg_du_seamonkey,-,-3148,0,5004,155,2.54,true,ok,prop from du
+hw0343,prop,lux:mesh32.pg_wa_Big_sawblade01,-,-17940,0,-8392,227,0.96,true,ok,prop from wa
+hw0344,prop,lux:mesh32.pg_tf_SpikePole,-,-4477,0,2929,70,1.20,true,ok,prop from tf
+hw0345,prop,lux:mesh32.pg_qc_PlanksBreak00,-,14810,0,16803,338,1.19,true,ok,prop from qc
+hw0346,prop,lux:mesh32.pg_hk_jetplane01,-,-13250,0,-23279,320,2.20,true,ok,prop from hk
+hw0347,prop,lux:mesh32.pg_qc_houseboat,-,13030,0,12834,270,2.59,true,ok,prop from qc
+hw0348,prop,lux:mesh32.pg_qc_turbo_prop,-,8843,0,-5118,194,1.38,true,ok,prop from qc
+hw0349,prop,lux:mesh32.pg_lo_finishline,-,-17590,0,-18837,180,2.15,true,ok,prop from lo
+hw0350,prop,lux:mesh32.pg_hk_rocketride,-,-4341,0,-6503,56,0.97,true,ok,prop from hk
+hw0351,prop,lux:mesh32.pg_qc_sailboat_red,-,-18165,0,-18103,320,2.88,true,ok,prop from qc
+hw0352,prop,lux:mesh32.pg_qc_blue_raft,-,-4281,0,6807,49,2.39,true,ok,prop from qc
+hw0353,prop,lux:mesh32.pg_qc_PlankFlat,-,14520,0,21180,268,1.63,true,ok,prop from hk
+hw0354,prop,lux:mesh32.pg_wa_baloons,-,7212,0,-21479,288,1.41,true,ok,prop from wa
+hw0355,prop,lux:mesh32.pg_hk_paperdoors00,-,13050,0,-22854,46,1.62,true,ok,prop from hk
+hw0356,prop,lux:mesh32.pg_wa_balloon_e,-,22474,0,-15609,232,1.48,true,ok,prop from qc
+hw0357,prop,lux:mesh32.pg_wa_Big_sawblade01,-,-12620,0,13412,244,0.91,true,ok,prop from wa
+hw0358,prop,lux:mesh32.pg_hk_Cboat01,-,19724,0,-23534,278,1.91,true,ok,prop from hk
+hw0359,prop,lux:mesh32.pg_du_JetJumbo_LM,-,4004,0,-8826,310,1.22,false,ok,prop from rs
+hw0360,prop,lux:mesh32.pg_tf_WallBroken00,-,18194,0,-3051,97,2.27,true,ok,prop from tf
+hw0361,prop,lux:mesh32.pg_hk_rocketride,-,-2707,0,996,234,1.44,true,ok,prop from hk
+hw0362,prop,lux:mesh32.pg_hk_junk1,-,-16509,0,-23317,116,2.04,true,ok,prop from hk
+hw0363,prop,lux:mesh32.pg_qc_DynoBarge,-,-20942,0,-7580,291,2.58,true,ok,prop from qc
+hw0364,prop,lux:mesh32.pg_qc_gas_prices,-,5774,0,6285,161,2.26,true,ok,prop from qc
+hw0365,prop,lux:mesh32.pg_qc_blue_raft,-,18695,0,2772,81,2.39,true,ok,prop from qc
+hw0366,prop,lux:mesh32.pg_du_FerrisWheelOFF,-,-18906,0,-8543,338,1.42,true,ok,prop from du
+hw0367,prop,lux:mesh32.pg_wa_SawArm_down02,-,-23576,0,15301,191,2.79,true,ok,prop from wa
+hw0368,prop,lux:mesh32.pg_com_H20SignSpin,-,-1129,0,2366,67,1.43,true,ok,prop from du
+hw0369,prop,lux:mesh32.pg_hk_tiltawhirl,-,18168,0,22643,227,1.19,true,ok,prop from hk
+hw0370,prop,lux:mesh32.pg_wa_motorboat_green,-,10264,0,-804,198,2.77,true,ok,prop from wa
+hw0371,prop,lux:mesh32.pg_qc_DynoBarge,-,-14704,0,18763,268,2.00,true,ok,prop from qc
+hw0372,prop,lux:mesh32.pg_wa_Claw,-,-20577,0,22350,10,0.86,true,ok,prop from wa
+hw0373,prop,lux:mesh32.pg_hk_paperdoors00,-,-14306,0,20476,4,3.00,true,ok,prop from hk
+hw0374,prop,lux:mesh32.pg_qc_slide04,-,-23490,0,11717,278,0.81,false,ok,prop from qc
+hw0375,prop,lux:mesh32.pg_qc_turbo_prop,-,-21358,0,13192,22,1.32,true,ok,prop from qc
+hw0376,prop,lux:mesh32.pg_qc_turbo_prop,-,20848,0,-18140,291,1.35,true,ok,prop from qc
+hw0377,prop,lux:mesh32.pg_wa_Claw,-,-16977,0,12200,269,1.26,true,ok,prop from wa
+hw0378,prop,lux:mesh32.pg_du_FerrisWheelOFF,-,-18444,0,13022,239,1.14,true,ok,prop from du
+hw0379,prop,lux:mesh32.pg_hk_rocketride,-,23581,0,-1635,49,1.06,true,ok,prop from hk
+hw0380,prop,lux:mesh32.pg_wa_balloon_b,-,22412,0,-15908,211,1.38,true,ok,prop from qc
+hw0381,prop,lux:mesh32.pg_com_H20SignSpin,-,19749,0,-888,187,1.53,true,ok,prop from du
+hw0382,prop,lux:mesh32.pg_qc_blue_raft,-,20167,0,-11632,338,2.51,true,ok,prop from qc
+hw0383,prop,lux:mesh32.pg_qc_PlankAngle,-,-4791,0,-21779,82,2.48,true,ok,prop from du
+hw0384,prop,lux:mesh32.pg_hk_Cboat01,-,17562,0,14547,287,2.46,true,ok,prop from hk
+hw0385,prop,lux:mesh32.pg_wa_balloon_e,-,22011,0,18518,45,1.53,true,ok,prop from qc
+hw0386,prop,lux:mesh32.pg_wa_balloon_b,-,-10634,0,-17452,252,1.03,true,ok,prop from qc
+hw0387,prop,lux:mesh32.pg_hk_ferrishwheel,-,-21934,0,21074,263,1.03,true,ok,prop from hk
+hw0388,prop,lux:mesh32.pg_lo_van,-,11107,0,22483,79,1.91,true,ok,prop from lo
+hw0389,prop,lux:mesh32.pg_wa_Claw,-,22939,0,14372,87,0.91,true,ok,prop from wa
+hw0390,prop,lux:mesh32.pg_lo_ContainBlu,-,448,0,21865,189,2.93,true,ok,prop from du
+hw0391,prop,lux:mesh32.pg_hk_junk1,-,3219,0,4186,117,2.95,true,ok,prop from hk
+hw0392,prop,lux:mesh32.pg_qc_slide04,-,-20302,0,883,329,1.09,false,ok,prop from qc
+hw0393,prop,lux:mesh32.pg_qc_helicopter,-,5558,0,-6536,198,1.54,true,ok,prop from qc
+hw0394,prop,lux:mesh32.pg_lo_finishline,-,-22796,0,19417,338,1.90,true,ok,prop from lo
+hw0395,prop,lux:mesh32.pg_wa_motorboat_green,-,-22566,0,-17013,326,2.73,true,ok,prop from wa
+hw0396,prop,lux:mesh32.pg_wa_sawblade,-,-15547,0,-13495,310,2.91,true,ok,prop from wa
+hw0397,prop,lux:mesh32.pg_hk_motorboat01,-,14121,0,13965,52,2.88,true,ok,prop from hk
+hw0398,prop,lux:mesh32.pg_qc_blue_raft,-,10705,0,-1308,274,1.78,true,ok,prop from qc
+hw0399,prop,lux:mesh32.pg_qc_slide01,-,-9246,0,-21039,225,1.52,false,ok,prop from qc
+hw0400,prop,lux:mesh32.pg_wa_log_burned,-,10952,0,14004,244,3.00,true,ok,prop from wa
+hw0401,prop,lux:mesh32.pg_wa_balloon_c,-,-7422,0,5947,194,0.85,true,ok,prop from qc
+hw0402,prop,lux:mesh32.pg_tf_WallBroken00,-,23369,0,-1097,158,2.46,true,ok,prop from tf
+hw0403,prop,lux:mesh32.pg_wa_balloon_b,-,22012,0,6588,110,0.96,true,ok,prop from qc
+hw0404,prop,lux:mesh32.tl_com_LapCounter,-,4051,0,-17870,360,1.23,true,ok,prop from du
+hw0405,prop,lux:mesh32.pg_hk_paperdoors00,-,-6765,0,-1088,248,3.00,true,ok,prop from hk
+hw0406,prop,lux:mesh32.pg_tf_SpikePole,-,23795,0,-2259,197,1.23,true,ok,prop from tf
+hw0407,prop,lux:mesh32.pg_tf_SnakeBind,-,-14617,0,-23660,309,1.23,true,ok,prop from tf
+hw0408,prop,lux:mesh32.pg_qc_DynoBarge,-,18392,0,-18411,281,2.78,true,ok,prop from qc
+hw0409,prop,lux:mesh32.pg_wa_SawArm02,-,8704,0,14450,118,2.85,true,ok,prop from wa
+hw0410,prop,lux:mesh32.pg_wa_balloon_e,-,-18141,0,-1092,317,1.43,true,ok,prop from qc
+hw0411,prop,lux:mesh32.pg_wa_balloon_b,-,2881,0,5781,201,1.21,true,ok,prop from qc
+hw0412,prop,lux:mesh32.pg_qc_sailboat_red,-,-7288,0,4586,158,2.13,true,ok,prop from qc
+hw0413,prop,lux:mesh32.pg_qc_PlankAngle,-,20983,0,22866,124,1.63,true,ok,prop from du
+hw0414,prop,lux:mesh32.pg_wa_balloon_d,-,23795,0,-596,140,0.96,true,ok,prop from qc
+hw0415,prop,lux:mesh32.pg_hk_paperdoors00,-,23425,0,13889,113,2.67,true,ok,prop from hk
+hw0416,prop,lux:mesh32.pg_wa_balloon_c,-,-21038,0,-17444,92,1.46,true,ok,prop from qc
+hw0417,prop,lux:mesh32.pg_hk_Cboat01,-,19443,0,-6036,124,2.61,true,ok,prop from hk
+hw0418,prop,lux:mesh32.pg_du_seamonkey,-,-1271,0,-16520,344,1.69,true,ok,prop from du
+hw0419,booster,-,red,-15892,30,1149,0,1.00,false,ok,boost
+hw0420,booster,-,blue,2782,30,11977,0,1.00,false,ok,boost
+hw0421,booster,-,blue,-610,30,-15171,0,1.00,false,ok,boost
+hw0422,booster,-,red,-9879,30,11561,0,1.00,false,ok,boost
+hw0423,booster,-,blue,10967,30,-7748,0,1.00,false,ok,boost
+hw0424,booster,-,blue,12069,30,2303,0,1.00,false,ok,boost
+hw0425,booster,-,blue,8458,30,-11970,0,1.00,false,ok,boost
+hw0426,booster,-,gold,-15889,30,-1076,0,1.00,false,ok,boost
+hw0427,booster,-,red,11017,30,-11184,0,1.00,false,ok,boost
+hw0428,booster,-,red,4812,30,-14088,0,1.00,false,ok,boost
+hw0429,booster,-,blue,12351,30,8352,0,1.00,false,ok,boost
+hw0430,booster,-,gold,-12351,30,6768,0,1.00,false,ok,boost
+hw0431,booster,-,blue,-11794,30,10552,0,1.00,false,ok,boost
+hw0432,booster,-,gold,-11507,30,-7569,0,1.00,false,ok,boost
+hw0433,booster,-,gold,-6409,30,12777,0,1.00,false,ok,boost
+hw0434,booster,-,red,-2391,30,11899,0,1.00,false,ok,boost
+hw0435,booster,-,red,14138,30,-43,0,1.00,false,ok,boost
+hw0436,booster,-,blue,-13376,30,-748,0,1.00,false,ok,boost
+hw0437,booster,-,red,-13395,30,-5386,0,1.00,false,ok,boost
+hw0438,booster,-,red,-391,30,-15305,0,1.00,false,ok,boost
+hw0439,booster,-,red,1502,30,-12320,0,1.00,false,ok,boost
+hw0440,booster,-,blue,-12037,30,2348,0,1.00,false,ok,boost
+hw0441,booster,-,gold,675,30,-12937,0,1.00,false,ok,boost
+hw0442,booster,-,red,-2559,30,13004,0,1.00,false,ok,boost
+hw0443,booster,-,blue,402,30,13534,0,1.00,false,ok,boost
+hw0444,booster,-,blue,11423,30,-10114,0,1.00,false,ok,boost
+hw0445,booster,-,red,1577,30,14356,0,1.00,false,ok,boost
+hw0446,booster,-,red,14100,30,-1740,0,1.00,false,ok,boost
+hw0447,booster,-,blue,-314,30,-13979,0,1.00,false,ok,boost
+hw0448,booster,-,blue,-13824,30,-7223,0,1.00,false,ok,boost
+hw0449,booster,-,red,-12629,30,-7790,0,1.00,false,ok,boost
+hw0450,booster,-,blue,10846,30,-9434,0,1.00,false,ok,boost
+hw0451,booster,-,blue,-7795,30,-12434,0,1.00,false,ok,boost
+hw0452,booster,-,red,-2060,30,-15433,0,1.00,false,ok,boost
+hw0453,booster,-,red,-5883,30,13592,0,1.00,false,ok,boost
+hw0454,booster,-,blue,6995,30,-9980,0,1.00,false,ok,boost
+hw0455,booster,-,red,3801,30,-13288,0,1.00,false,ok,boost
+hw0456,booster,-,blue,-14331,30,5449,0,1.00,false,ok,boost
+hw0457,booster,-,blue,-13006,30,-3607,0,1.00,false,ok,boost
+hw0458,booster,-,blue,-8408,30,10397,0,1.00,false,ok,boost
+hw0459,booster,-,blue,-14412,30,6238,0,1.00,false,ok,boost
+hw0460,booster,-,blue,-6205,30,-12773,0,1.00,false,ok,boost
+hw0461,booster,-,gold,4269,30,-12168,0,1.00,false,ok,boost
+hw0462,booster,-,blue,-3067,30,-14718,0,1.00,false,ok,boost
+hw0463,booster,-,blue,1611,30,-15617,0,1.00,false,ok,boost
+hw0464,booster,-,red,15475,30,1505,0,1.00,false,ok,boost
+hw0465,booster,-,blue,-15424,30,-14,0,1.00,false,ok,boost
+hw0466,booster,-,red,-12963,30,217,0,1.00,false,ok,boost
+hw0467,booster,-,red,-13293,30,3625,0,1.00,false,ok,boost
+hw0468,booster,-,red,11019,30,9311,0,1.00,false,ok,boost
+hw0469,booster,-,blue,5296,30,-8424,0,1.00,false,ok,boost
+hw0470,booster,-,red,6639,30,-1698,0,1.00,false,ok,boost
+hw0471,booster,-,gold,10806,30,13396,0,1.00,false,ok,boost
+hw0472,booster,-,blue,18332,30,-21220,0,1.00,false,ok,boost
+hw0473,booster,-,blue,17347,30,21844,0,1.00,false,ok,boost
+hw0474,booster,-,gold,23468,30,14633,0,1.00,false,ok,boost
+hw0475,booster,-,gold,-7939,30,-23996,0,1.00,false,ok,boost
+hw0476,booster,-,red,-1054,30,-7941,0,1.00,false,ok,boost
+hw0477,booster,-,blue,-1476,30,-466,0,1.00,false,ok,boost
+hw0478,booster,-,red,1230,30,-23210,0,1.00,false,ok,boost
+hw0479,booster,-,blue,-23924,30,3384,0,1.00,false,ok,boost
+hw0480,booster,-,gold,-7027,30,-23106,0,1.00,false,ok,boost
+hw0481,booster,-,blue,20468,30,-13652,0,1.00,false,ok,boost
+hw0482,booster,-,blue,22988,30,-6747,0,1.00,false,ok,boost
+hw0483,booster,-,red,-17006,30,-4604,0,1.00,false,ok,boost
+hw0484,booster,-,red,-16628,30,16840,0,1.00,false,ok,boost
+hw0485,booster,-,red,5526,30,11211,0,1.00,false,ok,boost
+hw0486,booster,-,red,-5029,30,16229,0,1.00,false,ok,boost
+hw0487,booster,-,blue,-22974,30,23565,0,1.00,false,ok,boost
+hw0488,booster,-,red,-22716,30,-20684,0,1.00,false,ok,boost
+hw0489,booster,-,blue,20503,30,2894,0,1.00,false,ok,boost
+hw0490,booster,-,gold,-20838,30,2831,0,1.00,false,ok,boost
+hw0491,booster,-,gold,-16061,30,-19672,0,1.00,false,ok,boost
+hw0492,booster,-,gold,-6223,30,20147,0,1.00,false,ok,boost
+hw0493,booster,-,gold,22140,30,5879,0,1.00,false,ok,boost
+hw0494,booster,-,blue,-5969,30,18774,0,1.00,false,ok,boost
+hw0495,booster,-,blue,-16906,30,7914,0,1.00,false,ok,boost
+hw0496,booster,-,blue,-11152,30,-232,0,1.00,false,ok,boost
+hw0497,booster,-,blue,-21822,30,-7532,0,1.00,false,ok,boost
+hw0498,booster,-,blue,1640,30,-17910,0,1.00,false,ok,boost
+hw0499,booster,-,blue,3380,30,-6290,0,1.00,false,ok,boost
+hw0500,booster,-,red,-3521,30,17207,0,1.00,false,ok,boost
+hw0501,booster,-,gold,-18422,30,-17442,0,1.00,false,ok,boost
+hw0502,booster,-,gold,14673,30,-5461,0,1.00,false,ok,boost
+hw0503,booster,-,red,6319,30,5382,0,1.00,false,ok,boost
+hw0504,booster,-,blue,-3780,30,-10077,0,1.00,false,ok,boost
+hw0505,booster,-,blue,-6994,30,9815,0,1.00,false,ok,boost
+hw0506,booster,-,blue,-16884,30,-10992,0,1.00,false,ok,boost
+hw0507,booster,-,blue,-14978,30,21167,0,1.00,false,ok,boost
+hw0508,booster,-,red,9677,30,10787,0,1.00,false,ok,boost

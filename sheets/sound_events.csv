@@ -1,0 +1,24 @@
+id,global,sounddef,status,description
+@types,ref:h2_globalsounds,ref:h2_sounddefs,status,str
+countdown,3 2 1 Go,-,ok,Race start countdown voice
+boost_pickup,Booster Collected,-,ok,Boost pickup collected
+super_pickup,SBoosters Online,-,ok,Gold (super) boost pickup collected
+checkpoint,Checkpoint,-,ok,Checkpoint passed - time extended
+checkpoint_low,Checkpoint Time Low,-,ok,Arcade timer under 10 seconds
+final_lap,Final Lap,-,ok,Player starts the last lap
+finish,Finish,-,ok,Player crosses the finish line
+finish_first_music,"Finish First Music ",-,ok,Music sting when the player wins
+finish_music,Finish Not First Music,-,ok,Music sting when the player finishes but not first
+time_up,Did Not Finish,-,ok,Arcade timer ran out
+wipeout,Non Fatal Wipeout,com_hull_wipeouts_med,ok,Player wipes out
+hull_impact,Hull Impact Crunch,-,ok,Boat-on-boat hit
+hullcrush_start,HullCrusher,-,ok,Hull Crusher deploys
+hullcrush_voice,Hull Crusher,-,ok,Hull Crusher announcer
+splash_large,"Large Splash ",-,ok,Landing from a big jump
+boost_low,Booster Low Warning,-,ok,Boost fuel runs low
+menu_tick,Keystroke,-,ok,Menu selection moved
+menu_choose,Choose Track,-,ok,Entering the menu
+super_start,-,com_super_rkbst_start,ok,Super (gold) rocket boost ignites
+super_end,-,com_super_rkbst_end,ok,Super rocket boost burns out
+hullcrush_attack,-,com_hullcrusher_wpn_attack,ok,Hull Crusher blasts a boat
+wall_hit,-,com_hull_vs_cement_hit,ok,Boat hits a wall hard
