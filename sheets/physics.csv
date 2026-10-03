@@ -108,3 +108,7 @@ ramp_max_slope,f32,1.0,rise per run,riptide design: a climb steeper than 45 degr
 hull_clearance,f32,5,units,riptide design: (parry courses) the boat collision cylinder starts this far above the waterline
 barrier_edge,f32,0.08,track width fraction,riptide design: (parry courses) a giant barrier whose centre lies more than this inside the corridor edges is a scripted piece and not a wall
 probe_launch,f32,400,units,riptide design: the collision check counts landings from higher than this as suspicious launches
+water_ripple_size,f32,170,units,riptide design: world size of one tile of the level's water normal map (ripples)
+water_ripple_strength,f32,0.6,normal tilt,riptide design: how strongly the two ripple layers bend the water's surface
+water_foam,f32,0.3,0-1,riptide design: foam whiteness on wave crests
+water_gloss,f32,0.12,roughness,riptide design: how mirror-like the water gets at grazing angles (fresnel)

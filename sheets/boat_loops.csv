@@ -1,0 +1,4 @@
+id,boat,clip,when,source
+@types,ref:boats,asset,enum:always|boosting|idle,str
+dutchman_octopus,frying_dutchman,lux:anim4.BA_Octopus,always,h2_boatdefs.Pirate Overlay Animation = BA_Octopus (28 tentacle bones on BG_Pirate)
+thunder_engines,thunder_blade,lux:anim4.BA_Thunder_Engines,boosting,riptide design: moves Engine_U_* bones that only exist on Thunder Blade's engine upgrade meshes

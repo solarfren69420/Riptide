@@ -240,43 +240,19 @@ fn move_props(time: Res<Time>, mut q: Query<(&mut PathMover, &mut Transform)>) {
 
 #[derive(Resource)]
 struct WaterMaterial {
-    material: Handle<StandardMaterial>,
-    mesh: Handle<Mesh>,
-    /// Rest positions of the water vertices.
-    base: Vec<[f32; 3]>,
+    /// The water (crate::water: waves, ripples and foam run on the GPU).
+    material: Handle<crate::water::WaterMat>,
     /// Animation frames (Hydro Thunder); empty = scroll the one texture instead.
     frames: Vec<Handle<Image>>,
 }
 
-fn water_flow(
-    time: Res<Time>,
-    water: Option<Res<WaterMaterial>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
-    mut meshes: ResMut<Assets<Mesh>>,
-) {
+fn water_flow(time: Res<Time>, water: Option<Res<WaterMaterial>>, mut materials: ResMut<Assets<crate::water::WaterMat>>) {
     let Some(w) = water else { return };
-    // Waves: three travelling sines; normals from their slopes.
-    if let Some(mesh) = meshes.get_mut(&w.mesh) {
-        let t = time.elapsed_secs() * phy::WAVE_SPEED;
-        let k = std::f32::consts::TAU / phy::WAVE_LENGTH.max(1.0);
-        let a = phy::WAVE_AMPLITUDE;
-        let mut pos = Vec::with_capacity(w.base.len());
-        let mut nor = Vec::with_capacity(w.base.len());
-        for p in &w.base {
-            let (x, z) = (p[0] * k, p[2] * k);
-            let (s1, s2, s3) = ((x + t).sin(), (z * 0.8 - t * 1.3).sin(), ((x + z) * 0.6 + t * 0.7).sin());
-            let (c1, c2, c3) = ((x + t).cos(), (z * 0.8 - t * 1.3).cos(), ((x + z) * 0.6 + t * 0.7).cos());
-            let y = a * (s1 + 0.6 * s2 + 0.3 * s3);
-            let dx = a * k * (c1 + 0.3 * 0.6 * c3);
-            let dz = a * k * (0.6 * 0.8 * c2 + 0.3 * 0.6 * c3);
-            pos.push([p[0], p[1] + y, p[2]]);
-            nor.push(Vec3::new(-dx, 1.0, -dz).normalize().to_array());
-        }
-        mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, pos);
-        mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, nor);
-    }
-    if let Some(m) = materials.get_mut(&w.material) {
+    if let Some(mat) = materials.get_mut(&w.material) {
         let t = time.elapsed_secs();
+        // The shader moves the waves and ripples from this clock.
+        mat.extension.params.time = t;
+        let m = &mut mat.base;
         if w.frames.is_empty() {
             m.uv_transform = bevy::math::Affine2::from_translation(Vec2::new(t * 0.013, t * 0.031));
         } else {
@@ -793,7 +769,6 @@ fn spawn_water(commands: &mut Commands, models: &mut Models, level: &H2Level, tr
     }
     let n = positions.len();
     let mut mesh = Mesh::new(PrimitiveTopology::TriangleList, RenderAssetUsages::default());
-    let base = positions.clone();
     mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, positions);
     mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, vec![[0.0, 1.0, 0.0]; n]);
     mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, uvs);
@@ -823,15 +798,20 @@ fn spawn_water(commands: &mut Commands, models: &mut Models, level: &H2Level, tr
         emissive: LinearRgba::rgb(0.004, 0.025, 0.035),
         alpha_mode: AlphaMode::Blend,
         // HT water is painted art: keep it matte so sky reflections don't wash it out.
-        normal_map_texture: normal_map,
+        // (The normal map drives the shader's ripple layers instead: crate::water.)
         perceptual_roughness: if own_color { 0.35 } else { 0.22 },
         reflectance: if own_color { 0.2 } else { 0.35 },
         double_sided: true,
         cull_mode: None,
         ..default()
     };
+    let water = models.water.add(crate::water::WaterMat {
+        base: material.clone(),
+        extension: crate::water::WaterExt { params: Default::default(), ripples: normal_map },
+    });
+    // Waterfalls are walls of water: the plain material, no flat-water waves.
     let material = models.materials.add(material);
-    commands.insert_resource(WaterMaterial { material: material.clone(), frames, mesh: mesh.clone(), base });
+    commands.insert_resource(WaterMaterial { material: water.clone(), frames });
     if !level.waterfalls.is_empty() {
         let mut positions = Vec::new();
         let mut uvs = Vec::new();
@@ -853,7 +833,7 @@ fn spawn_water(commands: &mut Commands, models: &mut Models, level: &H2Level, tr
     }
     commands.spawn((
         Mesh3d(mesh),
-        MeshMaterial3d(material),
+        MeshMaterial3d(water),
         NotShadowCaster,
         DespawnOnExit(Screen::Race),
         Name::new("water"),
@@ -2546,6 +2526,13 @@ impl Collider {
 struct ProbeState {
     prev: Option<Vec3>,
     stall: f32,
+    /// Current stall streak (s) and whether it was reported.
+    streak: f32,
+    reported: bool,
+    /// Furthest race distance, when it last grew, and whether that spot was reported.
+    far: f32,
+    far_t: f32,
+    far_reported: bool,
     launches: u32,
     peak: f32,
     max_air: f32,
@@ -2564,6 +2551,19 @@ fn probe(time: Res<Time>, clock: Res<RaceClock>, track: Res<Track>, collider: Op
         let moved = (b.pos - prev).xz().length();
         if clock.t > 2.0 && b.finished.is_none() && !b.airborne && b.control.throttle > 0.5 && moved / dt < 30.0 {
             st.stall += dt;
+            st.streak += dt;
+            if st.streak > 2.0 && !st.reported {
+                st.reported = true;
+                let touch = collider.as_ref().and_then(|c| c.walls(b.pos, phy::BOAT_RADIUS * b.info.scale.min(1.3), b.pos.y + 10.0));
+                info!(
+                    "STALL at {:.0} {:.0} {:.0} seg {} s {:.2} u {:.2} water {:.0} floor {:.0} wall {:?} speed {:.0} heading {:.2} forward {:?}",
+                    b.pos.x, b.pos.y, b.pos.z, b.tp.seg, b.tp.s, b.tp.u, b.tp.water, b.pos.y - b.tp.water,
+                    touch.map(|(_, n)| n), b.speed, b.yaw, b.tp.forward
+                );
+            }
+        } else if moved / dt > 60.0 {
+            st.streak = 0.0;
+            st.reported = false;
         }
         if let Some(col) = &collider {
             if moved > 1.0 && col.crosses_wall(prev + Vec3::Y * 12.0, b.pos + Vec3::Y * 12.0) {
@@ -2581,6 +2581,20 @@ fn probe(time: Res<Time>, clock: Res<RaceClock>, track: Res<Track>, collider: Op
         st.peak = 0.0;
     }
     st.best = st.best.max(track.race_distance(b.lap, b.tp.progress) / race_length(&track).max(1.0) * 100.0);
+    let d = track.race_distance(b.lap, b.tp.progress);
+    if d > st.far + 200.0 {
+        st.far = d;
+        st.far_t = clock.t;
+        st.far_reported = false;
+    } else if clock.t - st.far_t > 8.0 && !st.far_reported && b.finished.is_none() && clock.t > 2.0 {
+        st.far_reported = true;
+        let touch = collider.as_ref().and_then(|c| c.walls(b.pos, phy::BOAT_RADIUS * b.info.scale.min(1.3), b.pos.y + 10.0));
+        info!(
+            "STUCK at {:.0} {:.0} {:.0} seg {} s {:.2} u {:.2} water {:.0} above {:.0} wall {:?} speed {:.0} air {} forward {:?}",
+            b.pos.x, b.pos.y, b.pos.z, b.tp.seg, b.tp.s, b.tp.u, b.tp.water, b.pos.y - b.tp.water,
+            touch.map(|(_, n)| n), b.speed, b.airborne, b.tp.forward
+        );
+    }
     st.prev = Some(b.pos);
     st.frame += 1;
     if st.frame % 20 == 0 {

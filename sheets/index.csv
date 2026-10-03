@@ -31,3 +31,4 @@ h2_rocket_flames,content,game/h2_rocket_flames.csv,H2Overdrive CRocketFlameDef: 
 h2_bolts,content,game/h2_bolts.csv,H2Overdrive CSBoltDef lightning (data.global_bolts): Hull Crusher aura and zaps
 hackworld,content,hackworld.csv,Hackworld sandbox layout: H2 ramps / props from every level / boosts (riptide-tool hackworld-seed)
 h2_upgrades,content,game/h2_upgrades.csv,H2Overdrive boat attachments per upgrade axis and level (data.upgrades)
+boat_loops,content,boat_loops.csv,Looping boat clips (overlays and boost loops) and when they play

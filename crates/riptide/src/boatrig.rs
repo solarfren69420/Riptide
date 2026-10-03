@@ -8,7 +8,7 @@
 
 use crate::content::{BoatInfo, Models, Rig};
 use crate::race::Boat;
-use crate::sheets::H2_UPGRADES;
+use crate::sheets::{BoatLoopsWhen, BOATS, BOAT_LOOPS, H2_UPGRADES};
 use crate::Screen;
 use bevy::prelude::*;
 use riptide_assets::h2anim::{keys_at, Clip, FPS};
@@ -46,6 +46,13 @@ struct Bound {
 pub struct BoatRig {
     boost: Option<Bound>,
     wings: Option<Bound>,
+    /// Looping clips (`boat_loops`) and when they play.
+    loops: Vec<(Bound, BoatLoopsWhen)>,
+    /// Boat def timing: boost partition (s), boost clip speed, wing deploy / stow speeds.
+    partition: f32,
+    boost_speed: f32,
+    wing_deploy: f32,
+    wing_stow: f32,
     /// Rocket nozzles (`RKBOOST_*`), and the gold super-boost one (`RKSUPERBOOST`).
     pub nozzles: Vec<Entity>,
     pub super_nozzle: Option<Entity>,
@@ -86,9 +93,17 @@ fn spawn_bones(commands: &mut Commands, rig: &Rig, parent: Entity, base: Mat4, s
         }
     }
     for p in &rig.pieces {
-        let owner = p.bone.and_then(|b| ent.get(b as usize).copied().flatten()).unwrap_or(parent);
+        // A piece rides its bone; if that bone wasn't spawned (an attachment's copy of the
+        // channel bone or the root above it), it hangs off `parent`, placed by its bone's rest
+        // pose relative to `base`: a root at the model origin is not guaranteed (Scorpion's
+        // sits 49 units forward).
+        let (owner, place) = match p.bone.map(|b| (b, ent.get(b as usize).copied().flatten())) {
+            Some((_, Some(e))) => (e, Transform::IDENTITY),
+            Some((b, None)) => (parent, rig.bones.get(b as usize).map_or(Transform::IDENTITY, |bone| Transform::from_matrix(base.inverse() * mat(&bone.rest)))),
+            None => (parent, Transform::IDENTITY),
+        };
         commands.entity(owner).with_children(|c| {
-            c.spawn((Mesh3d(p.mesh.clone()), MeshMaterial3d(p.material.clone()), Transform::IDENTITY));
+            c.spawn((Mesh3d(p.mesh.clone()), MeshMaterial3d(p.material.clone()), place));
         });
     }
     rig.bones.iter().zip(ent).filter_map(|(b, e)| Some((b.name.to_ascii_lowercase(), e?))).collect()
@@ -165,9 +180,34 @@ pub fn spawn(commands: &mut Commands, models: &mut Models, info: &BoatInfo, mode
 
     let boost = info.row.anim.strip_prefix("lux:anim4.").and_then(|a| models.lux_clip(a)).map(|c| bind(c, &bones, &rests));
     let wings = wing_clip.map(|c| bind(c, &bones, &rests));
+    // Looping clips for this boat (`boat_loops`): overlays and boost loops.
+    let loops = BOAT_LOOPS
+        .iter()
+        .filter(|l| l.boat.is_some_and(|b| BOATS[b].id == info.row.id))
+        .filter_map(|l| {
+            let clip = models.lux_clip(l.clip.strip_prefix("lux:anim4.")?)?;
+            let bound = bind(clip, &bones, &rests);
+            if std::env::var_os("RIPTIDE_DEBUG").is_some() {
+                let names: Vec<&str> = bound.nodes.iter().map(|(ti, _, _)| bound.clip.tracks[*ti].name.as_str()).collect();
+                info!("rig loop {} on {}: {} bones {:?}", l.id, info.name, names.len(), names);
+            }
+            (!bound.nodes.is_empty()).then_some((bound, l.when))
+        })
+        .collect();
     let mut nozzles: Vec<(String, Entity)> = bones.iter().filter(|(n, _)| n.starts_with("rkboost")).map(|(n, e)| (n.clone(), *e)).collect();
     nozzles.sort();
-    Some(BoatRig { boost, wings, nozzles: nozzles.into_iter().map(|(_, e)| e).collect(), super_nozzle: bones.get("rksuperboost").copied() })
+    let def = info.def;
+    Some(BoatRig {
+        boost,
+        wings,
+        loops,
+        partition: def.anim_boost_partition_frame as f32 / FPS,
+        boost_speed: def.anim_boost_scale.max(0.05),
+        wing_deploy: def.anim_wing_deploy.max(0.05),
+        wing_stow: def.anim_wing_stow.max(0.05),
+        nozzles: nozzles.into_iter().map(|(_, e)| e).collect(),
+        super_nozzle: bones.get("rksuperboost").copied(),
+    })
 }
 
 /// Direct3D local key -> output space (Z mirrored).
@@ -186,16 +226,16 @@ fn sample(b: &Bound, track: usize, rest: Transform) -> Transform {
     Transform { translation, rotation, scale }
 }
 
-pub(crate) fn animate(time: Res<Time>, mut boats: Query<(&Boat, &mut BoatRig)>, mut bones: Query<&mut Transform, Without<Boat>>) {
-    let dt = time.delta_secs().min(0.1);
-    for (b, mut rig) in &mut boats {
-        let def = b.info.def;
+/// Advance a rig: `on` = boost held (deploy, hold, stow), `airborne` = wings out; loops play
+/// per their `boat_loops.when`.
+fn step(rig: &mut BoatRig, on: bool, airborne: bool, dt: f32) {
+    let (partition, speed, wing_deploy, wing_stow) = (rig.partition, rig.boost_speed, rig.wing_deploy, rig.wing_stow);
+    let mut deployed = false;
+    {
         // Boost: deploy to the partition frame and hold; stow through the rest of the clip.
         if let Some(c) = rig.boost.as_mut() {
             let end = c.clip.duration.max(1e-3);
-            let p = (def.anim_boost_partition_frame as f32 / FPS).clamp(0.0, end);
-            let speed = def.anim_boost_scale.max(0.05);
-            let on = b.boosting || b.super_time > 0.0;
+            let p = partition.clamp(0.0, end);
             c.phase = match (c.phase, on) {
                 (Phase::Idle, true) => {
                     c.t = 0.0;
@@ -223,35 +263,66 @@ pub(crate) fn animate(time: Res<Time>, mut boats: Query<(&Boat, &mut BoatRig)>, 
                 }
                 Phase::Idle => c.t = 0.0,
             }
+            deployed = c.phase == Phase::Deploy && c.t >= p;
         }
-        // Wings: open in the air, fold on the water.
-        if let Some(w) = rig.wings.as_mut() {
-            let end = w.clip.duration.max(1e-3);
-            w.t = if b.airborne { (w.t + dt * def.anim_wing_deploy.max(0.05)).min(end) } else { (w.t - dt * def.anim_wing_stow.max(0.05)).max(0.0) };
+    }
+    // Wings: open in the air, fold on the water.
+    if let Some(w) = rig.wings.as_mut() {
+        let end = w.clip.duration.max(1e-3);
+        w.t = if airborne { (w.t + dt * wing_deploy).min(end) } else { (w.t - dt * wing_stow).max(0.0) };
+    }
+    // Loops: overlays always; boost loops once the boost parts are out; idle loops otherwise.
+    let no_boost = rig.boost.is_none();
+    for (bound, when) in &mut rig.loops {
+        let play = match when {
+            BoatLoopsWhen::Always => true,
+            BoatLoopsWhen::Boosting => deployed || (no_boost && on),
+            BoatLoopsWhen::Idle => !on,
+        };
+        if play {
+            bound.t = (bound.t + dt) % bound.clip.duration.max(1e-3);
         }
-        for bound in [rig.boost.as_ref(), rig.wings.as_ref()].into_iter().flatten() {
-            for &(ti, e, rest) in &bound.nodes {
-                if let Ok(mut tf) = bones.get_mut(e) {
-                    *tf = sample(bound, ti, rest);
-                }
+    }
+}
+
+/// Pose a rig's bones: boost and wing clips, then any playing loops on top.
+fn apply(rig: &BoatRig, on: bool, bones: &mut Query<&mut Transform, Without<Boat>>) {
+    let loops = rig.loops.iter().filter(|(_, when)| *when != BoatLoopsWhen::Idle || !on).map(|(b, _)| b);
+    for bound in [rig.boost.as_ref(), rig.wings.as_ref()].into_iter().flatten().chain(loops) {
+        for &(ti, e, rest) in &bound.nodes {
+            if let Ok(mut tf) = bones.get_mut(e) {
+                *tf = sample(bound, ti, rest);
             }
         }
     }
 }
 
-/// The menu's turntable boat holds its rest pose, or with `RIPTIDE_TEST_RIG_T=<seconds>` the
-/// boost clip at that time (for checking the clips).
-fn pose_menu(mut rigs: Query<&mut BoatRig, Without<Boat>>, mut bones: Query<&mut Transform, Without<BoatRig>>) {
-    let Some(t) = std::env::var("RIPTIDE_TEST_RIG_T").ok().and_then(|s| s.parse::<f32>().ok()) else { return };
+pub(crate) fn animate(time: Res<Time>, mut boats: Query<(&Boat, &mut BoatRig)>, mut bones: Query<&mut Transform, Without<Boat>>) {
+    let dt = time.delta_secs().min(0.1);
+    for (b, mut rig) in &mut boats {
+        let on = b.boosting || b.super_time > 0.0;
+        step(&mut rig, on, b.airborne, dt);
+        apply(&rig, on, &mut bones);
+    }
+}
+
+/// The menu's turntable boat shows its moving parts: every 8 s it deploys and stows its
+/// boosters (and opens any wings), with its loops playing. `RIPTIDE_TEST_RIG_T=<seconds>`
+/// freezes the boost clip at that time instead (for checking the clips).
+fn pose_menu(time: Res<Time>, mut rigs: Query<&mut BoatRig, Without<Boat>>, mut bones: Query<&mut Transform, Without<Boat>>) {
+    let fixed = std::env::var("RIPTIDE_TEST_RIG_T").ok().and_then(|s| s.parse::<f32>().ok());
+    let cycle = time.elapsed_secs() % 8.0;
+    let (on, airborne) = ((1.5..5.0).contains(&cycle), (5.5..7.5).contains(&cycle));
     for mut rig in &mut rigs {
-        let rig = &mut *rig;
-        for bound in [rig.boost.as_mut(), rig.wings.as_mut()].into_iter().flatten() {
-            bound.t = t.min(bound.clip.duration);
-            for &(ti, e, rest) in &bound.nodes {
-                if let Ok(mut tf) = bones.get_mut(e) {
-                    *tf = sample(bound, ti, rest);
+        match fixed {
+            Some(t) => {
+                let r = &mut *rig;
+                for bound in [r.boost.as_mut(), r.wings.as_mut()].into_iter().flatten() {
+                    bound.t = t.min(bound.clip.duration);
                 }
             }
+            None => step(&mut rig, on, airborne, time.delta_secs().min(0.1)),
         }
+        apply(&rig, on, &mut bones);
     }
 }

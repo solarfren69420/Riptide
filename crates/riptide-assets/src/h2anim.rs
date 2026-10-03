@@ -7,7 +7,8 @@
 //!   `[+0x0c]` -> tracks, 0x30 bytes each:
 //!   `{name*, n pos, n rot, n scale, pos times*, rot times*, scale times*, pos*, rot*, scale*}`.
 //! - Times are pairs `(t, 1 / (t_next - t))` with `t` a fraction of the clip (0..1).
-//! - Positions and scales are 16-byte vectors (`w` unused), rotations quaternions `(x, y, z, w)`.
+//! - Positions are 16-byte vectors (`w` unused), rotations quaternions `(x, y, z, w)`, scales one
+//!   uniform f32 per key.
 //! - Values are node-local, in Direct3D space (left-handed, Y up), like the mesh bones.
 
 use crate::lux::{cstr, u32_at};
@@ -74,7 +75,8 @@ pub fn decode_anim(name: &str, blob: &[u8]) -> Result<Clip> {
         let rot_t = times(ptr(t + 0x14), nr);
         let scale_t = times(ptr(t + 0x18), ns);
         let pos = vec3(ptr(t + 0x1c), np);
-        let scale = vec3(ptr(t + 0x24), ns);
+        // Scale keys are one uniform f32 each (4 bytes), unlike the 16-byte position vectors.
+        let scale: Vec<[f32; 3]> = ptr(t + 0x24).map_or(Vec::new(), |a| (0..ns).filter_map(|k| f(a + k * 4).map(|s| [s, s, s])).collect());
         let rot: Vec<[f32; 4]> = ptr(t + 0x20).map_or(Vec::new(), |a| {
             (0..nr).filter_map(|k| Some([f(a + k * 16)?, f(a + k * 16 + 4)?, f(a + k * 16 + 8)?, f(a + k * 16 + 12)?])).collect()
         });

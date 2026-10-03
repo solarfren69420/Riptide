@@ -31,7 +31,7 @@ pub struct BoatInfo {
 
 impl BoatInfo {
     pub fn index(&self) -> usize {
-        BOATS.iter().position(|r| std::ptr::eq(r, self.row)).unwrap_or(0)
+        BOATS.iter().position(|r| r.id == self.row.id).unwrap_or(0)
     }
 }
 
@@ -95,7 +95,7 @@ impl Content {
                     scale: r.scale,
                     tune: BOAT_TUNING
                         .iter()
-                        .find(|t| t.boat.is_some_and(|b| std::ptr::eq(&BOATS[b], r)))
+                        .find(|t| t.boat.is_some_and(|b| BOATS[b].id == r.id))
                         .map_or([1.0; 4], |t| [t.speed_mult, t.thrust_mult, t.turn_mult, t.grip_mult]),
                 })
             })
@@ -196,6 +196,8 @@ pub struct Models<'w> {
     pub meshes: ResMut<'w, Assets<Mesh>>,
     pub materials: ResMut<'w, Assets<StandardMaterial>>,
     pub images: ResMut<'w, Assets<Image>>,
+    /// Water materials (crate::water).
+    pub water: ResMut<'w, Assets<crate::water::WaterMat>>,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]

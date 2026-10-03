@@ -73,7 +73,7 @@ fn main() -> Result<()> {
                 let r0 = t.rot.first().map(|k| k.1);
                 let r1 = t.rot.last().map(|k| k.1);
                 let p0 = t.pos.first().map(|k| k.1);
-                println!("  {:<26} pos {:>3} rot {:>3} scale {:>2}  pos0 {:?}  rot {:?} -> {:?}", t.name, t.pos.len(), t.rot.len(), t.scale.len(), p0, r0, r1);
+                println!("  {:<26} pos {:>3} rot {:>3} scale {:>2}  pos0 {:?}  rot {:?} -> {:?}  scale {:?}", t.name, t.pos.len(), t.rot.len(), t.scale.len(), p0, r0, r1, t.scale);
             }
         }
         Some("rig-check") => {
@@ -439,6 +439,13 @@ fn main() -> Result<()> {
             missing.sort();
             missing.dedup();
             println!("props with no mesh32: {missing:?}");
+            if std::env::var_os("EDGES").is_some() {
+                // EDGES=1: every racing-line cross-section: index, mid point, water level.
+                for (i, e) in lvl.path.iter().enumerate() {
+                    let m = [(e.start[0] + e.end[0]) / 2.0, (e.start[2] + e.end[2]) / 2.0];
+                    println!("edge {i:3} mid [{:8.0} {:8.0}] water {:7.1}", m[0], m[1], e.water);
+                }
+            }
             if let Some(out) = args.get(2) {
                 let mut world = Model::default();
                 for s in &lvl.sector_meshes {
