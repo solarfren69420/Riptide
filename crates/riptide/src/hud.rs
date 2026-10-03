@@ -100,13 +100,20 @@ fn spawn(mut commands: Commands, mut models: Models, sel: Res<Selection>) {
                 }
             }
             HudRole::SpeedNeedle | HudRole::BoostNeedle => {
-                // A zero-size pivot at the card centre; the needle sprite pivots on its ring
+                // Rotate around the visible dial ring. The boost ring sits in the upper-left
+                // of its texture, so its sheet pivot overrides the needle card centre.
+                let (cx, cy) = if row.pivot_x > 0.0 && row.pivot_y > 0.0 {
+                    (row.pivot_x, row.pivot_y)
+                } else {
+                    (card.x_position + w / 2.0, card.y_position + h / 2.0)
+                };
+                // A zero-size pivot at the dial centre; the needle sprite pivots on its ring
                 // (72% along) and points left at rest.
                 let len = w * row.scale;
                 e.insert(Node {
                     position_type: PositionType::Absolute,
-                    left: v(card.x_position + w / 2.0),
-                    top: v(card.y_position + h / 2.0),
+                    left: v(cx),
+                    top: v(cy),
                     width: px(0),
                     height: px(0),
                     ..default()

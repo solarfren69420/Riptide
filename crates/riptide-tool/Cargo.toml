@@ -7,3 +7,4 @@ edition.workspace = true
 anyhow.workspace = true
 riptide-assets = { path = "../riptide-assets" }
 png = "0.18"
+roxmltree.workspace = true

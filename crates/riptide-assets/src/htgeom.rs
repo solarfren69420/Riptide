@@ -77,7 +77,7 @@ pub fn decode_geometry_at(obj: &R2Object, base: usize, all_groups: bool) -> Resu
             }
         }
     }
-    let mut model = Model { name: obj.name.clone(), parts: Vec::new() };
+    let mut model = Model { name: obj.name.clone(), ..Default::default() };
     for rb in records {
         let npoly = obj.u32(rb).unwrap_or(0) as usize;
         let Some(polys) = obj.ptr(rb + 4) else { continue };

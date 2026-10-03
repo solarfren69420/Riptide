@@ -4141,8 +4141,12 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "bevy",
+ "js-sys",
  "riptide-assets",
  "riptide-sheets",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "web-sys",
 ]
 
 [[package]]
@@ -4170,6 +4174,7 @@ dependencies = [
  "anyhow",
  "png",
  "riptide-assets",
+ "roxmltree",
 ]
 
 [[package]]
@@ -5213,6 +5218,7 @@ dependencies = [
  "smallvec",
  "static_assertions",
  "wasm-bindgen",
+ "wasm-bindgen-futures",
  "web-sys",
  "wgpu-core",
  "wgpu-hal",

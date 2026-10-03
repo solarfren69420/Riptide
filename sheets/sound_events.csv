@@ -22,3 +22,5 @@ super_start,-,com_super_rkbst_start,ok,Super (gold) rocket boost ignites
 super_end,-,com_super_rkbst_end,ok,Super rocket boost burns out
 hullcrush_attack,-,com_hullcrusher_wpn_attack,ok,Hull Crusher blasts a boat
 wall_hit,-,com_hull_vs_cement_hit,ok,Boat hits a wall hard
+hullcrush_riff,HullCrusher Rif,-,ok,Hull Crusher riff: loops while the crusher is out
+hullcrush_stow,-,com_hullcrusher_metal,ok,Hull Crusher retracts

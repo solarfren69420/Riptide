@@ -44,6 +44,115 @@ fn main() -> Result<()> {
             let img = image::decode_txtr(l.get(&format!("txtr1.{}", a(1)?)).context("no such texture")?)?;
             write_png(Path::new(a(2)?), &img)?;
         }
+        Some("rig-render") => {
+            // rig-render <mesh> <clip> <seconds> out.png [yaw]: the rigged mesh posed by the clip.
+            let l = open_lux()?;
+            let name = a(1)?;
+            let rigged = h2mesh::decode_rigged(name, l.get(&format!("mesh32.{name}")).context("no such mesh")?)?;
+            let clip = riptide_assets::h2anim::decode_anim(a(2)?, l.get(&format!("anim4.{}", a(2)?)).context("no such clip")?)?;
+            let t: f32 = a(3)?.parse()?;
+            let m = riptide_assets::h2anim::pose(&rigged, &clip, t);
+            let mut tex = HashMap::new();
+            for p in &m.parts {
+                if let Some(t) = &p.texture {
+                    if let Some(img) = l.get(&format!("txtr1.{t}")).and_then(|b| image::decode_txtr(b).ok()) {
+                        tex.insert(t.clone(), img);
+                    }
+                }
+            }
+            let yaw: f32 = args.get(5).and_then(|s| s.parse().ok()).unwrap_or(35.0);
+            write_png(Path::new(a(4)?), &render(&m, &tex, yaw, 25.0, 768))?;
+        }
+        Some("anim") => {
+            // anim <clip>: decoded anim4 clip: per track, key counts and first/last values.
+            let l = open_lux()?;
+            let name = a(1)?;
+            let c = riptide_assets::h2anim::decode_anim(name, l.get(&format!("anim4.{name}")).context("no such clip")?)?;
+            println!("{}: {:.3} s ({:.0} frames), {} tracks", c.name, c.duration, c.duration * riptide_assets::h2anim::FPS, c.tracks.len());
+            for t in &c.tracks {
+                let r0 = t.rot.first().map(|k| k.1);
+                let r1 = t.rot.last().map(|k| k.1);
+                let p0 = t.pos.first().map(|k| k.1);
+                println!("  {:<26} pos {:>3} rot {:>3} scale {:>2}  pos0 {:?}  rot {:?} -> {:?}", t.name, t.pos.len(), t.rot.len(), t.scale.len(), p0, r0, r1);
+            }
+        }
+        Some("rig-check") => {
+            // rig-check <mesh>: rigged parts placed by their bones' rest matrices must match the
+            // baked mesh; prints both bounds and the part/bone counts.
+            let l = open_lux()?;
+            let name = a(1)?;
+            let blob = l.get(&format!("mesh32.{name}")).context("no such mesh")?;
+            let baked = h2mesh::decode_mesh(name, blob)?;
+            let rigged = h2mesh::decode_rigged(name, blob)?;
+            let mut placed = rigged.clone();
+            for p in &mut placed.parts {
+                if let Some(b) = p.bone {
+                    let m = rigged.bones[b as usize].rest;
+                    for v in &mut p.positions {
+                        let [x, y, z] = *v;
+                        *v = [
+                            m[0] * x + m[4] * y + m[8] * z + m[12],
+                            m[1] * x + m[5] * y + m[9] * z + m[13],
+                            m[2] * x + m[6] * y + m[10] * z + m[14],
+                        ];
+                    }
+                }
+            }
+            println!("baked  {:?}", baked.bounds());
+            println!("rigged {:?}  ({} parts, {} bones)", placed.bounds(), rigged.parts.len(), rigged.bones.len());
+        }
+        Some("rig") => {
+            // rig <mesh>: the mesh's bones: index, name, the two header words, rest translation.
+            let l = open_lux()?;
+            let b = l.get(&format!("mesh32.{}", a(1)?)).context("no such mesh")?;
+            let nfix = lux::u32_at(b, 8) as usize;
+            let start = 0x14 + nfix * 0x2c;
+            let mut ptrs = HashMap::new();
+            for i in 0..nfix {
+                let r = &b[0x14 + i * 0x2c..0x14 + (i + 1) * 0x2c];
+                if lux::u32_at(r, 0) == 1 {
+                    ptrs.insert(lux::u32_at(r, 4) as usize, lux::u32_at(r, 8) as usize);
+                }
+            }
+            let body = &b[start..];
+            let n = lux::u32_at(body, 0x40) as usize;
+            let at = *ptrs.get(&0x4c).context("no bone table")?;
+            let f = |o: usize| f32::from_le_bytes(body[o..o + 4].try_into().unwrap());
+            for i in 0..n {
+                let r = at + i * 0x170;
+                let name = lux::cstr(&body[r + 4..r + 0x24]);
+                let (w24, w28) = (lux::u32_at(body, r + 0x24), lux::u32_at(body, r + 0x28));
+                let t = [f(r + 0x60 + 48), f(r + 0x60 + 52), f(r + 0x60 + 56)];
+                println!("{i:2} {name:<28} {w24:#6x} {w28:#6x}  rest at [{:8.3} {:8.3} {:8.3}]", t[0], t[1], t[2]);
+            }
+        }
+        Some("lux-fix") => {
+            // lux-fix <entry>: body of a relocatable blob (mesh32, anim4, ...) as words, with
+            // internal pointers shown as `->target` and external references by name.
+            let l = open_lux()?;
+            let b = l.get(a(1)?).context("no such entry")?;
+            let nfix = lux::u32_at(b, 8) as usize;
+            let start = 0x14 + nfix * 0x2c;
+            let mut ptrs = HashMap::new();
+            for i in 0..nfix {
+                let r = &b[0x14 + i * 0x2c..0x14 + (i + 1) * 0x2c];
+                let (kind, at, target) = (lux::u32_at(r, 0), lux::u32_at(r, 4) as usize, lux::u32_at(r, 8));
+                let shown = if kind == 1 { format!("->{target:#x}") } else { format!("ext {}", lux::cstr(&r[0x0c..])) };
+                ptrs.insert(at, shown);
+            }
+            let body = &b[start..];
+            println!("{} fixups, body {:#x} bytes", nfix, body.len());
+            for o in (0..body.len().saturating_sub(3)).step_by(4) {
+                let w = lux::u32_at(body, o);
+                let f = f32::from_bits(w);
+                let shown = match ptrs.get(&o) {
+                    Some(p) => p.clone(),
+                    None if f.is_finite() && f.abs() > 1e-4 && f.abs() < 1e5 && w > 0x0100_0000 => format!("{f:.4}"),
+                    None => format!("{w:#x}"),
+                };
+                println!("{o:#06x}: {shown}");
+            }
+        }
         Some("lux-mesh") => {
             let l = open_lux()?;
             let m = lux_model(&l, a(1)?)?;

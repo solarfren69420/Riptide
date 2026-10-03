@@ -59,6 +59,13 @@ pub struct Sfx<'w, 's> {
     content: Res<'w, Content>,
 }
 
+/// Headless test runs (`RIPTIDE_SHOT`) and `RIPTIDE_MUTE=1` decode and log sounds but never play
+/// them: tests must not be heard.
+fn muted() -> bool {
+    static MUTED: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *MUTED.get_or_init(|| std::env::var_os("RIPTIDE_SHOT").is_some() || std::env::var_os("RIPTIDE_MUTE").is_some())
+}
+
 impl Sfx<'_, '_> {
     fn rand(&mut self) -> f32 {
         let s = &mut self.banks.seed;
@@ -109,7 +116,9 @@ impl Sfx<'_, '_> {
         if std::env::var_os("RIPTIDE_DEBUG").is_some() {
             info!("sound: play {} vol {:.2} pitch {:.2}", d.id, d.volume_2d * volume * gain, pitch);
         }
-        self.commands.spawn((AudioPlayer(src), settings));
+        if !muted() {
+            self.commands.spawn((AudioPlayer(src), settings));
+        }
     }
 
     /// Play the sound a `sound_events` row names (see `crate::sheets::sound_events_ids`).
@@ -126,11 +135,36 @@ impl Sfx<'_, '_> {
         }
     }
 
+    /// Stop a looping sound started by [`Self::event_loop`].
+    pub fn stop(&mut self, e: Entity) {
+        self.commands.entity(e).despawn();
+    }
+
+    /// Loop a `sound_events` row's sound (first variant at its own volume) until the returned
+    /// entity is despawned.
+    pub fn event_loop(&mut self, ev: usize, scope: impl Bundle) -> Option<Entity> {
+        let row = &SOUND_EVENTS[ev];
+        let def = row.sounddef.or(row.global.and_then(|g| H2_GLOBALSOUNDS[g].sounddef))?;
+        let d = &H2_SOUNDDEFS[def];
+        let v = variant(d, 0)?;
+        let src = self.source(v.sample)?;
+        if std::env::var_os("RIPTIDE_DEBUG").is_some() {
+            info!("sound: loop {}", d.id);
+        }
+        if muted() {
+            return None;
+        }
+        let settings = PlaybackSettings { mode: PlaybackMode::Loop, volume: Volume::Linear(d.volume_2d * v.volume), ..default() };
+        Some(self.commands.spawn((AudioPlayer(src), settings, scope)).id())
+    }
+
     /// Loop an `h2_samples` row (race music) at `volume`.
     pub fn music(&mut self, sample: usize, volume: f32, scope: impl Bundle) {
         if let Some(src) = self.source(sample) {
             let settings = PlaybackSettings { mode: PlaybackMode::Loop, volume: Volume::Linear(volume), ..default() };
-            self.commands.spawn((AudioPlayer(src), settings, scope));
+            if !muted() {
+                self.commands.spawn((AudioPlayer(src), settings, scope));
+            }
         }
     }
 
@@ -138,6 +172,9 @@ impl Sfx<'_, '_> {
     fn looped(&mut self, def: usize) -> Option<Entity> {
         let v = variant(&H2_SOUNDDEFS[def], 0)?;
         let src = self.source(v.sample)?;
+        if muted() {
+            return None;
+        }
         let settings = PlaybackSettings { mode: PlaybackMode::Loop, volume: Volume::Linear(0.0), ..default() };
         Some(self.commands.spawn((AudioPlayer(src), settings)).id())
     }

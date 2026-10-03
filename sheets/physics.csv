@@ -26,11 +26,12 @@ pickup_radius,f32,75,units,riptide engine
 pickup_respawn,f32,6,s,riptide engine
 wipeout_time,f32,1.5,s,riptide design (H2 wipeout animation length not decoded)
 hullcrush_scale,f32,1.5,x model,riptide design (visual only; H2 HullCrush Dim Ratio drives collision)
-cam_back,f32,150,units,riptide engine
-cam_back_speed,f32,40,units,riptide engine
-cam_up,f32,52,units,riptide engine
-cam_up_speed,f32,10,units,riptide engine
-cam_look_ahead,f32,90,units,riptide engine
+cam_back,f32,65,units,riptide design: keep the boat and deployed boosters readable
+cam_back_speed,f32,15,units,riptide design: speed-dependent camera pullback
+cam_up,f32,35,units,riptide design: chase-camera height
+cam_up_speed,f32,5,units,riptide design: speed-dependent camera height
+cam_look_ahead,f32,45,units,riptide design: look ahead while keeping the full boat in frame
+cam_follow_rate,f32,12,1/s,riptide design: reduce chase lag that made the boat and rocket flames too small
 cam_fov,f32,68,degrees,riptide engine
 ai_look,f32,220,units,riptide engine
 ai_look_per_speed,f32,0.9,s,riptide engine
@@ -51,8 +52,9 @@ wake_size_end,f32,85,units,riptide design
 wake_min_speed,f32,60,units/s,riptide design: no wake below this speed
 spray_rate,f32,30,per s,riptide design: rooster-tail spray while boosting (scaled by speed)
 spray_life,f32,0.9,s,riptide design
-spray_size_start,f32,14,units,riptide design
-spray_size_end,f32,50,units,riptide design
+spray_size_start,f32,9,units,riptide design
+spray_size_end,f32,30,units,riptide design
+spray_opacity,f32,0.22,0..1,riptide design: rooster spray should not obscure the boat and rocket exhaust
 spray_up,f32,220,units/s,riptide design: upward throw of rooster spray
 splash_count,f32,24,particles,riptide design: burst when landing from a jump
 water_subdiv,f32,6,cells per quad side,riptide design: water mesh subdivision for waves
@@ -88,12 +90,16 @@ cam_radius,f32,45,units,riptide design: the chase camera keeps this far from wal
 h2_floor_min_normal,f32,0.3,normal y,riptide design: H2 collision faces facing up at least this much are floors (steep jump ramps included; winding is reliable there)
 barrier_height,f32,900,units,riptide design: H2 collision faces taller than this are scripted invisible barriers (dams / gates the game opens); ones facing along the course are ignored
 music_volume,f32,0.55,linear,riptide design: race music level under the engine and effects
-rocket_size,f32,16,units per layer scale,riptide design: boost-flame particle size for a Scale value of 1 (layer Scale0/1/2 multiply it)
-rocket_rate,f32,60,particles/s per layer,riptide design: boost-flame emission rate
+rocket_size,f32,4,units per layer scale,riptide design: billboard diameter multiplier for the original layer scales
+rocket_additive_brightness,f32,0.08,multiplier,riptide design: keep overlapping additive rocket sprites from washing out their original flame colors
+rocket_smoke_opacity,f32,0.06,multiplier,riptide design: dense smoke must remain translucent so it does not cover the colored flame core
+rocket_rate,f32,60,particles/s per layer,riptide design: minimum emission rate; retail Motion Puff Dist determines flame density
+rocket_max_particles,f32,2400,particles,riptide design: separate budget for dense short-lived rocket exhaust
+rocket_near_fade,f32,30,units,riptide design: keep rocket flames visible near the chase camera without covering it
 rocket_nozzle_height,f32,10,units,riptide design: exhaust height above the boat origin at the stern (rooster offset Z)
 bolt_joints,f32,8,segments,riptide design: lightning segments per Hull Crusher bolt
 bolt_glow_scale,f32,3,x thickness,riptide design: glow ribbon width = thickness x (1 + Glow Width x this)
-fx_near_fade,f32,160,units,riptide design: spray and flame particles fade out inside this distance of the camera (the chase camera drives through rooster tails)
+fx_near_fade,f32,160,units,riptide design: spray particles fade out inside this distance of the camera (the chase camera drives through rooster tails)
 hackworld_ring_radius,f32,14000,units,riptide design: Hackworld's AI ring (matches riptide-tool hackworld-seed)
 hackworld_ring_width,f32,5000,units,riptide design: Hackworld ring width
 hackworld_water_half,f32,30000,units,riptide design: Hackworld water extends this far each way from the centre

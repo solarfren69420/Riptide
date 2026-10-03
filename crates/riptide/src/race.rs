@@ -166,6 +166,12 @@ enum HudText {
     Boat,
 }
 
+#[derive(Default)]
+struct SuperNotice {
+    last: f32,
+    until: f32,
+}
+
 #[derive(Component)]
 struct BoostBar;
 
@@ -404,7 +410,7 @@ fn spawn_race(mut commands: Commands, mut models: Models, sel: Res<Selection>, m
                 indices: (0..tris.len() as u32 * 3).collect(),
                 ..Default::default()
             };
-            let model = riptide_assets::model::Model { name: format!("wc_{lvl}"), parts: vec![part] };
+            let model = riptide_assets::model::Model { name: format!("wc_{lvl}"), parts: vec![part], ..Default::default() };
             commands.insert_resource(Collider { trusted: true, ..Collider::build(std::slice::from_ref(&model), 1.0, phy::WALL_STEEPNESS, true) });
         }
     }
@@ -627,11 +633,19 @@ fn spawn_race(mut commands: Commands, mut models: Models, sel: Res<Selection>, m
                 Name::new(info.name.clone()),
             ))
             .id();
-        if let Some(p) = pieces {
-            // Model node carries the per-game scale.
-            let model = commands.spawn((Transform::from_scale(Vec3::splat(info.scale)), Visibility::default())).id();
-            commands.entity(e).add_child(model);
-            attach(&mut commands, model, &p);
+        // Model node carries the per-game scale. H2Overdrive boats are skeletons with moving
+        // parts (crate::boatrig); others are drawn whole.
+        let model = commands.spawn((Transform::from_scale(Vec3::splat(info.scale)), Visibility::default())).id();
+        commands.entity(e).add_child(model);
+        match crate::boatrig::spawn(&mut commands, &mut models, &info, model) {
+            Some(rig) => {
+                commands.entity(e).insert(rig);
+            }
+            None => {
+                if let Some(p) = pieces {
+                    attach(&mut commands, model, &p);
+                }
+            }
         }
     }
 
@@ -1383,7 +1397,7 @@ fn pickups(
     }
 }
 
-fn place_boats(time: Res<Time>, tuning: Res<Tuning>, mut boats: Query<(&mut Boat, &mut Transform)>) {
+pub(crate) fn place_boats(time: Res<Time>, tuning: Res<Tuning>, mut boats: Query<(&mut Boat, &mut Transform)>) {
     let dt = time.delta_secs().min(1.0 / 20.0);
     let t = time.elapsed_secs();
     for (mut b, mut tf) in &mut boats {
@@ -1396,7 +1410,16 @@ fn place_boats(time: Res<Time>, tuning: Res<Tuning>, mut boats: Query<(&mut Boat
         };
         b.roll += (target_roll - b.roll) * (dt * 5.0).min(1.0);
         b.pitch += (target_pitch - b.pitch) * (dt * 4.0).min(1.0);
-        let bob = if b.airborne { 0.0 } else { 0.8 * (t * 5.0 + b.pos.x * 0.01).sin() };
+        let bob = if b.airborne { 0.0 } else {
+            // Match the rendered surface. Keeping the rig on the mean water
+            // plane submerges its low exhaust nozzles whenever a crest passes.
+            let k = std::f32::consts::TAU / phy::WAVE_LENGTH.max(1.0);
+            let phase = t * phy::WAVE_SPEED;
+            let (x, z) = (b.pos.x * k, b.pos.z * k);
+            phy::WAVE_AMPLITUDE * ((x + phase).sin()
+                + 0.6 * (z * 0.8 - phase * 1.3).sin()
+                + 0.3 * ((x + z) * 0.6 + phase * 0.7).sin())
+        };
         // Wiped-out boats spin while they recover.
         let spin = b.wipeout / phy::WIPEOUT_TIME * std::f32::consts::TAU * 2.0;
         tf.translation = b.pos + Vec3::Y * bob;
@@ -1423,7 +1446,7 @@ fn chase_camera(
     let speed_pull = (b.speed / phy::SPEED_NORM).clamp(0.0, 1.6);
     let want = b.pos - heading * (phy::CAM_BACK + phy::CAM_BACK_SPEED * speed_pull) * size.sqrt() * zoom
         + Vec3::Y * (phy::CAM_UP + phy::CAM_UP_SPEED * speed_pull) * zoom;
-    let k = (dt * 6.0).min(1.0);
+    let k = (dt * phy::CAM_FOLLOW_RATE).min(1.0);
     tf.translation = tf.translation.lerp(want, k);
     // Stay inside the river corridor so cliffs never swallow the view (open water has none).
     let at = track.locate(tf.translation, b.tp.seg);
@@ -1464,9 +1487,21 @@ fn hud(
     boats: Query<(Entity, &Boat)>,
     mut texts: Query<(&HudText, &mut Text)>,
     mut bar: Query<(&mut Node, &mut BackgroundColor), With<BoostBar>>,
+    mut super_notice: Local<SuperNotice>,
 ) {
     let g = &tuning.0;
     let Some((pe, p)) = boats.iter().find(|(_, b)| b.player) else { return };
+    if clock.t < 0.0 {
+        // Cheats can fill gold boost during the prerace countdown. Start the notice when
+        // racing begins, so it is not spent before the player sees the GO card.
+        super_notice.last = 0.0;
+        super_notice.until = 0.0;
+    } else {
+        if p.super_time > super_notice.last + 0.5 {
+            super_notice.until = clock.t + 1.5;
+        }
+        super_notice.last = p.super_time;
+    }
     // Finished boats rank by finish order, the rest by progress.
     let mut order: Vec<(f32, Entity)> = boats
         .iter()
@@ -1503,7 +1538,8 @@ fn hud(
                     let n = (-clock.t).ceil() as i32;
                     if n <= 3 { n.to_string() } else { String::new() }
                 } else if clock.t < 1.2 {
-                    "GO!".into()
+                    // The original GO card is drawn by hud::banners.
+                    String::new()
                 } else if let Some(t) = p.finished {
                     let suffix = match place {
                         1 => "st",
@@ -1520,7 +1556,7 @@ fn hud(
                     "WIPEOUT!".into()
                 } else if matches!(p.crush, Crush::Deploy(_)) {
                     "HULL CRUSHER!".into()
-                } else if p.super_time > 0.0 {
+                } else if p.super_time > 0.0 && clock.t < super_notice.until {
                     "MEGA BOOST!".into()
                 } else {
                     String::new()
@@ -1913,6 +1949,8 @@ struct HeardState {
     super_time: f32,
     wipeout: bool,
     crushing: bool,
+    stowing: bool,
+    riff: Option<Entity>,
     lap: u32,
     airborne: bool,
     finished: bool,
@@ -1980,7 +2018,22 @@ fn race_audio(
     if crushing && !last.crushing {
         sfx.event(ev::HULLCRUSH_START);
         sfx.event(ev::HULLCRUSH_VOICE);
+        if let Some(old) = last.riff.take() {
+            sfx.stop(old);
+        }
+        last.riff = sfx.event_loop(ev::HULLCRUSH_RIFF, DespawnOnExit(Screen::Race));
     }
+    // Retracting: the riff ends with the metal clank.
+    let stowing = matches!(p.crush, Crush::Stow(_));
+    if stowing && !last.stowing {
+        sfx.event(ev::HULLCRUSH_STOW);
+    }
+    if !crushing || stowing {
+        if let Some(e) = last.riff.take() {
+            sfx.stop(e);
+        }
+    }
+    last.stowing = stowing;
     if track.looped && p.lap > last.lap && p.lap + 1 == track.laps {
         sfx.event(ev::FINAL_LAP);
     }

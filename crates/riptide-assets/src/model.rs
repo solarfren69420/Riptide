@@ -16,6 +16,8 @@ pub enum Blend {
 
 #[derive(Debug, Clone, Default)]
 pub struct MeshPart {
+    /// Rigged models: the bone whose space the vertices are in (see [`Model::bones`]).
+    pub bone: Option<u16>,
     pub positions: Vec<[f32; 3]>,
     pub normals: Vec<[f32; 3]>,
     pub uvs: Vec<[f32; 2]>,
@@ -35,6 +37,8 @@ pub struct MeshPart {
 pub struct Model {
     pub name: String,
     pub parts: Vec<MeshPart>,
+    /// Rigged models only: the skeleton, in the same order [`MeshPart::bone`] indexes.
+    pub bones: Vec<Bone>,
 }
 
 impl Model {
@@ -107,4 +111,13 @@ impl Model {
         }
         s
     }
+}
+
+/// One node of a rigged model's skeleton.
+#[derive(Debug, Clone)]
+pub struct Bone {
+    pub name: String,
+    pub parent: Option<usize>,
+    /// Rest pose in model space (output space, Z mirrored), column-major.
+    pub rest: [f32; 16],
 }

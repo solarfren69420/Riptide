@@ -1,16 +1,14 @@
 //! Dreamcast GD-ROM images in `.gdi` form, read through the ISO 9660 filesystem in the
 //! high-density area (which starts at LBA 45000).
 
+use crate::source::Source;
 use anyhow::{bail, Context, Result};
-use memmap2::Mmap;
 use std::collections::BTreeMap;
-use std::fs::File;
-use std::path::Path;
 
 struct Track {
     start_lba: u32,
     sector_size: usize,
-    map: Mmap,
+    src: Box<dyn Source>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -27,22 +25,28 @@ pub struct GdRom {
 const HIGH_DENSITY_LBA: u32 = 45000;
 
 impl GdRom {
-    pub fn open(gdi: &Path) -> Result<Self> {
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn open(gdi: &std::path::Path) -> Result<Self> {
         let text = std::fs::read_to_string(gdi).with_context(|| format!("read {}", gdi.display()))?;
-        let dir = gdi.parent().unwrap_or(Path::new("."));
+        let dir = gdi.parent().unwrap_or(std::path::Path::new("."));
+        Self::from_parts(&text, |file| Ok(Box::new(crate::source::MapSource::open(&dir.join(file))?) as Box<dyn Source>))
+    }
+
+    /// Track files a `.gdi` names, in order: `(file name, start LBA, sector size)`.
+    pub fn gdi_tracks(text: &str) -> Vec<(String, u32, usize)> {
+        text.lines()
+            .skip(1)
+            .map(split_gdi_line)
+            .filter(|p| p.len() >= 5)
+            .filter_map(|p| Some((p[4].clone(), p[1].parse().ok()?, p[3].parse().ok()?)))
+            .collect()
+    }
+
+    /// Open from the `.gdi` text and a source per track file (by the name the `.gdi` gives).
+    pub fn from_parts(text: &str, mut open: impl FnMut(&str) -> Result<Box<dyn Source>>) -> Result<Self> {
         let mut tracks = Vec::new();
-        for line in text.lines().skip(1) {
-            let parts = split_gdi_line(line);
-            if parts.len() < 5 {
-                continue;
-            }
-            let start_lba: u32 = parts[1].parse()?;
-            let sector_size: usize = parts[3].parse()?;
-            let path = dir.join(&parts[4]);
-            let file = File::open(&path).with_context(|| format!("open {}", path.display()))?;
-            // SAFETY: read-only disc image.
-            let map = unsafe { Mmap::map(&file)? };
-            tracks.push(Track { start_lba, sector_size, map });
+        for (file, start_lba, sector_size) in Self::gdi_tracks(text) {
+            tracks.push(Track { start_lba, sector_size, src: open(&file)? });
         }
         tracks.sort_by_key(|t| t.start_lba);
         let mut rom = Self { tracks, files: BTreeMap::new() };
@@ -66,7 +70,7 @@ impl GdRom {
             .context("LBA before first track")?;
         let header = if t.sector_size == 2352 { 16 } else { 0 };
         let o = (lba - t.start_lba) as usize * t.sector_size + header;
-        t.map.get(o..o + 2048).context("sector past end of track")
+        t.src.read(o as u64, 2048).context("sector past end of track or not fetched")
     }
 
     fn walk(&mut self, lba: u32, size: u32, prefix: &str, depth: u32) -> Result<()> {
@@ -112,11 +116,26 @@ impl GdRom {
     fn read_extent(&self, lba: u32, size: u32) -> Result<Vec<u8>> {
         let n = (size as usize).div_ceil(2048);
         let mut out = Vec::with_capacity(n * 2048);
+        // Touch every sector even after one is missing: a sparse source then queues the whole
+        // extent in one go instead of one sector per fetch round.
+        let mut missing = None;
         for k in 0..n as u32 {
-            out.extend_from_slice(self.sector(lba + k)?);
+            match self.sector(lba + k) {
+                Ok(s) if missing.is_none() => out.extend_from_slice(s),
+                Ok(_) => {}
+                Err(e) => missing = missing.or(Some(e)),
+            }
+        }
+        if let Some(e) = missing {
+            return Err(e);
         }
         out.truncate(size as usize);
         Ok(out)
+    }
+
+    /// Some sector reads failed only because their bytes aren't fetched yet (browser build).
+    pub fn pending(&self) -> bool {
+        self.tracks.iter().any(|t| t.src.pending())
     }
 
     pub fn files(&self) -> impl Iterator<Item = (&str, &DiscFile)> {

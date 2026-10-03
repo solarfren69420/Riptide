@@ -10,6 +10,7 @@ use crate::model::Model;
 use crate::pvr::decode_pvrt_in;
 use crate::r2::R2Archive;
 use anyhow::{Context, Result};
+#[cfg(not(target_arch = "wasm32"))]
 use std::path::Path;
 use std::sync::{Arc, RwLock};
 
@@ -21,10 +22,19 @@ pub struct HydroThunder {
 }
 
 impl HydroThunder {
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn open(gdi: &Path) -> Result<Self> {
-        let disc = GdRom::open(gdi)?;
+        Self::from_disc(GdRom::open(gdi)?)
+    }
+
+    pub fn from_disc(disc: GdRom) -> Result<Self> {
         let main = R2Archive::parse(disc.read("HYDRODC.R2").context("read HYDRODC.R2")?)?;
         Ok(Self { disc, main, track: RwLock::new(None) })
+    }
+
+    /// Disc reads are waiting on bytes not fetched yet (browser build).
+    pub fn pending(&self) -> bool {
+        self.disc.pending()
     }
 
     fn archives(&self) -> Vec<Arc<R2Archive>> {

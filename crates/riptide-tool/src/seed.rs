@@ -226,6 +226,7 @@ pub fn seed_sheets(lux: &LuxArchive, dir: &Path) -> Result<()> {
     let hud: Vec<_> = objects(lux, "global_GameHud")?.into_iter().filter(|o| o.class == "CSHudCard").collect();
     write("h2_hud.csv", wide(&hud))?;
     write("h2_font_glyphs.csv", font_glyphs(lux)?)?;
+    write("h2_upgrades.csv", upgrades(lux)?)?;
     Ok(())
 }
 
@@ -327,6 +328,48 @@ fn font_glyphs(lux: &LuxArchive) -> Result<String> {
                 height
             )
             .unwrap();
+        }
+    }
+    Ok(out)
+}
+
+/// `data.upgrades`: which extra meshes (and their clips) hang off which bone ("channel") of each
+/// boat, per upgrade axis and level. Level 0 is the boat as raced without upgrades.
+fn upgrades(lux: &LuxArchive) -> Result<String> {
+    let blob = lux.get("data.upgrades").context("data.upgrades missing")?;
+    let text = String::from_utf8_lossy(blob);
+    let doc = roxmltree::Document::parse(&text).context("data.upgrades XML")?;
+    let mut out = String::from("id,axis,level,boat,channel,mesh,anim\n@types,str,i32,ref:h2_boatdefs,str,asset,asset\n");
+    let asset = |kind: &str, v: Option<&str>| match v.map(str::trim).filter(|s| !s.is_empty()) {
+        Some(n) => format!("lux:{kind}.{n}"),
+        None => "-".into(),
+    };
+    // The file lists some axes twice (a later "Booster" block): later rows get a suffix.
+    let mut seen = std::collections::HashSet::new();
+    for axis in doc.descendants().filter(|n| n.has_tag_name("UpgradeAxis")) {
+        let a = axis.attribute("name").unwrap_or("?");
+        for level in axis.children().filter(|n| n.has_tag_name("Level")) {
+            let l = level.attribute("id").unwrap_or("0");
+            for boat in level.children().filter(|n| n.has_tag_name("boat")) {
+                let b = boat.attribute("name").unwrap_or("?");
+                for (k, m) in boat.children().filter(|n| n.has_tag_name("Mesh")).enumerate() {
+                    let mut id = format!("{a}.{l}.{b}.{k}");
+                    while !seen.insert(id.clone()) {
+                        id.push('b');
+                    }
+                    writeln!(
+                        out,
+                        "{},{},{l},{},{},{},{}",
+                        cell(&id),
+                        cell(a),
+                        cell(b),
+                        cell(m.attribute("channel").unwrap_or("-")),
+                        asset("mesh32", m.attribute("mesh")),
+                        asset("anim4", m.attribute("anim"))
+                    )
+                    .unwrap();
+                }
+            }
         }
     }
     Ok(out)

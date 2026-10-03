@@ -2,6 +2,7 @@
 
 pub mod fsb;
 pub mod gdi;
+pub mod h2anim;
 pub mod h2coll;
 pub mod h2level;
 pub mod h2mesh;
@@ -13,6 +14,7 @@ pub mod lux;
 pub mod model;
 pub mod pvr;
 pub mod r2;
+pub mod source;
 
 use std::path::PathBuf;
 

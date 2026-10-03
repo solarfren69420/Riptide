@@ -7,7 +7,7 @@ from the discs and archives you own, and races them in a new engine built on [Be
 No game content ships in this repository.
 
 ![status](https://img.shields.io/badge/status-playable%20alpha-orange)
-![progress](https://img.shields.io/badge/progress-~67%25-blue)
+![progress](https://img.shields.io/badge/progress-~71%25-blue)
 ![courses](https://img.shields.io/badge/courses-25%20playable-brightgreen)
 ![boats](https://img.shields.io/badge/boats-25-brightgreen)
 ![rust](https://img.shields.io/badge/rust-bevy%200.18-dea584)
@@ -27,7 +27,7 @@ No game content ships in this repository.
 
 ## 📊 How far along is it?
 
-**About 67% of the planned feature set** (13 of 21 items done, 2 partly done; partial counts as half). That's a count of the
+**About 71% of the planned feature set** (14 of 21 items done, 2 partly done; partial counts as half). That's a count of the
 checklist below, not a byte-level decompilation figure.
 
 | Area | Status | Notes |
@@ -44,10 +44,10 @@ checklist below, not a byte-level decompilation figure.
 | Music | 🟡 | H2Overdrive tracks ✅ · Hydro Thunder music not decoded (plays the H2O theme) |
 | HUD | ✅ | Original layout, dials and fonts |
 | Water, skies, lighting | ✅ | Animated water, per-level skyboxes and sun |
-| Boost flames and Hull Crusher lightning | ✅ | From the original particle and bolt definitions |
+| Boost flames and Hull Crusher lightning | ✅ | Original definitions and art; sprite renderer approximates the original shader |
 | Collision | 🟡 | Walls and ramps work; a few spots still trap boats |
 | Cheats menu | ✅ | |
-| Boat part animations (wings, flaps) | ❌ | Animation format not decoded yet |
+| Boat part animations (wings, flaps) | ✅ | Decoded anim4 clips, boost deployment, wing movement and upgrade attachments |
 | Chaser boats | ❌ | AI-only boats not implemented |
 | Career mode and upgrades | ❌ | |
 | Hydro Thunder checkpoint times | ❌ | |
@@ -65,10 +65,9 @@ Pick anything here. Each item says what's missing and where to start.
    checkpoint). Run `scripts/race-all.sh`, find the DNFs, and look at `Collider` in
    `crates/riptide/src/race.rs`. H2Overdrive's collision mesh (`coll4.wc_<level>`) has inconsistent
    triangle winding, and giant invisible gate quads that the original's level scripts remove.
-2. **Boat part animations.** Wings, flaps and engines that move on boost and Hull Crusher. The
-   `anim4.BA_<boat>` entries in `triton.lux` start with an `ANIM` header followed by 0x2c-byte
-   per-node track records whose names are blanked. The boat definitions name the frames to play
-   (`Anim Boost Partition Frame`, `Anim Wing Deploy` / `Stow`).
+2. **Animation fidelity.** The animation format is decoded and boat parts move. Compare each
+   boat's deployment and stow poses against the original game, including upgrade levels and
+   Hull Crusher transitions (`Anim Boost Partition Frame`, `Anim Wing Deploy` / `Stow`).
 3. **Chaser boats.** H2Overdrive's AI-only chasers (Headhunter, Scotland Yard, Zodiac, Hong Kong
    Phooey) have models and boat definitions but no AI behaviour (rows marked `n/a` in `sheets/boats.csv`).
 4. **Career mode and upgrades.** Experience, armour, engine and spoiler upgrades. The data is in
@@ -165,6 +164,28 @@ cargo run --release -p riptide
 
 If any sheet cell is missing or wrong, the build stops before compiling and writes a report to
 `target/sheets/preflight.txt`.
+
+## 🌐 Browser build and hosting
+
+The browser version runs the engine on the player's computer. They choose their local
+`triton.lux` and optionally the Hydro Thunder `.gdi` and its track files. The browser reads
+only the byte ranges needed; game files are never uploaded or stored on the host.
+Selected ranges are cached in the player's browser memory during play.
+
+```sh
+scripts/build-web.sh
+python3 -m http.server -d web 8080
+```
+
+Open `http://localhost:8080`. For public hosting, publish `web/index.html` and `web/pkg/`
+over HTTPS with the `.wasm` MIME type `application/wasm`. The page uses relative paths,
+so it can live at `/riptide/` on an existing site or on a static host such as GitHub Pages.
+There is no backend or upload endpoint. Publish the built site; `web/pkg/` is ignored by Git.
+
+The current engine build is approximately 73 MB before HTTP compression (about 14 MB with gzip).
+Enable compression and caching on the host. Each player downloads the engine, then reads their own game files
+locally. The host's storage does not grow with player game files. Browser play requires WebGPU;
+desktop builds remain available for unsupported browsers.
 
 ## 🎮 Controls
 

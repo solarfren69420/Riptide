@@ -10,6 +10,7 @@
 //! frame), `RIPTIDE_EXIT_ON_FINISH=1` (stop when the autopiloted player finishes; logs `RESULT`).
 //! `scripts/race-all.sh` races every playable track this way.
 
+mod boatrig;
 mod cheats;
 mod content;
 mod effects;
@@ -20,6 +21,8 @@ mod race;
 mod sheets;
 mod sound;
 mod track;
+#[cfg(target_arch = "wasm32")]
+mod web;
 
 use bevy::camera::{ImageRenderTarget, RenderTarget};
 use bevy::prelude::*;
@@ -32,6 +35,8 @@ use content::{Content, ModelCache};
 pub enum Screen {
     #[default]
     Menu,
+    /// Browser build: fetching the chosen course from the player's files.
+    Loading,
     Race,
     /// Bounces straight back into `Race` so its scoped entities respawn.
     Restart,
@@ -57,7 +62,14 @@ struct ShotPlan {
     frame: u32,
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 fn main() -> AppExit {
+    // RIPTIDE_RECORD=<file>: write every triton.lux entry the run reads (the web build's
+    // per-course fetch lists are made this way; see scripts/web-manifests.sh).
+    let record = std::env::var("RIPTIDE_RECORD").ok();
+    if record.is_some() {
+        riptide_assets::lux::record();
+    }
     let content = match Content::load() {
         Ok(c) => c,
         Err(e) => {
@@ -66,6 +78,17 @@ fn main() -> AppExit {
             return AppExit::error();
         }
     };
+    run(content)
+}
+
+/// In the browser the page starts the game through [`web::start`] once the player has picked
+/// their game files.
+#[cfg(target_arch = "wasm32")]
+fn main() {}
+
+/// Build and run the app over loaded game data (desktop and web).
+pub fn run(content: Content) -> AppExit {
+    let record = std::env::var("RIPTIDE_RECORD").ok();
     if content.tracks.is_empty() || content.boats.is_empty() {
         eprintln!("riptide: no playable levels or boats found");
         return AppExit::error();
@@ -101,18 +124,41 @@ fn main() -> AppExit {
             primary_window: Some(Window {
                 title: "Riptide".into(),
                 resolution: WindowResolution::new(1600, 900),
+                // In the browser: draw into the page's canvas and fill its container.
+                canvas: cfg!(target_arch = "wasm32").then(|| "#riptide".into()),
+                fit_canvas_to_parent: true,
+                prevent_default_event_handling: true,
                 ..default()
             }),
             ..default()
         }
     };
-    app.add_plugins(DefaultPlugins.set(window).set(ImagePlugin { default_sampler: content::repeat_sampler() }))
+    let plugins = DefaultPlugins.set(window).set(ImagePlugin { default_sampler: content::repeat_sampler() });
+    if shot.is_some() {
+        // Off-screen captures need a schedule runner, but no display or audio device.
+        app.add_plugins(plugins.disable::<bevy::winit::WinitPlugin>().disable::<bevy::audio::AudioPlugin>());
+        app.add_plugins(bevy::app::ScheduleRunnerPlugin::default());
+        app.init_asset::<bevy::audio::AudioSource>();
+    } else {
+        app.add_plugins(plugins);
+    }
+    app
         .insert_resource(ClearColor(Color::srgb(0.55, 0.68, 0.82)))
         .insert_resource(content)
         .init_resource::<ModelCache>()
         .init_state::<Screen>()
-        .add_plugins((cheats::CheatsPlugin, menu::MenuPlugin, race::RacePlugin, sound::SoundPlugin, effects::EffectsPlugin, hud::HudPlugin))
+        .add_plugins((cheats::CheatsPlugin, menu::MenuPlugin, race::RacePlugin, sound::SoundPlugin, effects::EffectsPlugin, hud::HudPlugin, boatrig::BoatRigPlugin))
         .add_systems(OnEnter(Screen::Restart), |mut next: ResMut<NextState<Screen>>| next.set(Screen::Race));
+    #[cfg(target_arch = "wasm32")]
+    app.add_plugins(web::WebPlugin);
+    if let Some(path) = record {
+        app.add_systems(Last, move |mut n: Local<u32>| {
+            *n += 1;
+            if *n % 20 == 0 {
+                let _ = std::fs::write(&path, riptide_assets::lux::recorded().join("\n"));
+            }
+        });
+    }
 
     if let Some(prefix) = shot {
         let frames: Vec<u32> = std::env::var("RIPTIDE_SHOT_FRAMES")

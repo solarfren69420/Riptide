@@ -27,3 +27,9 @@ opt-level = 3
 
 [profile.dev]
 opt-level = 1
+
+# Browser build (scripts/build-web.sh): smaller and faster to download.
+[profile.web]
+inherits = "release"
+lto = "thin"
+codegen-units = 1

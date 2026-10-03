@@ -43,8 +43,9 @@ struct MenuText;
 #[derive(Component)]
 struct ShownBoat(usize);
 
-fn spawn_menu(mut commands: Commands, sel: Res<Selection>) {
+fn spawn_menu(mut commands: Commands, sel: Res<Selection>, mut models: Models) {
     let scope = DespawnOnExit(Screen::Menu);
+    let track_background = models.lux_texture("ut_bg_track");
     let mut cam = commands.spawn((
         Camera3d::default(),
         IsDefaultUiCamera,
@@ -60,7 +61,8 @@ fn spawn_menu(mut commands: Commands, sel: Res<Selection>) {
         scope.clone(),
     ));
     commands.insert_resource(GlobalAmbientLight { color: Color::WHITE, brightness: 1200.0, ..default() });
-    commands.spawn((Transform::IDENTITY, Visibility::default(), Turntable, ShownBoat(usize::MAX), scope.clone()));
+    // Leave the left side for track/boat selection text while the boat remains on display.
+    commands.spawn((Transform::from_xyz(55.0, 0.0, 0.0), Visibility::default(), Turntable, ShownBoat(usize::MAX), scope.clone()));
     commands
         .spawn((
             Node {
@@ -74,13 +76,24 @@ fn spawn_menu(mut commands: Commands, sel: Res<Selection>) {
             scope,
         ))
         .with_children(|c| {
+            if let Some(image) = track_background {
+                c.spawn((
+                    Node {
+                        position_type: PositionType::Absolute,
+                        width: percent(100),
+                        height: percent(100),
+                        ..default()
+                    },
+                    ImageNode::new(image),
+                ));
+            }
             c.spawn((
                 Text::new("RIPTIDE"),
                 TextFont { font_size: 64.0, ..default() },
                 TextColor(Color::srgb(1.0, 0.82, 0.25)),
                 TextShadow::default(),
             ));
-            c.spawn((Text::new(""), TextFont { font_size: 22.0, ..default() }, TextShadow::default(), MenuText));
+            c.spawn((Text::new(""), TextFont { font_size: 20.0, ..default() }, TextShadow::default(), MenuText));
         });
 }
 
@@ -154,7 +167,8 @@ fn menu_input(
         sfx.event(crate::sheets::sound_events_ids::MENU_TICK);
     }
     if input.just_pressed(ctl::MENU_START) {
-        next.set(Screen::Race);
+        // The browser build fetches the course from the player's files first.
+        next.set(if cfg!(target_arch = "wasm32") { Screen::Loading } else { Screen::Race });
     }
     if input.just_pressed(ctl::MENU_QUIT) && sel.render_target.is_none() {
         exit.write(AppExit::Success);
@@ -178,10 +192,17 @@ fn refresh_preview(
         }
     }
     let info = models.content.boats[sel.boat].clone();
-    if let Some(p) = models.boat(&info) {
-        let node = commands.spawn((Transform::from_scale(Vec3::splat(info.scale * 1.4)), Visibility::default())).id();
-        commands.entity(e).add_child(node);
-        attach(&mut commands, node, &p);
+    let node = commands.spawn((Transform::from_scale(Vec3::splat(info.scale * 1.4)), Visibility::default())).id();
+    commands.entity(e).add_child(node);
+    match crate::boatrig::spawn(&mut commands, &mut models, &info, node) {
+        Some(rig) => {
+            commands.entity(node).insert(rig);
+        }
+        None => {
+            if let Some(p) = models.boat(&info) {
+                attach(&mut commands, node, &p);
+            }
+        }
     }
 }
 

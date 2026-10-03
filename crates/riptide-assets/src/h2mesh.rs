@@ -16,7 +16,7 @@
 //! Source space is Direct3D (left-handed, Y up); output flips Z and the winding.
 
 use crate::lux::{cstr, u32_at};
-use crate::model::{Blend, MeshPart, Model};
+use crate::model::{Blend, Bone, MeshPart, Model};
 use anyhow::{bail, Context, Result};
 use std::collections::HashMap;
 
@@ -27,7 +27,34 @@ struct Fixups {
     external: Vec<(usize, String)>,
 }
 
+/// A mesh in its rest pose: skinned vertices placed by their bones, everything in one piece.
 pub fn decode_mesh(name: &str, blob: &[u8]) -> Result<Model> {
+    decode(name, blob, false)
+}
+
+/// A mesh for animating: [`Model::bones`] filled, and each part's vertices left in its bone's
+/// space ([`MeshPart::bone`]); place a part with its bone's (animated) model-space matrix.
+/// Parts whose mesh has no bones come out as from [`decode_mesh`].
+pub fn decode_rigged(name: &str, blob: &[u8]) -> Result<Model> {
+    decode(name, blob, true)
+}
+
+/// Direct3D row-major, row-vector matrix -> column-major matrix in output space (Z mirrored).
+fn mirrored_cols(m: &[f32; 16]) -> [f32; 16] {
+    // Read as column-major the array is already the column-vector transpose; mirroring Z is
+    // S * M * S, which negates entries with exactly one index on the Z axis.
+    // The stored matrices use only 3x4 affine entries. Their unused last
+    // column (including m[15]) is zero, not a homogeneous matrix row.
+    // Restore it before Bevy decomposes/inverts the skeleton transforms.
+    std::array::from_fn(|k| {
+        if k == 15 { 1.0 }
+        else if k % 4 == 3 { 0.0 }
+        else if (k / 4 == 2) != (k % 4 == 2) { -m[k] }
+        else { m[k] }
+    })
+}
+
+fn decode(name: &str, blob: &[u8], rigged: bool) -> Result<Model> {
     if blob.len() < 0x14 || &blob[0x0c..0x10] != b"MESH" {
         bail!("{name}: not a MESH blob");
     }
@@ -115,6 +142,17 @@ pub fn decode_mesh(name: &str, blob: &[u8]) -> Result<Model> {
             .collect(),
         _ => Vec::new(),
     };
+    // Bone records: `+0x04` name (0x20), `+0x24` own index, `+0x28` parent index (-1 = root).
+    let rig: Vec<Bone> = match ptr(0x4c) {
+        Some(b) if rigged && !bones.is_empty() => (0..bones.len())
+            .map(|i| {
+                let r = b + i * 0x170;
+                let parent = rd(r + 0x28).filter(|&p| (p as usize) < bones.len()).map(|p| p as usize);
+                Bone { name: cstr(&body[r + 4..r + 0x24]), parent, rest: mirrored_cols(&bones[i]) }
+            })
+            .collect(),
+        _ => Vec::new(),
+    };
     let uvs: Option<Vec<[f32; 2]>> = find(5, 8).map(|s| {
         (0..vcount)
             .map(|i| {
@@ -133,7 +171,7 @@ pub fn decode_mesh(name: &str, blob: &[u8]) -> Result<Model> {
             .collect()
     });
 
-    let mut model = Model { name: name.to_string(), parts: Vec::new() };
+    let mut model = Model { name: name.to_string(), ..Default::default() };
     for m in 0..nmat {
         let mb = mats + m * MATERIAL_STRIDE;
         if mb + MATERIAL_STRIDE > body.len() {
@@ -193,26 +231,39 @@ pub fn decode_mesh(name: &str, blob: &[u8]) -> Result<Model> {
             ranges.iter().find(|(f, n, _)| index_pos >= *f && index_pos < f + n).map(|r| &r.2)
         };
 
-        // Compact the shared streams down to what this material draws.
-        let mut remap: HashMap<(u32, usize), u32> = HashMap::new();
-        let mut part = MeshPart {
+        // Compact the shared streams down to what this material draws: one part, or (rigged)
+        // one per bone, each with its own vertex remap.
+        let blank = MeshPart {
             texture: texture.map(|t| t.trim_start_matches("txtr1.").to_string()),
             shader: shader.as_ref().map(|s| s.trim_start_matches("shad4.").to_string()),
             ..Default::default()
         };
+        let mut split: Vec<(MeshPart, HashMap<(u32, usize), u32>)> = Vec::new();
         for (ti, tri) in raw.chunks_exact(3).enumerate() {
             if tri.iter().any(|&v| v as usize >= vcount) || tri[0] == tri[1] || tri[1] == tri[2] || tri[0] == tri[2] {
                 continue;
             }
-            let bone = |vi: usize| -> Option<&[f32; 16]> {
+            let bone_index = |vi: usize| -> Option<usize> {
                 let pal = palette_for(ti * 3)?;
-                bones.get(*pal.get(vbone[vi] as usize)?)
+                let i = *pal.get(vbone[vi] as usize)?;
+                (i < bones.len()).then_some(i)
             };
+            // Rigged: the whole triangle rides its first vertex's bone (boat parts are rigid).
+            let tri_bone = if rig.is_empty() { None } else { bone_index(tri[0] as usize) };
+            let slot = match split.iter().position(|(p, _)| p.bone == tri_bone.map(|b| b as u16)) {
+                Some(s) => s,
+                None => {
+                    split.push((MeshPart { bone: tri_bone.map(|b| b as u16), ..blank.clone() }, HashMap::new()));
+                    split.len() - 1
+                }
+            };
+            let (part, remap) = &mut split[slot];
             // Mirroring Z already turns Direct3D's clockwise fronts counter-clockwise.
             for &v in tri {
                 let next = remap.len() as u32;
                 let vi = v as usize;
-                let b = if bones.is_empty() { None } else { bone(vi) };
+                // Baked: place the vertex by its bone. Rigged: leave it in the bone's space.
+                let b = if bones.is_empty() || !rig.is_empty() { None } else { bone_index(vi).map(|i| &bones[i]) };
                 let key = (v, b.map_or(usize::MAX, |m| m.as_ptr() as usize));
                 let id = *remap.entry(key).or_insert_with(|| {
                     let p = positions[vi];
@@ -248,20 +299,23 @@ pub fn decode_mesh(name: &str, blob: &[u8]) -> Result<Model> {
                 part.indices.push(id);
             }
         }
-        if part.indices.is_empty() {
-            continue;
+        for (mut part, _) in split {
+            if part.indices.is_empty() {
+                continue;
+            }
+            part.blend = match part.shader.as_deref() {
+                Some("D_Cutout") => Blend::Cutout,
+                Some(s) if s.starts_with("FX_Flare") || s.contains("Bolt") || s.contains("Glow") => Blend::Add,
+                Some(s) if s.starts_with("FX_Water") || s.starts_with("FX_Particles") || s == "FX_Blur" => Blend::Blend,
+                _ => Blend::Opaque,
+            };
+            model.parts.push(part);
         }
-        part.blend = match part.shader.as_deref() {
-            Some("D_Cutout") => Blend::Cutout,
-            Some(s) if s.starts_with("FX_Flare") || s.contains("Bolt") || s.contains("Glow") => Blend::Add,
-            Some(s) if s.starts_with("FX_Water") || s.starts_with("FX_Particles") || s == "FX_Blur" => Blend::Blend,
-            _ => Blend::Opaque,
-        };
-        model.parts.push(part);
     }
     if model.parts.is_empty() {
         bail!("{name}: no drawable materials");
     }
+    model.bones = rig;
     model.ensure_normals();
     Ok(model)
 }
@@ -269,4 +323,20 @@ pub fn decode_mesh(name: &str, blob: &[u8]) -> Result<Model> {
 fn srgb(c: u8) -> f32 {
     let c = c as f32 / 255.0;
     if c <= 0.04045 { c / 12.92 } else { ((c + 0.055) / 1.055).powf(2.4) }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::mirrored_cols;
+
+    #[test]
+    fn packed_affine_bone_preserves_homogeneous_points() {
+        // The disk format leaves the fourth column zero. A translated point
+        // must still have w=1 when consumed as a full matrix by the engine.
+        let packed = [1., 0., 0., 0., 0., 1., 0., 0., 0., 0., 1., 0., 4., 5., 6., 0.];
+        let m = mirrored_cols(&packed);
+        let p = [2., 3., -1., 1.];
+        let placed: [f32; 4] = std::array::from_fn(|r| (0..4).map(|c| m[c * 4 + r] * p[c]).sum());
+        assert_eq!(placed, [6., 8., -7., 1.]);
+    }
 }

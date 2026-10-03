@@ -64,6 +64,8 @@ pub struct Content {
 }
 
 impl Content {
+    /// Open the game files at their configured paths (`RIPTIDE_LUX`, `RIPTIDE_GDI`).
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn load() -> anyhow::Result<Self> {
         let lux = Arc::new(LuxArchive::open(&riptide_assets::default_lux_path())?);
         let ht = match HydroThunder::open(&riptide_assets::default_gdi_path()) {
@@ -73,6 +75,11 @@ impl Content {
                 None
             }
         };
+        Ok(Self::from_archives(lux, ht))
+    }
+
+    /// Build the roster and course list over already-open game files.
+    pub fn from_archives(lux: Arc<LuxArchive>, ht: Option<Arc<HydroThunder>>) -> Self {
         // Every boat row whose status is ok, in menu order.
         let mut rows: Vec<&'static BoatsRow> = BOATS.iter().filter(|r| r.status.is_ok()).collect();
         rows.sort_by_key(|r| r.menu_order);
@@ -118,8 +125,14 @@ impl Content {
                 Some(TrackChoice { id: t.id, name: t.display_name.to_string(), game: t.game, source })
             })
             .collect();
-        Ok(Self { lux, ht, boats, tracks })
+        Self { lux, ht, boats, tracks }
     }
+}
+
+/// A model with its skeleton: pieces ride bones (see [`crate::boatrig`]).
+pub struct Rig {
+    pub pieces: Vec<Piece>,
+    pub bones: Vec<riptide_assets::model::Bone>,
 }
 
 /// One drawable piece of a cached model.
@@ -127,11 +140,15 @@ impl Content {
 pub struct Piece {
     pub mesh: Handle<Mesh>,
     pub material: Handle<StandardMaterial>,
+    /// Rigged models: the bone the piece rides (its vertices are in that bone's space).
+    pub bone: Option<u16>,
 }
 
 #[derive(Resource, Default)]
 pub struct ModelCache {
     models: HashMap<String, Option<Arc<Vec<Piece>>>>,
+    rigs: HashMap<String, Option<Arc<Rig>>>,
+    clips: HashMap<String, Option<Arc<riptide_assets::h2anim::Clip>>>,
     textures: HashMap<String, Option<(Handle<Image>, TexAlpha)>>,
 }
 
@@ -178,6 +195,11 @@ pub enum Source {
 }
 
 impl Models<'_> {
+    /// A miss may only mean the bytes aren't fetched yet (browser build): don't remember it.
+    fn pending(&self) -> bool {
+        self.content.lux.pending() || self.content.ht.as_ref().is_some_and(|h| h.pending())
+    }
+
     /// Pieces of an H2Overdrive `mesh32` (name without prefix).
     pub fn lux(&mut self, name: &str) -> Option<Arc<Vec<Piece>>> {
         let key = format!("lux:{name}");
@@ -196,7 +218,9 @@ impl Models<'_> {
             }
             Arc::new(self.build(&m, Source::Lux, false))
         });
-        self.cache.models.insert(key, pieces.clone());
+        if pieces.is_some() || !self.pending() {
+            self.cache.models.insert(key, pieces.clone());
+        }
         pieces
     }
 
@@ -207,7 +231,7 @@ impl Models<'_> {
             return hit.clone();
         }
         let ht = self.content.ht.clone()?;
-        let mut model = Model { name: names.to_string(), parts: Vec::new() };
+        let mut model = Model { name: names.to_string(), ..Default::default() };
         for n in names.split(',') {
             match ht.geometry(n) {
                 Ok(m) => model.parts.extend(m.parts),
@@ -216,7 +240,9 @@ impl Models<'_> {
         }
         keep_bright_colors(&mut model);
         let pieces = (!model.parts.is_empty()).then(|| Arc::new(self.build(&model, Source::Ht, false)));
-        self.cache.models.insert(key, pieces.clone());
+        if pieces.is_some() || !self.pending() {
+            self.cache.models.insert(key, pieces.clone());
+        }
         pieces
     }
 
@@ -239,8 +265,52 @@ impl Models<'_> {
             }
             Arc::new(self.build(&m, Source::Lux, true))
         });
-        self.cache.models.insert(key, pieces.clone());
+        if pieces.is_some() || !self.pending() {
+            self.cache.models.insert(key, pieces.clone());
+        }
         pieces
+    }
+
+    /// An H2Overdrive `mesh32` with its skeleton (name without prefix), for animating.
+    pub fn lux_rig(&mut self, name: &str) -> Option<Arc<Rig>> {
+        let key = name.to_ascii_lowercase();
+        if let Some(hit) = self.cache.rigs.get(&key) {
+            return hit.clone();
+        }
+        let model = self
+            .content
+            .lux
+            .get(&format!("mesh32.{name}"))
+            .and_then(|b| riptide_assets::h2mesh::decode_rigged(name, b).map_err(|e| warn!("{name}: {e:#}")).ok());
+        let rig = model.map(|mut m| {
+            for p in &mut m.parts {
+                p.colors.clear();
+            }
+            let pieces = self.build(&m, Source::Lux, false);
+            Arc::new(Rig { pieces, bones: m.bones })
+        });
+        if rig.is_some() || !self.pending() {
+            self.cache.rigs.insert(key, rig.clone());
+        }
+        rig
+    }
+
+    /// An H2Overdrive `anim4` clip by name (without prefix).
+    pub fn lux_clip(&mut self, name: &str) -> Option<Arc<riptide_assets::h2anim::Clip>> {
+        let key = name.to_ascii_lowercase();
+        if let Some(hit) = self.cache.clips.get(&key) {
+            return hit.clone();
+        }
+        let clip = self
+            .content
+            .lux
+            .get(&format!("anim4.{name}"))
+            .and_then(|b| riptide_assets::h2anim::decode_anim(name, b).map_err(|e| warn!("{name}: {e:#}")).ok())
+            .map(Arc::new);
+        if clip.is_some() || !self.pending() {
+            self.cache.clips.insert(key, clip.clone());
+        }
+        clip
     }
 
     pub fn boat(&mut self, info: &BoatInfo) -> Option<Arc<Vec<Piece>>> {
@@ -275,7 +345,9 @@ impl Models<'_> {
             }
             (self.images.add(to_bevy_image(img)), TexAlpha::Smooth)
         });
-        self.cache.textures.insert(key, out.clone());
+        if out.is_some() || !self.pending() {
+            self.cache.textures.insert(key, out.clone());
+        }
         out.map(|t| t.0)
     }
 
@@ -291,7 +363,9 @@ impl Models<'_> {
             image.texture_descriptor.format = TextureFormat::Rgba8Unorm;
             (self.images.add(image), TexAlpha::None)
         });
-        self.cache.textures.insert(key, out.clone());
+        if out.is_some() || !self.pending() {
+            self.cache.textures.insert(key, out.clone());
+        }
         out.map(|t| t.0)
     }
 
@@ -322,7 +396,9 @@ impl Models<'_> {
             };
             (self.images.add(to_bevy_image(img)), alpha)
         });
-        self.cache.textures.insert(key, out.clone());
+        if out.is_some() || !self.pending() {
+            self.cache.textures.insert(key, out.clone());
+        }
         out
     }
 
@@ -374,7 +450,7 @@ impl Models<'_> {
                 fog_enabled: !unlit,
                 ..default()
             };
-            out.push(Piece { mesh: self.meshes.add(mesh), material: self.materials.add(material) });
+            out.push(Piece { mesh: self.meshes.add(mesh), material: self.materials.add(material), bone: part.bone });
         }
         out
     }

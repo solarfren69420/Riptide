@@ -1,5 +1,8 @@
 /target
 /out
 /target-dev
-# Extracted from the games: generate locally with riptide-tool seed-sheets
+/web/pkg/
+/target-web
+
+# Extract original data locally with riptide-tool seed-sheets.
 /sheets/game/

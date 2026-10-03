@@ -179,12 +179,12 @@ fn spawn_menu(mut commands: Commands) {
         children![(Text::new(""), TextFont { font_size: 20.0, ..default() }, TextShadow::default())],
     ));
     commands.spawn((
-        Node { position_type: PositionType::Absolute, right: px(24), top: px(18), ..default() },
+        Node { position_type: PositionType::Absolute, left: percent(50), top: px(60), ..default() },
         GlobalZIndex(9),
         CheatBadge,
         children![(
             Text::new(""),
-            TextFont { font_size: 15.0, ..default() },
+            TextFont { font_size: 13.0, ..default() },
             TextColor(Color::srgb(1.0, 0.75, 0.2)),
         )],
     ));
@@ -223,8 +223,8 @@ fn draw_menu(
     }
     if let Ok((mut vis, children)) = badge.single_mut() {
         *vis = if cheats.menu_open { Visibility::Hidden } else { Visibility::Visible };
-        let on: Vec<&str> = CHEATS.iter().zip(&cheats.on).filter(|(_, o)| **o).map(|(c, _)| c.label).collect();
-        let s = if on.is_empty() { "Tab: cheats".to_string() } else { format!("CHEATS: {}", on.join(", ")) };
+        let active = cheats.on.iter().filter(|on| **on).count();
+        let s = if active == 0 { "Tab: cheats".to_string() } else { format!("CHEATS x{active}") };
         if let Some(mut t) = children.first().and_then(|c| texts.get_mut(*c).ok()) {
             t.0 = s;
         }

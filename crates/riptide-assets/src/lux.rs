@@ -9,11 +9,10 @@
 //!
 //! The TOC carries no offsets: blobs are stored in FILETIME order starting at `0x38`.
 
+use crate::source::Source;
 use anyhow::{bail, Context, Result};
-use memmap2::Mmap;
-use std::collections::HashMap;
-use std::fs::File;
-use std::path::Path;
+use std::collections::{BTreeSet, HashMap};
+use std::sync::Mutex;
 
 #[derive(Debug, Clone)]
 pub struct LuxEntry {
@@ -23,7 +22,7 @@ pub struct LuxEntry {
 }
 
 pub struct LuxArchive {
-    map: Mmap,
+    src: Box<dyn Source>,
     entries: Vec<LuxEntry>,
     by_name: HashMap<String, usize>,
 }
@@ -32,21 +31,33 @@ const TOC_RECORD: usize = 0x60;
 const DATA_START: u64 = 0x38;
 
 impl LuxArchive {
-    pub fn open(path: &Path) -> Result<Self> {
-        let file = File::open(path).with_context(|| format!("open {}", path.display()))?;
-        // SAFETY: the archive is read-only game data that nothing rewrites while we run.
-        let map = unsafe { Mmap::map(&file)? };
-        if map.len() < 0x40 || &map[0x30..0x34] != b"LUX!" {
-            bail!("{} is not a LUX archive", path.display());
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn open(path: &std::path::Path) -> Result<Self> {
+        Self::from_source(Box::new(crate::source::MapSource::open(path)?)).with_context(|| path.display().to_string())
+    }
+
+    /// Byte ranges the header and table of contents live in: `(0, 0x40)`, then (once the
+    /// header is present) the TOC. A sparse source needs these before [`Self::from_source`].
+    pub fn index_ranges(src: &dyn Source) -> Vec<(u64, u64)> {
+        let mut out = vec![(0, 0x40)];
+        if let Some(h) = src.read(0, 0x40) {
+            let (count, toc) = (u32_at(h, 4) as u64, u32_at(h, 8) as u64);
+            out.push((toc, toc + count * TOC_RECORD as u64));
         }
-        let count = u32_at(&map, 4) as usize;
-        let toc = u32_at(&map, 8) as usize;
-        if toc + count * TOC_RECORD > map.len() {
-            bail!("LUX TOC out of range");
+        out
+    }
+
+    pub fn from_source(src: Box<dyn Source>) -> Result<Self> {
+        let head = src.read(0, 0x40).context("LUX header not available")?;
+        if &head[0x30..0x34] != b"LUX!" {
+            bail!("not a LUX archive");
         }
+        let count = u32_at(head, 4) as usize;
+        let toc = u32_at(head, 8) as usize;
+        let table = src.read(toc as u64, count * TOC_RECORD).context("LUX TOC out of range or not available")?;
         let mut raw: Vec<(u64, String, u64)> = (0..count)
             .map(|i| {
-                let r = &map[toc + i * TOC_RECORD..toc + (i + 1) * TOC_RECORD];
+                let r = &table[i * TOC_RECORD..(i + 1) * TOC_RECORD];
                 let name = cstr(&r[..0x20]);
                 let size = u64::from_le_bytes(r[0x40..0x48].try_into().unwrap());
                 let filetime = u64::from_le_bytes(r[0x50..0x58].try_into().unwrap());
@@ -68,7 +79,7 @@ impl LuxArchive {
             .enumerate()
             .map(|(i, e)| (e.name.to_ascii_lowercase(), i))
             .collect();
-        Ok(Self { map, entries, by_name })
+        Ok(Self { src, entries, by_name })
     }
 
     pub fn entries(&self) -> &[LuxEntry] {
@@ -76,8 +87,26 @@ impl LuxArchive {
     }
 
     pub fn get(&self, name: &str) -> Option<&[u8]> {
-        let e = &self.entries[*self.by_name.get(&name.to_ascii_lowercase())?];
-        Some(&self.map[e.offset as usize..(e.offset + e.size) as usize])
+        let e = self.entry(name)?;
+        if let Some(r) = RECORD.lock().unwrap().as_mut() {
+            r.insert(e.name.clone());
+        }
+        self.src.read(e.offset, e.size as usize)
+    }
+
+    pub fn entry(&self, name: &str) -> Option<&LuxEntry> {
+        Some(&self.entries[*self.by_name.get(&name.to_ascii_lowercase())?])
+    }
+
+    /// Some reads failed only because their bytes aren't fetched yet (browser build): a
+    /// `None` from [`Self::get`] is then "not yet", not "doesn't exist".
+    pub fn pending(&self) -> bool {
+        self.src.pending()
+    }
+
+    /// The underlying source (to fetch ranges into a sparse one).
+    pub fn source(&self) -> &dyn Source {
+        self.src.as_ref()
     }
 
     pub fn contains(&self, name: &str) -> bool {
@@ -93,11 +122,30 @@ impl LuxArchive {
     }
 }
 
-pub(crate) fn u32_at(b: &[u8], o: usize) -> u32 {
+pub fn u32_at(b: &[u8], o: usize) -> u32 {
     u32::from_le_bytes(b[o..o + 4].try_into().unwrap())
 }
 
-pub(crate) fn cstr(b: &[u8]) -> String {
+pub fn cstr(b: &[u8]) -> String {
     let end = b.iter().position(|&c| c == 0).unwrap_or(b.len());
     String::from_utf8_lossy(&b[..end]).into_owned()
+}
+
+/// Entry names read through [`LuxArchive::get`] while recording (see [`record`]).
+static RECORD: Mutex<Option<BTreeSet<String>>> = Mutex::new(None);
+
+/// Start (or restart) recording which entries are read: the per-course lists the web build
+/// fetches are made this way.
+pub fn record() {
+    *RECORD.lock().unwrap() = Some(BTreeSet::new());
+}
+
+/// Entries read since [`record`], and stop recording.
+pub fn take_recorded() -> Vec<String> {
+    RECORD.lock().unwrap().take().map(|s| s.into_iter().collect()).unwrap_or_default()
+}
+
+/// Entries read since [`record`], recording continuing.
+pub fn recorded() -> Vec<String> {
+    RECORD.lock().unwrap().as_ref().map(|s| s.iter().cloned().collect()).unwrap_or_default()
 }

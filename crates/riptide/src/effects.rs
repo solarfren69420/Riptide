@@ -18,7 +18,12 @@ impl Plugin for EffectsPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<FlameArt>()
             .add_systems(OnEnter(Screen::Race), (load_art, load_bolt_art))
-            .add_systems(Update, (emit, animate, emit_flames, animate_flames, hull_bolts).chain().run_if(in_state(Screen::Race)));
+            .add_systems(Update, (emit, animate, hull_bolts).chain().run_if(in_state(Screen::Race)))
+            .add_systems(Update, (emit_flames, animate_flames).chain()
+                .after(emit)
+                .after(crate::race::place_boats)
+                .after(crate::boatrig::animate)
+                .run_if(in_state(Screen::Race)));
     }
 }
 
@@ -57,18 +62,18 @@ struct Particle {
 struct Emitter {
     foam_due: f32,
     spray_due: f32,
-    flame_due: f32,
+    flame_due: HashMap<usize, f32>,
     was_airborne: bool,
 }
 
 fn load_art(mut commands: Commands, mut models: Models) {
     let quad = models.meshes.add(Rectangle::new(1.0, 1.0));
-    let fades = |models: &mut Models, tex: Handle<Image>, blend: AlphaMode| -> Vec<Handle<StandardMaterial>> {
+    let fades = |models: &mut Models, tex: Handle<Image>, blend: AlphaMode, opacity: f32| -> Vec<Handle<StandardMaterial>> {
         (0..FADE_STEPS)
             .map(|k| {
                 let a = 1.0 - k as f32 / FADE_STEPS as f32;
                 models.materials.add(StandardMaterial {
-                    base_color: Color::srgba(0.92, 0.96, 1.0, a * 0.55),
+                    base_color: Color::srgba(0.92, 0.96, 1.0, a * opacity),
                     base_color_texture: Some(tex.clone()),
                     alpha_mode: blend,
                     unlit: true,
@@ -103,12 +108,12 @@ fn load_art(mut commands: Commands, mut models: Models) {
             models.images.add(crate::content::to_bevy_image(img))
         })
         .collect();
-    let foam: Vec<Vec<Handle<StandardMaterial>>> = foam_tex.into_iter().map(|t| fades(&mut models, t, AlphaMode::Blend)).collect();
+    let foam: Vec<Vec<Handle<StandardMaterial>>> = foam_tex.into_iter().map(|t| fades(&mut models, t, AlphaMode::Blend, 0.55)).collect();
     let mut spray_tex: Vec<Handle<Image>> = (1..=4).filter_map(|n| models.lux_texture(&format!("ET_COM_WaterSpray{n:02}"))).collect();
     spray_tex.extend(models.lux_texture("ET_COM_splash"));
     let spray: Vec<Vec<Handle<StandardMaterial>>> = spray_tex
         .into_iter()
-        .map(|t| fades(&mut models, t, AlphaMode::Blend))
+        .map(|t| fades(&mut models, t, AlphaMode::Blend, phy::SPRAY_OPACITY))
         .collect();
     commands.insert_resource(FxArt { quad, foam, spray });
 }
@@ -302,11 +307,13 @@ fn flame_materials(models: &mut Models, layer: usize) -> Vec<Handle<StandardMate
     let tex = models.lux_texture(l.texture);
     // Smoke layers blend, flame layers add (evidence EVD_ROCKET_LAYERS).
     let add = !l.texture.to_ascii_lowercase().contains("smoke");
+    let brightness = if add { phy::ROCKET_ADDITIVE_BRIGHTNESS } else { 1.0 };
     (0..FLAME_STEPS)
         .map(|k| {
             let (c, a) = layer_color(l, (k as f32 + 0.5) / FLAME_STEPS as f32);
             models.materials.add(StandardMaterial {
-                base_color: Color::LinearRgba(LinearRgba::new(c.x, c.y, c.z, a)),
+                base_color: Color::LinearRgba(LinearRgba::new(c.x * brightness, c.y * brightness, c.z * brightness,
+                    a * if add { 1.0 } else { phy::ROCKET_SMOKE_OPACITY })),
                 base_color_texture: tex.clone(),
                 alpha_mode: if add { AlphaMode::Add } else { AlphaMode::Blend },
                 unlit: true,
@@ -324,12 +331,13 @@ fn emit_flames(
     art: Option<Res<FxArt>>,
     mut flames: ResMut<FlameArt>,
     mut models: Models,
-    live: Query<(), With<Flame>>,
-    mut boats: Query<(&Boat, &mut Emitter)>,
+    live: Query<&Flame>,
+    mut boats: Query<(&Boat, &mut Emitter, Option<&crate::boatrig::BoatRig>)>,
+    places: bevy::transform::helper::TransformHelper,
 ) {
     let Some(art) = art else { return };
     let dt = time.delta_secs().min(1.0 / 20.0);
-    let mut budget = (phy::FX_MAX_PARTICLES as usize).saturating_sub(live.iter().count());
+    let mut budget = (phy::ROCKET_MAX_PARTICLES as usize).saturating_sub(live.iter().filter(|p| p.age + dt < p.life).count());
     let mut seed = (time.elapsed_secs() * 7919.0) as u32 | 1;
     let mut rand = move || {
         seed ^= seed << 13;
@@ -337,7 +345,9 @@ fn emit_flames(
         seed ^= seed << 5;
         (seed % 10_000) as f32 / 10_000.0 * 2.0 - 1.0
     };
-    for (b, mut em) in &mut boats {
+    let mut emitters: Vec<_> = boats.iter_mut().collect();
+    emitters.sort_by_key(|(b, _, _)| !b.player);
+    for (b, mut em, rig) in emitters {
         let def = b.info.def;
         let flame = if b.super_time > 0.0 {
             def.flamedef_super.or(def.flamedef_boost)
@@ -347,35 +357,66 @@ fn emit_flames(
             None
         };
         let Some(flame) = flame else {
-            em.flame_due = 0.0;
+            em.flame_due.clear();
             continue;
         };
         let f = &H2_ROCKET_FLAMES[flame];
         let rot = Quat::from_rotation_y(b.yaw);
         let s = b.info.scale;
         let back = rot * Vec3::Z;
-        let nozzle = b.pos + rot * Vec3::new(0.0, phy::ROCKET_NOZZLE_HEIGHT, -def.rooster_offset_z) * s;
+        // The boat's own rocket nozzle bones (RKBOOST_*, RKSUPERBOOST for gold boost); boats
+        // without a rig use the stern estimate (physics.rocket_nozzle_height).
+        let fallback = b.pos + rot * Vec3::new(0.0, phy::ROCKET_NOZZLE_HEIGHT, -def.rooster_offset_z) * s;
+        let nozzles: Vec<(Vec3, Vec3)> = match rig {
+            Some(r) => {
+                let ids: Vec<Entity> = match (b.super_time > 0.0, r.super_nozzle) {
+                    (true, Some(n)) => vec![n],
+                    _ => r.nozzles.clone(),
+                };
+                // GlobalTransform is from the previous frame during Update; compute
+                // from this frame's local boat/bone poses before render preparation.
+                ids.iter().filter_map(|e| places.compute_global_transform(*e).ok()).map(|g| {
+                    // Original emitter velocity follows the nozzle's local +Z. The
+                    // asset decoder mirrors Z, so that axis is -Z in output space.
+                    (g.translation(), g.affine().transform_vector3(Vec3::NEG_Z).normalize_or(back))
+                }).collect()
+            }
+            None => Vec::new(),
+        };
+        let nozzles = if nozzles.is_empty() { vec![(fallback, back)] } else { nozzles };
         let carry = Vec3::new(b.vel.x, b.vy, b.vel.y);
-        em.flame_due += phy::ROCKET_RATE * dt;
-        let n = em.flame_due as usize;
-        em.flame_due -= n as f32;
         for layer in [f.layer0_def, f.layer1_def, f.layer2_def, f.layer3_def].into_iter().flatten() {
             let mat = flames.0.entry(layer).or_insert_with(|| flame_materials(&mut models, layer))[0].clone();
             let l = &H2_ROCKET_LAYERS[layer];
-            for _ in 0..n {
-                if budget == 0 {
-                    return;
-                }
-                budget -= 1;
+            // FUN_004d6500 fills the gap between the moving nozzle and its newest
+            // puff at Motion Puff Dist intervals; 60 Hz is far too sparse for
+            // the retail 40 ms flame. Use the layer's exhaust travel / puff distance.
+            let rate = (l.high_motion_speed.abs() / l.high_motion_puff_dist.max(0.01)).max(phy::ROCKET_RATE);
+            let due = em.flame_due.entry(layer).or_default();
+            let due_before = *due;
+            *due += rate * dt;
+            let n = *due as usize;
+            *due -= n as f32;
+            for k in 0..n * nozzles.len() {
+                let (nozzle, direction) = nozzles[k % nozzles.len()];
+                // Emit throughout the frame. A 40 ms flame otherwise dies in the same
+                // 50 ms capture step in which it was born, before it can be rendered.
+                let born_at = (k / nozzles.len()) as f32 + 1.0 - due_before;
+                let born_at = born_at / rate;
                 let life = (l.high_motion_life_secs + l.high_motion_life_secs_spread * rand()).max(0.02);
+                let age = (dt - born_at).max(0.0);
+                if age >= life { continue; }
+                if budget == 0 { return; }
+                budget -= 1;
                 let speed = l.high_motion_speed + l.high_motion_speed_spread * rand();
                 let size = phy::ROCKET_SIZE * s;
-                let jitter = rot * Vec3::new(rand() * l.high_motion_pos_delta_x, rand() * l.high_motion_pos_delta_y, 0.0) * size;
+                let jitter = rot * Vec3::new(rand() * l.high_motion_pos_delta_x, rand() * l.high_motion_pos_delta_y, 0.0) * s;
                 commands.spawn((
                     Mesh3d(art.quad.clone()),
                     MeshMaterial3d(mat.clone()),
-                    Transform::from_translation(nozzle + jitter).with_scale(Vec3::splat(l.high_scale0_val.max(0.01) * size)),
-                    Flame { layer, vel: carry + back * speed, age: 0.0, life, size },
+                    // Interpolate the nozzle's birth position within this frame.
+                    Transform::from_translation(nozzle - carry * age + jitter).with_scale(Vec3::splat(l.high_scale0_val.max(0.01) * size)),
+                    Flame { layer, vel: carry + direction * speed, age: -born_at, life, size },
                     NotShadowCaster,
                     DespawnOnExit(Screen::Race),
                 ));
@@ -400,6 +441,7 @@ fn animate_flames(
     }
     let eye = cam.single().map(|c| c.translation).ok();
     for (e, mut p, mut tf, mut mat) in &mut parts {
+        let active_dt = (p.age + dt).max(0.0).min(dt);
         p.age += dt;
         if p.age >= p.life {
             commands.entity(e).despawn();
@@ -407,14 +449,14 @@ fn animate_flames(
         }
         let l = &H2_ROCKET_LAYERS[p.layer];
         let t = p.age / p.life;
-        p.vel *= 1.0 - (l.high_motion_friction * dt).min(1.0);
-        p.vel.y -= l.high_motion_gravity * dt;
-        tf.translation += p.vel * dt;
+        p.vel *= 1.0 - (l.high_motion_friction * active_dt).min(1.0);
+        p.vel.y -= l.high_motion_gravity * active_dt;
+        tf.translation += p.vel * active_dt;
         tf.scale = Vec3::splat(layer_scale(l, t).max(0.01) * p.size);
         if let Some(eye) = eye {
             tf.look_at(eye, Vec3::Y);
         }
-        let near = eye.map_or(1.0, |e| (tf.translation.distance(e) / phy::FX_NEAR_FADE).clamp(0.0, 1.0));
+        let near = eye.map_or(1.0, |e| (tf.translation.distance(e) / phy::ROCKET_NEAR_FADE).clamp(0.0, 1.0));
         if near < 1.0 {
             tf.scale *= near;
         }
