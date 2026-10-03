@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Riptide</title>
+<style>
+  :root {
+    --bg: #04121c;
+    --panel: #0b2433;
+    --line: #1d4b63;
+    --text: #e6f4fb;
+    --muted: #8fb4c7;
+    --accent: #2ec5f2;
+    --accent-ink: #032130;
+    --warn: #ffb347;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
+    font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  #game { position: fixed; inset: 0; }
+  #riptide { width: 100%; height: 100%; display: block; outline: none; }
+  #setup { position: fixed; inset: 0; display: grid; place-items: center; padding: 16px;
+    background: radial-gradient(ellipse at top, #0c3a52 0%, var(--bg) 70%); overflow-y: auto; }
+  .card { width: min(560px, 100%); background: var(--panel); border: 1px solid var(--line);
+    border-radius: 14px; padding: 28px; box-shadow: 0 20px 60px rgba(0,0,0,.45); }
+  h1 { margin: 0 0 4px; font-size: 34px; letter-spacing: .5px; }
+  .tag { margin: 0 0 22px; color: var(--muted); }
+  .step { margin: 18px 0; }
+  .step label { display: block; font-weight: 600; margin-bottom: 6px; }
+  .hint { color: var(--muted); font-size: 14px; margin: 4px 0 0; }
+  input[type=file] { width: 100%; color: var(--muted); }
+  input[type=file]::file-selector-button { background: transparent; color: var(--accent);
+    border: 1px solid var(--accent); border-radius: 8px; padding: 7px 14px; margin-right: 12px; cursor: pointer; }
+  button#go { width: 100%; margin-top: 10px; padding: 13px; font-size: 17px; font-weight: 700;
+    border: 0; border-radius: 10px; background: var(--accent); color: var(--accent-ink); cursor: pointer; }
+  button#go:disabled { opacity: .45; cursor: default; }
+  #status { min-height: 1.5em; margin-top: 14px; color: var(--muted); }
+  #status.error { color: var(--warn); }
+  .privacy { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--line); color: var(--muted); font-size: 13px; }
+  code { color: var(--text); }
+</style>
+</head>
+<body>
+<div id="game"><canvas id="riptide" tabindex="0"></canvas></div>
+
+<div id="setup">
+  <div class="card">
+    <h1>🌊 Riptide</h1>
+    <p class="tag">H2Overdrive and Hydro Thunder courses, racing in your browser, from your own game files.</p>
+
+    <div class="step">
+      <label for="lux">1. H2Overdrive: <code>triton.lux</code> <span class="hint">(required)</span></label>
+      <input id="lux" type="file" accept=".lux">
+      <p class="hint">In the arcade game's install folder, about 3.1 GB.</p>
+    </div>
+
+    <div class="step">
+      <label for="disc">2. Hydro Thunder: <code>disc.gdi</code> + all its <code>track*.bin</code> <span class="hint">(optional)</span></label>
+      <input id="disc" type="file" multiple accept=".gdi,.bin">
+      <p class="hint">Select the <code>.gdi</code> and every track file together (Ctrl+A in the folder).</p>
+    </div>
+
+    <button id="go" disabled>Start</button>
+    <div id="status"></div>
+
+    <p class="privacy">Your files never leave your computer: the game reads only the parts it needs,
+      straight from your disk. Nothing is uploaded. Needs a browser with WebGPU (current Chrome,
+      Edge, Firefox or Safari).</p>
+  </div>
+</div>
+
+<script type="module">
+  import init, { startGame } from "./pkg/riptide.js";
+  import { loadEngine } from "./engine.js";
+
+  const $ = (id) => document.getElementById(id);
+  const status = (text, error = false) => { $("status").textContent = text; $("status").className = error ? "error" : ""; };
+
+  if (!navigator.gpu) {
+    status("This browser has no WebGPU. Try a current Chrome, Edge, Firefox or Safari.", true);
+  }
+  $("lux").addEventListener("change", () => { $("go").disabled = !$("lux").files.length || !navigator.gpu; });
+
+  $("go").addEventListener("click", async () => {
+    const lux = $("lux").files[0];
+    const disc = Array.from($("disc").files);
+    if (disc.length && !disc.some((f) => f.name.toLowerCase().endsWith(".gdi"))) {
+      status("Hydro Thunder: include the .gdi file with the track files.", true);
+      return;
+    }
+    $("go").disabled = true;
+    status("Loading the engine…");
+    try {
+      await loadEngine(init);
+      status("Reading your game files…");
+      await startGame(lux, disc);
+      $("setup").remove();
+      $("riptide").focus();
+    } catch (e) {
+      console.error(e);
+      status(String(e), true);
+      $("go").disabled = false;
+    }
+  });
+</script>
+</body>
+</html>
