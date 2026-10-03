@@ -1,7 +1,9 @@
 // Published builds carry a gzip file so static hosts need no compression settings.
 // Local build-web.sh output can still use wasm-bindgen's ordinary .wasm loader.
 export async function loadEngine(init) {
-  const response = await fetch(new URL("./pkg/riptide_bg.wasm.gz", import.meta.url));
+  const url = new URL("./pkg/riptide_bg.wasm.gz", import.meta.url);
+  url.search = new URL(import.meta.url).search;
+  const response = await fetch(url);
   if (response.status === 404) return init();
   if (!response.ok) throw new Error(`Engine download failed (${response.status}). Please retry.`);
 
