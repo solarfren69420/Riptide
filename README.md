@@ -102,52 +102,139 @@ Pick anything here. Each item says what's missing and where to start.
   `sudo apt install pkg-config libasound2-dev libudev-dev`
 - **Your own copies of the games**, see below
 
-## 💾 Game files
+## 💾 Game files (read this first!)
 
-Riptide needs **one file from H2Overdrive** and, optionally, **one disc image of Hydro Thunder**.
-Nothing else from either game is used.
+Riptide is only the engine. It ships with **no** game content, so you need your own copies of the
+games. It reads exactly **two things**, and nothing else from either game:
 
-### H2Overdrive: `triton.lux` (required)
+1. **H2Overdrive's `triton.lux`** (required): one big archive file from the arcade game.
+2. **Hydro Thunder's Dreamcast disc, as a GDI dump** (optional): adds the Hydro Thunder courses
+   and boats.
+
+Below is exactly what Riptide was built and tested with, so you can check yours matches.
+
+### 1. H2Overdrive: `triton.lux` (required)
+
+**What it is:** H2Overdrive is a 2009 arcade boat racer by Raw Thrills. The arcade cabinet runs
+Windows, and the whole game (every model, texture, track, sound and setting) is packed into one
+file called `triton.lux`. That single file is all Riptide needs.
+
+**Where to find it:** in your H2Overdrive install folder (the folder TeknoParrot or the cabinet
+runs the game from). It sits next to files like `sdaemon.exe`, `Settings.xml` and `Scores.xml`:
+
+```text
+H2Overdrive/            ← your install folder (any name)
+├── sdaemon.exe         ← the game itself (Riptide doesn't need it)
+├── Settings.xml
+├── Scores.xml
+├── movies/
+└── triton.lux          ← ✅ this is the one Riptide needs
+```
+
+**The exact version Riptide was made with:**
 
 | | |
 |---|---|
-| **Version** | The 2009 Raw Thrills **arcade** release (the PC-based cabinet) |
-| **File** | `triton.lux`, about **3.1 GB**, in the game's install folder next to `Settings.xml` and `Scores.xml` |
-| **Holds** | Every model, texture, level, collision mesh, sound bank and data table |
-| **Tell Riptide** | `RIPTIDE_LUX=/path/to/triton.lux` |
-| **Default** | `~/MEGA downloads/TRITON/TRITON/triton.lux` |
+| Game | **H2Overdrive** (Raw Thrills, 2009), PC-based arcade release |
+| File | `triton.lux` |
+| Size | **3,300,747,006 bytes** (about 3.1 GB) |
+| File date | 6 November 2009 |
+| Archive header | LUX version 3, **5,147 entries** |
+| MD5 | `5f3f132361416a978e9370d48ab213ae` |
+| SHA-1 | `3ed3768e05dde4e3399e63565c40bd026ae9d4c5` |
 
-Only `triton.lux` is read. The game's executable, DLLs, movies and loaders aren't needed.
+If your checksum is different, you probably have a different release or revision. It may still
+work, but it isn't tested.
 
-### Hydro Thunder: Dreamcast disc image (optional)
+### 2. Hydro Thunder: Dreamcast disc as a GDI dump (optional)
+
+**What it is:** Hydro Thunder (Midway, 1999) on the Sega Dreamcast. Dreamcast discs (called
+GD-ROMs) are usually backed up as a **GDI dump**: one small text file named `something.gdi` that
+lists the disc's tracks, plus one `.bin` file per track. Riptide reads the game's files straight
+out of that dump; you don't need to extract anything.
+
+**What the folder should look like:** all 38 files together in one folder:
+
+```text
+Hydro Thunder (USA)/
+├── disc.gdi            ← ✅ the file you point Riptide at
+├── track01.bin
+├── track02.bin
+├── track03.bin         ← the main game data (134 MB)
+├── ...                 ← track04.bin to track36.bin (music and audio)
+└── track37.bin         ← more game data (553 MB)
+```
+
+**The exact disc Riptide was made with:**
 
 | | |
 |---|---|
-| **Version** | **Hydro Thunder (USA)**, Sega Dreamcast |
-| **Format** | A **GDI dump**: `disc.gdi` plus its `track01.bin` … `track37.bin`, all in one folder, about **1.2 GB** in total (Redump-style raw 2352-byte sectors) |
-| **Holds** | `HYDRODC.R2` (boats, textures, fonts) and one `.R2` archive per course, read straight out of the image |
-| **Tell Riptide** | `RIPTIDE_GDI=/path/to/disc.gdi` |
-| **Default** | `~/Games/Dreamcast/Hydro Thunder (USA)/disc.gdi` |
+| Game | **Hydro Thunder**, Sega Dreamcast, **USA** release (Midway) |
+| Product number | **T-9702N** |
+| Version | **V1.020** (disc date 1999-10-04) |
+| Format | GDI dump, **37 tracks**, raw 2352-byte sectors (the standard Redump-style layout) |
+| Total size | 1,188,616,128 bytes of `.bin` files (about 1.2 GB) |
+| SHA-1 `disc.gdi` | `7acc178f9695038b3fd8ba8daf0a11c880076d33` |
+| SHA-1 `track03.bin` | `d8252cd17a048e8ab801a79b0101b9769414e7dd` (140,242,704 bytes) |
+| SHA-1 `track37.bin` | `53b62d8ad8faa123e90f92f812b8f3df189f4425` (579,617,472 bytes) |
 
-`.cdi`, `.chd` and `.iso` images aren't supported. Convert them to GDI first: for example,
-`chdman extractcd` turns a CHD back into GDI plus BIN files. Without a Hydro Thunder image, Riptide
-still runs, with H2Overdrive courses and boats only.
+**Other formats:** `.cdi`, `.chd` and `.iso` images **don't work** as they are. If you have a
+`.chd`, convert it to GDI first with MAME's `chdman` tool:
 
-### Setting the paths
+```sh
+chdman extractcd -i "Hydro Thunder (USA).chd" -o disc.gdi
+```
 
-Export the variables in your shell, or put them in front of every command:
+Without Hydro Thunder, Riptide still runs fine with just the H2Overdrive courses and boats.
+
+### How to check a checksum
+
+A checksum is a fingerprint of a file: if yours matches the table, you have the same file.
+
+- **Windows** (Command Prompt): `certutil -hashfile triton.lux SHA1`
+- **macOS** (Terminal): `shasum -a 1 triton.lux`
+- **Linux** (terminal): `sha1sum triton.lux`
+
+Hashing a 3 GB file takes a little while; that's normal.
+
+### Telling Riptide where your files are
+
+Riptide finds the files through two settings, `RIPTIDE_LUX` and `RIPTIDE_GDI`. Set them in the
+terminal you start Riptide from (use your own paths):
+
+**Linux / macOS:**
 
 ```sh
 export RIPTIDE_LUX="$HOME/Games/H2Overdrive/triton.lux"
-export RIPTIDE_GDI="$HOME/Games/Dreamcast/Hydro Thunder (USA)/disc.gdi"
+export RIPTIDE_GDI="$HOME/Games/Hydro Thunder (USA)/disc.gdi"
 ```
 
-To check that both are found:
+**Windows (PowerShell):**
+
+```powershell
+$env:RIPTIDE_LUX = "C:\Games\H2Overdrive\triton.lux"
+$env:RIPTIDE_GDI = "C:\Games\Hydro Thunder (USA)\disc.gdi"
+```
+
+These last until you close the terminal. To check that Riptide can read both:
 
 ```sh
-cargo run --release -p riptide-tool -- level wa       # prints Wild America's contents from triton.lux
-cargo run --release -p riptide-tool -- ht-track AMAZ.R2 HJTAMAZTRH0   # reads Lost Island from the disc image
+cargo run --release -p riptide-tool -- level wa                       # should print Wild America's contents
+cargo run --release -p riptide-tool -- ht-track AMAZ.R2 HJTAMAZTRH0   # should print Lost Island's course
 ```
+
+**In the browser version**, you don't set anything: the page asks you to pick `triton.lux`, and
+optionally the `.gdi` together with all its `track*.bin` files. They're read straight from your
+disk and never uploaded.
+
+### Troubleshooting
+
+- **"cannot load game data" / "not a LUX archive":** `RIPTIDE_LUX` doesn't point at the real
+  `triton.lux`. Check the path, including quotes if it has spaces.
+- **"Hydro Thunder disc not loaded":** check that `RIPTIDE_GDI` points at the `.gdi` file itself, and
+  that all 37 `track*.bin` files are in the same folder with their original names.
+- **Hydro Thunder courses missing from the menu:** same as above. The H2Overdrive courses still
+  work without it.
 
 ## 🚀 Build and run
 
