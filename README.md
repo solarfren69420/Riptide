@@ -66,6 +66,44 @@ checklist below, not a byte-level decompilation figure.
 | Multiplayer | ❌ | |
 | Full front-end menus | ❌ | Minimal boat and track select for now |
 
+## 🏁 Course status
+
+Every course, measured by two automatic tests (headless, run on the current build):
+
+- **Racing-line check** (`scripts/collision-check.sh`): the boat drives the centre of the racing line with no time limit. It shows how far it got, how many frames it touched a wall, and how long it was stuck. 🟢 95%+ · 🟡 60–94% · 🔴 under 60%.
+- **AI race** (`scripts/race-all.sh`): a full race against 7 AI boats under the arcade timer. ✅ finished · ⏱️ ran out of time · ❌ got stuck.
+- **Collision**: each course uses whichever collision system measured better on it (`collision` column in `sheets/tracks.csv`): the original grid-based `classic`, or `parry` (parry3d triangle meshes with swept hull tests).
+
+| # | Course | Game | Collision | Racing-line check | Wall contacts | Stalled | AI race (arcade timer on) |
+|---|---|---|---|---|---|---|---|
+| 1 | Wild America | H2Overdrive | classic | 🟡 90% | 168 | 7.2s | ⏱️ time up at 67% after 200.01s |
+| 2 | Hong Kong Buoy | H2Overdrive | classic | 🔴 49% | 841 | 38.6s | ⏱️ time up at 44% after 110.05s |
+| 3 | Temple of Flume | H2Overdrive | classic | 🟡 92% | 13 | 11.5s | ✅ finished 8 of 8 in 111.75s |
+| 4 | London Underground | H2Overdrive | classic | 🟡 91% | 175 | 5.7s | ✅ finished 7 of 8 in 111.05s |
+| 5 | Quake Canyon | H2Overdrive | classic | 🔴 45% | 1612 | 72.2s | ⏱️ time up at 45% after 170.01s |
+| 6 | Revenge of the Nile | H2Overdrive | classic | 🟢 99% | 1902 | 11.7s | ❌ DNF furthest seg 4 |
+| 7 | Frozen Tundra | H2Overdrive | parry | 🟡 75% | 437 | 10.3s | ✅ finished 5 of 8 in 141.60s |
+| 8 | Down Underdrive | H2Overdrive | parry | 🟡 71% | 818 | 40.6s | ✅ finished 2 of 8 in 153.25s |
+| 9 | Frozen Tundra Backward | H2Overdrive | classic | 🟢 100% | 142 | 3.3s | ✅ finished 2 of 8 in 110.25s |
+| 10 | Down Underdrive Backward | H2Overdrive | parry | 🟡 82% | 811 | 25.1s | ⏱️ time up at 8% after 90.00s |
+| 11 | Thunder Park | Hydro Thunder | parry | 🟡 69% | 643 | 47.7s | ✅ finished 2 of 8 in 287.20s |
+| 12 | Lost Island | Hydro Thunder | classic | 🔴 34% | 1219 | 12.8s | ✅ finished 4 of 8 in 268.86s |
+| 13 | Lake Powell | Hydro Thunder | classic | 🟡 94% | 23 | 11.1s | ❌ DNF furthest seg 77 |
+| 14 | Arctic Circle | Hydro Thunder | parry | 🔴 46% | 1741 | 15.3s | ❌ DNF furthest seg 58 |
+| 15 | Greek Isles | Hydro Thunder | classic | 🔴 33% | 1242 | 37.1s | ❌ DNF furthest seg 20 |
+| 16 | Ship Graveyard | Hydro Thunder | classic | 🟡 92% | 76 | 7.4s | ❌ DNF furthest seg 84 |
+| 17 | Venice Canals | Hydro Thunder | classic | 🔴 19% | 1161 | 31.4s | ❌ DNF furthest seg 23 |
+| 18 | Far East | Hydro Thunder | classic | 🔴 51% | 1329 | 17.1s | ❌ DNF furthest seg 66 |
+| 19 | New York Disaster | Hydro Thunder | classic | 🟡 78% | 740 | 13.1s | ❌ DNF furthest seg 57 |
+| 20 | Nile Adventure | Hydro Thunder | parry | 🔴 34% | 711 | 40.7s | ❌ DNF furthest seg 70 |
+| 21 | Hydro Speedway | Hydro Thunder | classic | 🟢 99% | 255 | 9.1s | ✅ finished 8 of 8 in 129.20s |
+| 22 | Castle Von Dandy | Hydro Thunder | classic | 🟢 100% | 139 | 10.0s | ✅ finished 6 of 8 in 156.20s |
+| 23 | Catacomb | Hydro Thunder | classic | 🟡 89% | 117 | 9.3s | ✅ finished 6 of 8 in 169.91s |
+| 24 | Practice | Hydro Thunder | classic | 🔴 39% | 598 | 40.4s | ❌ DNF furthest seg 50 |
+| 25 | Hackworld | Sandbox | classic | 🔴 1% | 0 | 16.4s | ❌ DNF furthest seg 70 |
+
+**Totals:** 10 of 25 AI races finished (8 with either collision system alone). Hackworld is an open-water sandbox with a 99-lap ring, so it never "finishes". Lost Island finishing despite a low racing-line score means the AI found a better line than the dead centre.
+
 ## 🚧 What still needs to be done
 
 Pick anything here. Each item says what's missing and where to start.

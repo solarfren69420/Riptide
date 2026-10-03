@@ -206,7 +206,7 @@ impl Track {
     }
 
     /// Is `q` inside the quad between cross-sections `seg` and `seg + 1`?
-    fn contains(&self, seg: usize, q: Vec2) -> bool {
+    pub fn contains(&self, seg: usize, q: Vec2) -> bool {
         let (a, b) = (&self.edges[seg], &self.edges[seg + 1]);
         Self::contains_edges(a, b, q)
     }

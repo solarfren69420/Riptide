@@ -5,6 +5,7 @@ edition.workspace = true
 
 [dependencies]
 anyhow.workspace = true
+parry3d = "0.31.1"
 bevy.workspace = true
 riptide-assets = { path = "../riptide-assets" }
 

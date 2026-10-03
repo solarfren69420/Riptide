@@ -105,3 +105,6 @@ hackworld_ring_width,f32,5000,units,riptide design: Hackworld ring width
 hackworld_water_half,f32,30000,units,riptide design: Hackworld water extends this far each way from the centre
 hackworld_laps,f32,99,laps,riptide design: Hackworld never really ends
 ramp_max_slope,f32,1.0,rise per run,riptide design: a climb steeper than 45 degrees within one frame is a ledge (no launch) and not a ramp
+hull_clearance,f32,5,units,riptide design: (parry courses) the boat collision cylinder starts this far above the waterline
+barrier_edge,f32,0.08,track width fraction,riptide design: (parry courses) a giant barrier whose centre lies more than this inside the corridor edges is a scripted piece and not a wall
+probe_launch,f32,400,units,riptide design: the collision check counts landings from higher than this as suspicious launches

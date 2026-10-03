@@ -13,6 +13,7 @@
 
 mod boatrig;
 mod cheats;
+mod collide;
 mod content;
 mod effects;
 mod hud;
@@ -195,9 +196,18 @@ pub fn run(content: Content) -> AppExit {
     app.run()
 }
 
-fn shot_driver(mut commands: Commands, mut plan: ResMut<ShotPlan>, mut exit: MessageWriter<AppExit>) {
+fn shot_driver(mut commands: Commands, mut plan: ResMut<ShotPlan>, mut exit: MessageWriter<AppExit>, mut cams: Query<&mut Camera>) {
     plan.frame += 1;
     let f = plan.frame;
+    // Headless tests only need pictures on capture frames: cameras draw on those (and two
+    // frames before, so the image is fresh) and the rest of the run is pure simulation.
+    // RIPTIDE_RENDER_ALL=1 draws every frame.
+    let draw = std::env::var_os("RIPTIDE_RENDER_ALL").is_some() || plan.frames.iter().any(|&c| c >= f && c <= f + 2);
+    for mut cam in &mut cams {
+        if cam.is_active != draw {
+            cam.is_active = draw;
+        }
+    }
     if plan.frames.contains(&f) {
         let path = format!("{}_{f}.png", plan.prefix);
         commands.spawn(Screenshot::image(plan.image.clone())).observe(save_to_disk(path));

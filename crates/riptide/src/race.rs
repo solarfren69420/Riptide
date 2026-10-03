@@ -3,7 +3,7 @@
 use crate::cheats::{Cheats, Tuning};
 use crate::content::{attach, BoatInfo, CourseSource, Models};
 use crate::controls::Input;
-use crate::sheets::{controls_ids as ctl, physics as phy, CheatsEffect, CHECKPOINTS, HackworldKind, HACKWORLD, H2_GLOBALS, H2_LEVELS, H2_TRIPWIRES, PICKUPS, TRACKS};
+use crate::sheets::{controls_ids as ctl, physics as phy, CheatsEffect, TracksCollision, CHECKPOINTS, HackworldKind, HACKWORLD, H2_GLOBALS, H2_LEVELS, H2_TRIPWIRES, PICKUPS, TRACKS};
 use crate::track::{Track, TrackPos};
 use crate::{Autopilot, Screen, Selection};
 use bevy::camera::visibility::NoFrustumCulling;
@@ -28,7 +28,8 @@ pub struct RacePlugin;
 
 impl Plugin for RacePlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(OnEnter(Screen::Race), (spawn_race, start_race_audio).chain())
+        app.add_systems(Update, probe.run_if(in_state(Screen::Race)))
+            .add_systems(OnEnter(Screen::Race), (spawn_race, choose_collision, start_race_audio).chain())
             .add_systems(
                 Update,
                 (
@@ -117,6 +118,8 @@ pub struct Boat {
     /// Running counts for sound cues: boats blasted by this one's Hull Crusher, hard wall hits.
     pub smashes: u32,
     pub wall_hits: u32,
+    /// Frames this boat was pushed out of a wall (collision check, RIPTIDE_PROBE).
+    pub contacts: u32,
     /// Jumps since leaving the water, and seconds since the last one.
     pub jumps: u32,
     pub jump_t: f32,
@@ -653,6 +656,7 @@ fn spawn_race(mut commands: Commands, mut models: Models, sel: Res<Selection>, m
                     catchup: 0.0,
                     smashes: 0,
                     wall_hits: 0,
+                    contacts: 0,
                     jumps: 0,
                     jump_t: 0.0,
                 },
@@ -1204,11 +1208,40 @@ fn boat_physics(
         let slide = if b.airborne { phy::SLIDE_AIR } else { phy::SLIDE_WATER * b.info.tune[3] };
         let vel = b.vel;
         b.vel = vel.lerp(want, (slide * dt).min(1.0));
-        // Move in sub-steps of at most half a hull radius so fast boats cannot skip through a wall.
-        let step = b.vel * dt;
+        let mut step = b.vel * dt;
         let r = phy::BOAT_RADIUS * b.info.scale.min(1.3);
-        let subs = ((step.length() / (r * 0.5)).ceil() as usize).clamp(1, 8);
         let mut penalised = false;
+        // Parry courses (tracks.collision): moves longer than the hull radius are swept first,
+        // collide and slide against up to three walls, so nothing skips through. Classic courses
+        // and slower moves rely on the sub-step push-out below.
+        if let Some(col) = collider.as_ref().filter(|c| c.parry.is_some() && c.trusted && step.length() > r) {
+            let mut from = b.pos;
+            let mut done = Vec2::ZERO;
+            for _ in 0..3 {
+                let Some((t, n)) = col.sweep_hull(from, step, r, Some(b.tp.forward)) else {
+                    done += step;
+                    step = Vec2::ZERO;
+                    break;
+                };
+                let before = step * (t - 0.02).max(0.0);
+                done += before;
+                from += Vec3::new(before.x, 0.0, before.y);
+                let rest = step - before;
+                step = rest - n * rest.dot(n).min(0.0);
+                let into = b.vel.dot(n);
+                if into < 0.0 {
+                    if !penalised && -into > g.unit_scrape_to_impact_collision_threshhold * b.vel.length() {
+                        b.speed *= g.hit_wall_speed_penalty_mult;
+                        penalised = true;
+                        b.wall_hits += 1;
+                    }
+                    b.vel -= n * into * phy::WALL_BOUNCE;
+                }
+            }
+            step += done;
+        }
+        // Sub-steps of at most half a hull radius so fast boats cannot skip through a wall.
+        let subs = ((step.length() / (r * 0.5)).ceil() as usize).clamp(1, 8);
         for _ in 0..subs {
             b.pos.x += step.x / subs as f32;
             b.pos.z += step.y / subs as f32;
@@ -1217,10 +1250,13 @@ fn boat_physics(
             let Some(col) = &collider else { continue };
             // Cut at hull height and lower down, so low walls and slopes catch too.
             let fwd = b.tp.forward;
-            let hit = [col.probe, col.probe * 0.35]
-                .iter()
-                .find_map(|&h| col.walls_id(b.pos, r, b.pos.y + h, Some(fwd)).map(|(p, n, _)| (p, n)))
-                .filter(|(push, _)| {
+            // Parry courses: the hull cylinder's exact contacts; classic: walls cut at two heights.
+            let touch = if col.parry.is_some() {
+                col.hull(b.pos, r, Some(fwd)).map(|(p, n, _)| (p, n))
+            } else {
+                [col.probe, col.probe * 0.35].iter().find_map(|&h| col.walls_id(b.pos, r, b.pos.y + h, Some(fwd)).map(|(p, n, _)| (p, n)))
+            };
+            let hit = touch.filter(|(push, _)| {
                 // Hydro Thunder collides with its visual terrain: there the corridor owns the
                 // banks and pushes that would leave it are ignored. H2Overdrive's collision
                 // mesh is authoritative.
@@ -1233,6 +1269,7 @@ fn boat_physics(
             if let Some((push, n)) = hit {
                 b.pos.x += push.x;
                 b.pos.z += push.y;
+                b.contacts += 1;
                 if b.player && std::env::var_os("RIPTIDE_DEBUG").is_some() {
                     let before = b.pos - Vec3::new(push.x, 0.0, push.y);
                     let h = [col.probe, col.probe * 0.35].iter().find_map(|&h| col.walls_id(before, r, before.y + h, Some(fwd)));
@@ -1744,6 +1781,18 @@ pub struct Collider {
     walls: std::collections::HashMap<(i32, i32), Vec<u32>>,
     /// Upward-facing triangles (floors: ramps, mounds, banks), same grid layout.
     floors: std::collections::HashMap<(i32, i32), Vec<u32>>,
+    /// Per triangle: a wall / a floor (as classified for the grids above).
+    steep_tri: Vec<bool>,
+    floor_tri: Vec<bool>,
+    /// Parry collision (crate::collide), switched on per course by `tracks.collision`.
+    parry: Option<ParrySets>,
+}
+
+/// The course triangles in parry meshes: walls, floors, and sight blockers.
+pub struct ParrySets {
+    walls: crate::collide::Set,
+    floors: crate::collide::Set,
+    sight: crate::collide::Set,
 }
 
 impl Collider {
@@ -1764,6 +1813,7 @@ impl Collider {
         let mut grid: std::collections::HashMap<(i32, i32), Vec<u32>> = Default::default();
         let mut walls: std::collections::HashMap<(i32, i32), Vec<u32>> = Default::default();
         let mut floors: std::collections::HashMap<(i32, i32), Vec<u32>> = Default::default();
+        let (mut steep_tri, mut floor_tri) = (Vec::new(), Vec::new());
         for part in models.iter().flat_map(|m| &m.parts) {
             for t in part.indices.chunks_exact(3) {
                 let v = [0, 1, 2].map(|k| Vec3::from(part.positions[t[k] as usize]) * scale);
@@ -1773,6 +1823,8 @@ impl Collider {
                 // Walls: near-vertical faces only. The H2 mesh flips some triangles' winding, so the
                 // normal's sign means nothing (a flat riverbed patch can face "down").
                 let steep = n != Vec3::ZERO && n.y.abs() < steepness;
+                steep_tri.push(steep);
+                floor_tri.push(n.y.abs() >= floor_min);
                 for cx in (lo.x / Self::CELL).floor() as i32..=(hi.x / Self::CELL).floor() as i32 {
                     for cz in (lo.z / Self::CELL).floor() as i32..=(hi.z / Self::CELL).floor() as i32 {
                         grid.entry((cx, cz)).or_default().push(id);
@@ -1801,11 +1853,14 @@ impl Collider {
             walls.len(),
             barrier.iter().filter(|b| **b).count()
         );
-        Self { cell: Self::CELL, grid, tris, walls, floors, probe: phy::WALL_PROBE_HEIGHT, trusted: false, barrier }
+        Self { cell: Self::CELL, grid, tris, walls, floors, probe: phy::WALL_PROBE_HEIGHT, trusted: false, barrier, steep_tri, floor_tri, parry: None }
     }
 
     /// First hit along `a -> b` as a fraction of the segment.
     fn hit(&self, a: Vec3, b: Vec3) -> Option<f32> {
+        if let Some(p) = &self.parry {
+            return p.sight.along(a, b);
+        }
         let d = b - a;
         let steps = ((d.x.abs().max(d.z.abs()) / (self.cell * 0.5)).ceil() as usize).max(1);
         let mut seen = std::collections::HashSet::new();
@@ -2156,6 +2211,9 @@ impl Collider {
     /// Push a circle of radius `r` at `p` out of the walls cut at height `y`: the summed push
     /// (XZ) and the normal of the deepest contact, or `None` when clear.
     fn walls(&self, p: Vec3, r: f32, y: f32) -> Option<(Vec2, Vec2)> {
+        if let Some(pq) = &self.parry {
+            return pq.walls.push_out(Vec3::new(p.x, y, p.z), r * 0.5, r, |_| false).map(|(push, n, _)| (push, n));
+        }
         self.walls_id(p, r, y, None).map(|(push, n, _)| (push, n))
     }
 
@@ -2259,6 +2317,9 @@ fn sky_cubemap(sun: Vec3, sun_color: Color) -> Image {
 impl Collider {
     /// Highest floor under (x, z) that is no higher than `max_y`.
     fn floor(&self, x: f32, z: f32, max_y: f32) -> Option<f32> {
+        if let Some(p) = &self.parry {
+            return p.floors.down(Vec3::new(x, max_y, z), 1.0e6).map(|d| max_y - d);
+        }
         let key = ((x / self.cell).floor() as i32, (z / self.cell).floor() as i32);
         let q = Vec2::new(x, z);
         let mut best: Option<f32> = None;
@@ -2331,6 +2392,8 @@ fn spawn_hackworld(commands: &mut Commands, models: &mut Models, scope: DespawnO
     for cell in col.walls.values_mut() {
         cell.retain(|&id| id as usize >= ramp_tris);
     }
+    let n = ramp_tris.min(col.steep_tri.len());
+    col.steep_tri[..n].fill(false);
     commands.insert_resource(col);
 }
 
@@ -2387,4 +2450,149 @@ fn sky_skirt(models: &Models, mesh: &str) -> Option<(Mesh, Color)> {
     m.insert_attribute(Mesh::ATTRIBUTE_NORMAL, normals);
     m.insert_indices(Indices::U32(indices));
     Some((m, Color::srgb(c.x, c.y, c.z)))
+}
+
+impl Collider {
+    /// Switch this course to parry collision (crate::collide). Giant barriers inside the racing
+    /// corridor are level-script pieces (Hong Kong's dam and the like): not walls there.
+    pub fn enable_parry(&mut self, track: Option<&Track>) {
+        if let Some(track) = track.filter(|t| !t.open) {
+            for i in 0..self.tris.len() {
+                if !self.barrier[i] || !self.steep_tri[i] {
+                    continue;
+                }
+                let c = (self.tris[i][0] + self.tris[i][1] + self.tris[i][2]) / 3.0;
+                let at = track.locate_anywhere(c);
+                if track.contains(at.seg, c.xz()) && (phy::BARRIER_EDGE..=1.0 - phy::BARRIER_EDGE).contains(&at.u) {
+                    self.steep_tri[i] = false;
+                }
+            }
+        }
+        let (steep, floor, barrier) = (&self.steep_tri, &self.floor_tri, &self.barrier);
+        self.parry = Some(ParrySets {
+            walls: crate::collide::Set::new(&self.tris, |i| steep[i]),
+            floors: crate::collide::Set::new(&self.tris, |i| floor[i]),
+            sight: crate::collide::Set::new(&self.tris, |i| !barrier[i]),
+        });
+        info!("collision: parry ({} walls)", self.parry.as_ref().map_or(0, |p| p.walls.len()));
+    }
+
+    /// A scripted gate across the course (a giant barrier whose face looks along `course`).
+    fn gate(&self, id: u32, course: Option<Vec2>) -> bool {
+        let (Some(f), true) = (course, self.barrier[id as usize]) else { return false };
+        let t = &self.tris[id as usize];
+        let n = (t[1] - t[0]).cross(t[2] - t[0]).xz().normalize_or_zero();
+        n.dot(f).abs() > 0.866
+    }
+
+    /// The boat's collision cylinder at `p`: physics.hull_clearance up to the probe height.
+    fn hull_shape(&self, p: Vec3) -> (Vec3, f32) {
+        let (lo, hi) = (phy::HULL_CLEARANCE, self.probe.max(phy::HULL_CLEARANCE + 1.0));
+        (p + Vec3::Y * (lo + hi) * 0.5, (hi - lo) * 0.5)
+    }
+
+    /// Parry: push the hull at `p` out of the walls (push, normal, triangle id).
+    fn hull(&self, p: Vec3, r: f32, course: Option<Vec2>) -> Option<(Vec2, Vec2, u32)> {
+        let (c, h) = self.hull_shape(p);
+        self.parry.as_ref()?.walls.push_out(c, h, r, |id| self.gate(id, course))
+    }
+
+    /// Parry: cast the hull at `p` along `step` (XZ): (fraction before a wall, its normal).
+    fn sweep_hull(&self, p: Vec3, step: Vec2, r: f32, course: Option<Vec2>) -> Option<(f32, Vec2)> {
+        let (c, h) = self.hull_shape(p);
+        self.parry.as_ref()?.walls.sweep(c, Vec3::new(step.x, 0.0, step.y), h, r, |id| self.gate(id, course)).map(|(t, n, _)| (t, n))
+    }
+}
+
+/// Collision per course (`tracks.collision`): classic, or parry (crate::collide). The test
+/// switch RIPTIDE_COLLISION=classic|parry forces one everywhere.
+fn choose_collision(collider: Option<ResMut<Collider>>, track: Option<Res<Track>>, sel: Res<Selection>, content: Res<crate::content::Content>) {
+    let Some(mut col) = collider else { return };
+    let row = content.tracks.get(sel.level).and_then(|c| TRACKS.iter().find(|t| t.id == c.id));
+    let parry = match std::env::var("RIPTIDE_COLLISION").ok().as_deref() {
+        Some("parry") => true,
+        Some("classic") => false,
+        _ => row.is_some_and(|t| t.collision == TracksCollision::Parry),
+    };
+    if parry {
+        col.enable_parry(track.as_deref());
+    } else {
+        info!("collision: classic");
+    }
+}
+
+impl Collider {
+    /// Does the move `a -> b` pass through a wall (a steep, non-barrier triangle)?
+    fn crosses_wall(&self, a: Vec3, b: Vec3) -> bool {
+        if let Some(p) = &self.parry {
+            return p.walls.along(a, b).is_some();
+        }
+        let d = b - a;
+        let key = |p: Vec3| ((p.x / self.cell).floor() as i32, (p.z / self.cell).floor() as i32);
+        let mut cells = vec![key(a)];
+        if key(b) != key(a) {
+            cells.push(key(b));
+        }
+        cells.iter().any(|c| {
+            self.walls.get(c).is_some_and(|ids| ids.iter().any(|&id| !self.barrier[id as usize] && segment_triangle(a, d, &self.tris[id as usize]).is_some()))
+        })
+    }
+}
+
+/// Collision check (RIPTIDE_PROBE=1): the player's run, logged as one `PROBE` line every
+/// 20 frames: progress, wall contacts, seconds stalled while driving, launches higher than
+/// physics.probe_launch, the highest air, and moves that crossed a wall.
+#[derive(Default)]
+struct ProbeState {
+    prev: Option<Vec3>,
+    stall: f32,
+    launches: u32,
+    peak: f32,
+    max_air: f32,
+    crossings: u32,
+    best: f32,
+    frame: u32,
+}
+
+fn probe(time: Res<Time>, clock: Res<RaceClock>, track: Res<Track>, collider: Option<Res<Collider>>, boats: Query<&Boat>, mut st: Local<ProbeState>) {
+    if std::env::var_os("RIPTIDE_PROBE").is_none() {
+        return;
+    }
+    let Some(b) = boats.iter().find(|b| b.player) else { return };
+    let dt = time.delta_secs().max(1e-3);
+    if let Some(prev) = st.prev {
+        let moved = (b.pos - prev).xz().length();
+        if clock.t > 2.0 && b.finished.is_none() && !b.airborne && b.control.throttle > 0.5 && moved / dt < 30.0 {
+            st.stall += dt;
+        }
+        if let Some(col) = &collider {
+            if moved > 1.0 && col.crosses_wall(prev + Vec3::Y * 12.0, b.pos + Vec3::Y * 12.0) {
+                st.crossings += 1;
+            }
+        }
+    }
+    if b.airborne {
+        st.peak = st.peak.max(b.pos.y - b.tp.water);
+    } else if st.peak > 0.0 {
+        if st.peak > phy::PROBE_LAUNCH {
+            st.launches += 1;
+        }
+        st.max_air = st.max_air.max(st.peak);
+        st.peak = 0.0;
+    }
+    st.best = st.best.max(track.race_distance(b.lap, b.tp.progress) / race_length(&track).max(1.0) * 100.0);
+    st.prev = Some(b.pos);
+    st.frame += 1;
+    if st.frame % 20 == 0 {
+        info!(
+            "PROBE done {:.0}% finished {} contacts {} stall {:.1}s launches {} max_air {:.0} crossings {}",
+            st.best.min(100.0),
+            b.finished.is_some(),
+            b.contacts,
+            st.stall,
+            st.launches,
+            st.max_air,
+            st.crossings
+        );
+    }
 }
