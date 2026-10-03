@@ -12,6 +12,18 @@ No game content ships in this repository.
 ![boats](https://img.shields.io/badge/boats-25-brightgreen)
 ![rust](https://img.shields.io/badge/rust-bevy%200.18-dea584)
 
+<p align="center">
+  <a href="https://solarfren69420.github.io/Riptide/">
+    <img alt="Play Riptide in your browser" src="https://img.shields.io/badge/%E2%96%B6%20PLAY%20IN%20YOUR%20BROWSER-solarfren69420.github.io%2FRiptide-ff6a00?style=for-the-badge&logo=googlechrome&logoColor=white&labelColor=0a3d62">
+  </a>
+</p>
+
+> [!TIP]
+> ### 🎮 Play now: **[solarfren69420.github.io/Riptide](https://solarfren69420.github.io/Riptide/)**
+> Runs right in Chrome or Edge (WebGPU). Pick your own `triton.lux` (and optionally your Hydro
+> Thunder `disc.gdi` with its `track*.bin` files) when the page asks: they're read straight from
+> your disk and **never uploaded**. Not sure which files you need? See [💾 Game files](#-game-files-read-this-first).
+
 ---
 
 ## ✨ Highlights
