@@ -545,6 +545,17 @@ fn spawn_race(mut commands: Commands, mut models: Models, sel: Res<Selection>, m
                     c.spawn((Mesh3d(piece.mesh.clone()), MeshMaterial3d(piece.material.clone()), NoFrustumCulling, NotShadowCaster));
                 }
             });
+            // The dome is a half sphere: from high up, past the terrain's edge, nothing is drawn
+            // below its rim. Close it with a skirt in its own horizon colour.
+            if let Some((mesh, color)) = sky_skirt(&models, &sky.mesh) {
+                // Gaps in the dome (cut-out art) show the clear colour: make it the horizon too.
+                commands.insert_resource(ClearColor(color));
+                let material = models.materials.add(StandardMaterial { base_color: color, unlit: true, fog_enabled: false, cull_mode: None, ..default() });
+                let mesh = models.meshes.add(mesh);
+                commands.entity(e).with_children(|c| {
+                    c.spawn((Mesh3d(mesh), MeshMaterial3d(material), NoFrustumCulling, NotShadowCaster));
+                });
+            }
         }
     }
 
@@ -649,6 +660,15 @@ fn spawn_race(mut commands: Commands, mut models: Models, sel: Res<Selection>, m
                 Name::new(info.name.clone()),
             ))
             .id();
+        // Hull depth below the origin, for the ride height (place_boats).
+        let hull = info.row.model.strip_prefix("lux:mesh32.").and_then(|m| {
+            let b = models.content.lux.get(&format!("mesh32.{m}"))?;
+            let lo = riptide_assets::h2mesh::decode_mesh(m, b).ok()?.bounds()?.0;
+            Some(-lo[1] * info.scale)
+        });
+        if let Some(h) = hull {
+            commands.entity(e).insert(Hull(h));
+        }
         // Model node carries the per-game scale. H2Overdrive boats are skeletons with moving
         // parts (crate::boatrig); others are drawn whole.
         let model = commands.spawn((Transform::from_scale(Vec3::splat(info.scale)), Visibility::default())).id();
@@ -1304,13 +1324,28 @@ fn boat_physics(
             }
             b.airborne = true;
         }
+        // Test hook: RIPTIDE_TEST_LAUNCH=secs throws the player high once (checking the view from
+        // the air).
+        if b.player && !b.airborne {
+            if let Some(t) = std::env::var("RIPTIDE_TEST_LAUNCH").ok().and_then(|s| s.parse::<f32>().ok()) {
+                if clock.t > t && clock.t < t + 0.2 {
+                    b.vy = 900.0;
+                    b.airborne = true;
+                }
+            }
+        }
         // Crest launches: the surface fell away faster than gravity.
         if !b.airborne {
             let prev = b.surface;
-            let rise = (water - prev) / dt;
-            if rise > 0.0 {
-                // Riding up a ramp carries the climb rate into the air at its lip.
-                b.vy = b.vy.max(rise.min(600.0));
+            let climb = water - prev;
+            // Only a slope launches: a ledge climbed in one frame (rocks, collision-mesh steps,
+            // prop edges) is steeper than physics.ramp_max_slope over the distance travelled.
+            let run = b.vel.length() * dt;
+            if climb > 0.0 && climb <= run * phy::RAMP_MAX_SLOPE {
+                // Riding up a ramp carries the climb rate into the air at its lip, never faster
+                // than the game's own launch ceiling (TritonGame Player / AI Vel Y Max).
+                let cap = if b.player { g.player_vel_y_max } else { g.ai_vel_y_max };
+                b.vy = b.vy.max((climb / dt).min(cap));
             }
         }
         b.surface = water;
@@ -1431,10 +1466,14 @@ fn pickups(
     }
 }
 
-pub(crate) fn place_boats(time: Res<Time>, tuning: Res<Tuning>, mut boats: Query<(&mut Boat, &mut Transform)>) {
+/// How far a boat's hull reaches below its model origin (world units).
+#[derive(Component)]
+pub struct Hull(pub f32);
+
+pub(crate) fn place_boats(time: Res<Time>, tuning: Res<Tuning>, mut boats: Query<(&mut Boat, &mut Transform, Option<&Hull>)>) {
     let dt = time.delta_secs().min(1.0 / 20.0);
     let t = time.elapsed_secs();
-    for (mut b, mut tf) in &mut boats {
+    for (mut b, mut tf, hull) in &mut boats {
         let norm = (b.speed / phy::SPEED_NORM).clamp(0.0, 1.0);
         let target_roll = -b.control.steer * norm * 0.22;
         let target_pitch = if b.airborne {
@@ -1456,7 +1495,15 @@ pub(crate) fn place_boats(time: Res<Time>, tuning: Res<Tuning>, mut boats: Query
         };
         // Wiped-out boats spin while they recover.
         let spin = b.wipeout / phy::WIPEOUT_TIME * std::f32::consts::TAU * 2.0;
-        tf.translation = b.pos + Vec3::Y * bob;
+        // Ride height (boat def Buoyancy Depth Max at rest -> Min once planing at OnPlane
+        // Speed): the hull's lowest point sits that deep, so fast boats ride on the water.
+        let lift = hull.map_or(0.0, |h| {
+            let d = b.info.def;
+            let plane = (b.speed.max(0.0) / phy::SPEED_SCALE / d.onplane_speed.max(1.0)).clamp(0.0, 1.0);
+            let draft = d.buoyancy_depth_max + (d.buoyancy_depth_min - d.buoyancy_depth_max) * plane;
+            (h.0 - draft).max(0.0)
+        });
+        tf.translation = b.pos + Vec3::Y * (bob + lift);
         tf.rotation = Quat::from_euler(EulerRot::YXZ, b.yaw + spin, b.pitch, b.roll);
         tf.scale = Vec3::splat(1.0 + (phy::HULLCRUSH_SCALE - 1.0) * b.crush.grown(&tuning));
     }
@@ -2285,4 +2332,59 @@ fn spawn_hackworld(commands: &mut Commands, models: &mut Models, scope: DespawnO
         cell.retain(|&id| id as usize >= ramp_tris);
     }
     commands.insert_resource(col);
+}
+
+/// A wall and floor closing a sky dome below its rim, coloured like the dome at its horizon:
+/// the average of the dome texture at the rim vertices (the lowest 3% of the dome's height).
+fn sky_skirt(models: &Models, mesh: &str) -> Option<(Mesh, Color)> {
+    let lux = &models.content.lux;
+    let model = riptide_assets::h2mesh::decode_mesh(mesh, lux.get(&format!("mesh32.{mesh}"))?).ok()?;
+    let (lo, hi) = model.bounds()?;
+    let rim_y = lo[1] + (hi[1] - lo[1]) * 0.03;
+    let radius = (hi[0] - lo[0]).max(hi[2] - lo[2]) * 0.5;
+    let (mut sum, mut n) = (Vec3::ZERO, 0.0f32);
+    for part in &model.parts {
+        let Some(img) = part.texture.as_ref().and_then(|t| lux.get(&format!("txtr1.{t}"))).and_then(|b| riptide_assets::image::decode_txtr(b).ok()) else {
+            continue;
+        };
+        for (p, uv) in part.positions.iter().zip(&part.uvs) {
+            if p[1] > rim_y {
+                continue;
+            }
+            let x = ((uv[0].rem_euclid(1.0)) * (img.width - 1) as f32) as u32;
+            let y = ((uv[1].rem_euclid(1.0)) * (img.height - 1) as f32) as u32;
+            let px = &img.rgba[((y * img.width + x) * 4) as usize..][..3];
+            sum += Vec3::new(px[0] as f32, px[1] as f32, px[2] as f32) / 255.0;
+            n += 1.0;
+        }
+    }
+    if n == 0.0 {
+        return None;
+    }
+    let c = sum / n;
+    // Wall from the rim down to one radius below, then a floor; 48 sides, viewed from inside.
+    let sides = 48;
+    let (top, bottom) = (lo[1] + 1.0, lo[1] - radius);
+    let mut positions = Vec::new();
+    let mut indices: Vec<u32> = Vec::new();
+    for i in 0..sides {
+        let a = i as f32 / sides as f32 * std::f32::consts::TAU;
+        let (x, z) = (a.cos() * radius, a.sin() * radius);
+        positions.push([x, top, z]);
+        positions.push([x, bottom, z]);
+    }
+    let centre = positions.len() as u32;
+    positions.push([0.0, bottom, 0.0]);
+    for i in 0..sides as u32 {
+        let j = (i + 1) % sides as u32;
+        let (t0, b0, t1, b1) = (i * 2, i * 2 + 1, j * 2, j * 2 + 1);
+        indices.extend([t0, b0, b1, t0, b1, t1]);
+        indices.extend([b0, centre, b1]);
+    }
+    let normals = vec![[0.0, 1.0, 0.0]; positions.len()];
+    let mut m = Mesh::new(PrimitiveTopology::TriangleList, RenderAssetUsages::RENDER_WORLD);
+    m.insert_attribute(Mesh::ATTRIBUTE_POSITION, positions);
+    m.insert_attribute(Mesh::ATTRIBUTE_NORMAL, normals);
+    m.insert_indices(Indices::U32(indices));
+    Some((m, Color::srgb(c.x, c.y, c.z)))
 }

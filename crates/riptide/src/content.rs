@@ -448,6 +448,8 @@ impl Models<'_> {
             let tex = part.texture.as_deref().and_then(|t| self.texture(source, t));
             let shader = part.shader.as_deref().unwrap_or("");
             let alpha_mode = material_alpha(source, part.texture.as_deref().unwrap_or(""), shader, part.blend, tex.as_ref().map(|t| t.1));
+            // Sky effect layers (London's lightning flashes: FX_Textured, white on black) add light.
+            let alpha_mode = if unlit && shader.starts_with("FX_") { AlphaMode::Add } else { alpha_mode };
             let deferred = tex.is_none() && part.texture.is_some() && self.pending();
             let material = StandardMaterial {
                 base_color: if tex.is_some() { Color::WHITE } else { Color::srgb(0.55, 0.55, 0.58) },

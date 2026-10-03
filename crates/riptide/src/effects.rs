@@ -403,7 +403,8 @@ fn emit_flames(
                 // 50 ms capture step in which it was born, before it can be rendered.
                 let born_at = (k / nozzles.len()) as f32 + 1.0 - due_before;
                 let born_at = born_at / rate;
-                let life = (l.high_motion_life_secs + l.high_motion_life_secs_spread * rand()).max(0.02);
+                // At least ~2.5 frames: a slow frame (browser, hitches) must not blank the jet.
+                let life = (l.high_motion_life_secs + l.high_motion_life_secs_spread * rand()).max(0.02).max(2.5 * dt);
                 let age = (dt - born_at).max(0.0);
                 if age >= life { continue; }
                 if budget == 0 { return; }

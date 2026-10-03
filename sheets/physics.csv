@@ -104,3 +104,4 @@ hackworld_ring_radius,f32,14000,units,riptide design: Hackworld's AI ring (match
 hackworld_ring_width,f32,5000,units,riptide design: Hackworld ring width
 hackworld_water_half,f32,30000,units,riptide design: Hackworld water extends this far each way from the centre
 hackworld_laps,f32,99,laps,riptide design: Hackworld never really ends
+ramp_max_slope,f32,1.0,rise per run,riptide design: a climb steeper than 45 degrees within one frame is a ledge (no launch) and not a ramp
