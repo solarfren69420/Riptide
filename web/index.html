@@ -20,9 +20,9 @@
     font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
   #game { position: fixed; inset: 0; }
   #riptide { width: 100%; height: 100%; display: block; outline: none; }
-  #setup { position: fixed; inset: 0; display: grid; place-items: center; padding: 16px;
+  #setup { position: fixed; inset: 0; display: grid; place-items: safe center; padding: 16px;
     background: radial-gradient(ellipse at top, #0c3a52 0%, var(--bg) 70%); overflow-y: auto; }
-  .card { width: min(560px, 100%); background: var(--panel); border: 1px solid var(--line);
+  .card { width: min(680px, 100%); background: var(--panel); border: 1px solid var(--line);
     border-radius: 14px; padding: 28px; box-shadow: 0 20px 60px rgba(0,0,0,.45); }
   h1 { margin: 0 0 4px; font-size: 34px; letter-spacing: .5px; }
   .tag { margin: 0 0 22px; color: var(--muted); }
@@ -39,6 +39,21 @@
   #status.error { color: var(--warn); }
   .privacy { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--line); color: var(--muted); font-size: 13px; }
   code { color: var(--text); }
+  details { margin-top: 8px; border: 1px solid var(--line); border-radius: 10px; background: rgba(4, 18, 28, .55); }
+  details > summary { cursor: pointer; padding: 8px 12px; color: var(--accent); font-size: 14px; font-weight: 600; }
+  details[open] > summary { border-bottom: 1px solid var(--line); }
+  .info { padding: 10px 14px 12px; font-size: 14px; }
+  .info p { margin: 6px 0; }
+  .info table { width: 100%; border-collapse: collapse; margin: 6px 0; }
+  .info td { padding: 3px 6px; border-bottom: 1px solid rgba(29, 75, 99, .6); vertical-align: top; }
+  .info td:first-child { color: var(--muted); white-space: nowrap; width: 1%; }
+  .info pre { margin: 6px 0; padding: 8px 10px; background: #031019; border-radius: 8px; overflow-x: auto;
+    font-size: 13px; line-height: 1.4; color: var(--text); }
+  .hash { font-family: ui-monospace, monospace; font-size: 12px; word-break: break-all; }
+  .ok { color: #7ee2a8; }
+  a { color: var(--accent); }
+  .guide { margin: 0 0 6px; padding: 10px 14px; border-left: 3px solid var(--accent); background: rgba(46, 197, 242, .08);
+    border-radius: 0 10px 10px 0; font-size: 14px; color: var(--muted); }
 </style>
 </head>
 <body>
@@ -49,17 +64,85 @@
     <h1>🌊 Riptide</h1>
     <p class="tag">H2Overdrive and Hydro Thunder courses, racing in your browser, from your own game files.</p>
 
+    <p class="guide">Riptide ships with <b>no game content</b>: you need your own copies. It reads exactly
+      <b>two things</b>: H2Overdrive's <code>triton.lux</code> (required) and, optionally, your Hydro Thunder
+      Dreamcast disc as a GDI dump. Open the panels below to check you have the right ones.</p>
+
     <div class="step">
       <label for="lux">1. H2Overdrive: <code>triton.lux</code> <span class="hint">(required)</span></label>
       <input id="lux" type="file" accept=".lux">
       <p class="hint">In the arcade game's install folder, about 3.1 GB.</p>
+      <details>
+        <summary>Exactly which file? (version, size, checksums)</summary>
+        <div class="info">
+          <p><b>H2Overdrive</b> is Raw Thrills' 2009 arcade boat racer. The cabinet runs Windows, and the whole
+            game (models, textures, tracks, sounds, settings) is packed into one file: <code>triton.lux</code>.</p>
+          <pre>H2Overdrive/          ← your install folder (any name)
+├── sdaemon.exe       ← the game (not needed)
+├── Settings.xml
+├── Scores.xml
+├── movies/
+└── triton.lux        ← ✅ pick this one</pre>
+          <table>
+            <tr><td>Game</td><td>H2Overdrive (Raw Thrills, 2009), PC-based arcade release</td></tr>
+            <tr><td>File</td><td><code>triton.lux</code></td></tr>
+            <tr><td>Size</td><td><b>3,300,747,006 bytes</b> (about 3.1 GB)</td></tr>
+            <tr><td>Date</td><td>6 November 2009</td></tr>
+            <tr><td>Contents</td><td>LUX archive version 3, 5,147 entries</td></tr>
+            <tr><td>MD5</td><td class="hash">5f3f132361416a978e9370d48ab213ae</td></tr>
+            <tr><td>SHA-1</td><td class="hash">3ed3768e05dde4e3399e63565c40bd026ae9d4c5</td></tr>
+          </table>
+          <p>A different checksum means a different release or revision: it may still work, but it isn't tested.</p>
+        </div>
+      </details>
     </div>
 
     <div class="step">
       <label for="disc">2. Hydro Thunder: <code>disc.gdi</code> + all its <code>track*.bin</code> <span class="hint">(optional)</span></label>
       <input id="disc" type="file" multiple accept=".gdi,.bin">
       <p class="hint">Select the <code>.gdi</code> and every track file together (Ctrl+A in the folder).</p>
+      <details>
+        <summary>Exactly which disc? (version, tracks, checksums)</summary>
+        <div class="info">
+          <p><b>Hydro Thunder</b> (Midway, 1999) on the <b>Sega Dreamcast</b>, backed up as a <b>GDI dump</b>: one small
+            <code>.gdi</code> text file that lists the disc's tracks, plus one <code>.bin</code> file per track.
+            Pick <b>all 38 files</b> together.</p>
+          <pre>Hydro Thunder (USA)/
+├── disc.gdi          ← ✅ pick this
+├── track01.bin       ← ✅ and all of these
+├── track02.bin
+├── track03.bin       ← main game data (134 MB)
+├── ...               ← track04.bin – track36.bin (audio)
+└── track37.bin       ← more game data (553 MB)</pre>
+          <table>
+            <tr><td>Game</td><td>Hydro Thunder, Sega Dreamcast, <b>USA</b> release (Midway)</td></tr>
+            <tr><td>Product no.</td><td><b>T-9702N</b></td></tr>
+            <tr><td>Version</td><td><b>V1.020</b> (disc date 1999-10-04)</td></tr>
+            <tr><td>Format</td><td>GDI dump, <b>37 tracks</b>, raw 2352-byte sectors (Redump-style), about 1.2 GB</td></tr>
+            <tr><td>disc.gdi</td><td class="hash">SHA-1 7acc178f9695038b3fd8ba8daf0a11c880076d33</td></tr>
+            <tr><td>track03.bin</td><td class="hash">SHA-1 d8252cd17a048e8ab801a79b0101b9769414e7dd (140,242,704 bytes)</td></tr>
+            <tr><td>track37.bin</td><td class="hash">SHA-1 53b62d8ad8faa123e90f92f812b8f3df189f4425 (579,617,472 bytes)</td></tr>
+          </table>
+          <p><code>.cdi</code>, <code>.chd</code> and <code>.iso</code> images don't work as they are. Convert a
+            <code>.chd</code> with MAME's tool: <code>chdman extractcd -i "Hydro Thunder (USA).chd" -o disc.gdi</code></p>
+          <p class="ok">Without Hydro Thunder, Riptide still runs with all the H2Overdrive courses and boats.</p>
+        </div>
+      </details>
     </div>
+
+    <details>
+      <summary>How do I check a checksum?</summary>
+      <div class="info">
+        <p>A checksum is a file's fingerprint: if yours matches the table above, you have the same file.</p>
+        <table>
+          <tr><td>Windows</td><td><code>certutil -hashfile triton.lux SHA1</code> (in Command Prompt)</td></tr>
+          <tr><td>macOS</td><td><code>shasum -a 1 triton.lux</code> (in Terminal)</td></tr>
+          <tr><td>Linux</td><td><code>sha1sum triton.lux</code></td></tr>
+        </table>
+        <p>Hashing a 3 GB file takes a little while. The full guide is on
+          <a href="https://github.com/solarfren69420/Riptide#-game-files-read-this-first" target="_blank" rel="noopener">GitHub</a>.</p>
+      </div>
+    </details>
 
     <button id="go" disabled>Start</button>
     <div id="status"></div>
