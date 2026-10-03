@@ -172,6 +172,14 @@ The browser version runs the engine on the player's computer. They choose their 
 only the byte ranges needed; game files are never uploaded or stored on the host.
 Selected ranges are cached in the player's browser memory during play.
 
+Before creating the menu or course, the browser preloads meshes and their texture references.
+Materials also retry textures that finish reading later. Nearby raw disc sectors share file reads.
+The selection screen changes its preview and backdrop with the track: original select scenes
+where available, and a scene rendered locally from the course elsewhere.
+
+Hydro Thunder water covers the connected sector graph, including shortcuts. Waterfall curtains
+are generated at portal drops; their appearance approximates the original effect.
+
 ```sh
 scripts/build-web.sh
 python3 -m http.server -d web 8080
@@ -179,7 +187,8 @@ python3 -m http.server -d web 8080
 
 Open `http://localhost:8080`. To prepare a public deployment, run `scripts/package-web.sh`
 and publish the contents of `out/site/` over HTTPS. The package contains a gzip-compressed
-engine that the browser decompresses automatically. The page uses relative paths,
+engine that the browser decompresses automatically. Engine files use a build hash in their URLs
+so a new release cannot silently reuse an older cached engine. The page uses relative paths,
 so it can live at `/riptide/` on an existing site or on a static host such as GitHub Pages.
 There is no backend or upload endpoint. Publish the built site; `web/pkg/` is ignored by Git.
 

@@ -25,7 +25,7 @@ fn v(px: f32) -> Val {
 }
 
 #[derive(Component)]
-struct Needle(HudRole);
+struct Needle(HudRole, f32, f32);
 
 #[derive(Component)]
 struct BitmapText {
@@ -118,7 +118,7 @@ fn spawn(mut commands: Commands, mut models: Models, sel: Res<Selection>) {
                     height: px(0),
                     ..default()
                 });
-                e.insert(Needle(row.role));
+                e.insert(Needle(row.role, row.angle_min, row.angle_span));
                 if let Some(t) = tex {
                     e.with_children(|c| {
                         c.spawn((
@@ -207,10 +207,12 @@ fn needles(boats: Query<&Boat>, tuning: Res<Tuning>, mut q: Query<(&Needle, &mut
     let g = &tuning.0;
     for (n, mut t) in &mut q {
         let deg = match n.0 {
-            HudRole::SpeedNeedle => p.vel.length() / phy::SPEED_SCALE * g.needle_mph_scale_factor,
-            _ => p.fuel / g.boost_fuel_max_regular.max(1e-3) * 180.0,
+            // The game's MPH-to-angle factor, clamped to the dial (hud.angle_span).
+            HudRole::SpeedNeedle => (p.vel.length() / phy::SPEED_SCALE * g.needle_mph_scale_factor).clamp(0.0, n.2) + n.1,
+            // Fuel across the boost face's arc (hud.angle_min, angle_span).
+            _ => n.1 + (p.fuel / g.boost_fuel_max_regular.max(1e-3)).clamp(0.0, 1.0) * n.2,
         };
-        t.rotation = Rot2::degrees(deg.clamp(0.0, 200.0));
+        t.rotation = Rot2::degrees(deg);
     }
 }
 

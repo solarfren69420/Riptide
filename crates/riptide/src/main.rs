@@ -9,6 +9,7 @@
 //! Testing: `RIPTIDE_SHOT_SIZE=320x180` (smaller target), `RIPTIDE_SIM_DT=0.05` (fixed game step per
 //! frame), `RIPTIDE_EXIT_ON_FINISH=1` (stop when the autopiloted player finishes; logs `RESULT`).
 //! `scripts/race-all.sh` races every playable track this way.
+//! `RIPTIDE_SHOT_AT=x,y,z,yaw-degrees` places the capture boat/camera at a particular feature.
 
 mod boatrig;
 mod cheats;
@@ -147,6 +148,7 @@ pub fn run(content: Content) -> AppExit {
         .insert_resource(content)
         .init_resource::<ModelCache>()
         .init_state::<Screen>()
+        .add_systems(Update, content::finish_textures)
         .add_plugins((cheats::CheatsPlugin, menu::MenuPlugin, race::RacePlugin, sound::SoundPlugin, effects::EffectsPlugin, hud::HudPlugin, boatrig::BoatRigPlugin))
         .add_systems(OnEnter(Screen::Restart), |mut next: ResMut<NextState<Screen>>| next.set(Screen::Race));
     #[cfg(target_arch = "wasm32")]
@@ -155,7 +157,7 @@ pub fn run(content: Content) -> AppExit {
         app.add_systems(Last, move |mut n: Local<u32>| {
             *n += 1;
             if *n % 20 == 0 {
-                let _ = std::fs::write(&path, riptide_assets::lux::recorded().join("\n"));
+                let _ = std::fs::write(&path, format!("{}\n", riptide_assets::lux::recorded().join("\n")));
             }
         });
     }

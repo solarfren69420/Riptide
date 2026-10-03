@@ -179,7 +179,8 @@ fn spawn_menu(mut commands: Commands) {
         children![(Text::new(""), TextFont { font_size: 20.0, ..default() }, TextShadow::default())],
     ));
     commands.spawn((
-        Node { position_type: PositionType::Absolute, left: percent(50), top: px(60), ..default() },
+        // Bottom centre: the top of the screen belongs to the HUD (time left, position).
+        Node { position_type: PositionType::Absolute, left: percent(47), bottom: px(14), ..default() },
         GlobalZIndex(9),
         CheatBadge,
         children![(

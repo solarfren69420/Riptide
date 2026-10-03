@@ -70,14 +70,15 @@ impl SparseSource {
         self.chunks.write().unwrap().entry((off, end)).or_insert_with(|| data.into_boxed_slice());
     }
 
-    /// Ranges asked for but missing since the last call, merged and sorted (start, end).
+    /// Missing ranges, coalesced and sorted. Nearby disc sectors share a file slice:
+    /// their 304-byte raw-sector headers must not cause tens of thousands of browser reads.
     pub fn take_misses(&self) -> Vec<(u64, u64)> {
         let mut m = std::mem::take(&mut *self.misses.lock().unwrap());
         m.sort_unstable();
         let mut out: Vec<(u64, u64)> = Vec::new();
         for (a, b) in m {
             match out.last_mut() {
-                Some(last) if a <= last.1 => last.1 = last.1.max(b),
+                Some(last) if a <= last.1 || (a.saturating_sub(last.1) <= 4096 && b.saturating_sub(last.0) <= 16 * 1024 * 1024) => last.1 = last.1.max(b),
                 _ => out.push((a, b)),
             }
         }
@@ -109,6 +110,21 @@ impl SparseSource {
         // SAFETY: chunks are boxed and append-only (never removed, replaced or mutated), so the
         // bytes outlive the lock guard for as long as `self` lives.
         Some(unsafe { std::slice::from_raw_parts(slice.as_ptr(), slice.len()) })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn raw_disc_sectors_are_read_together_without_losing_offsets() {
+        let source = SparseSource::new(100_000);
+        assert!(source.read(16,2048).is_none());
+        assert!(source.read(2352+16,2048).is_none());
+        assert_eq!(source.take_misses(),vec![(16,4416)]);
+        let data: Vec<u8> = (16..4416).map(|i| (i%251) as u8).collect();
+        source.insert(16,data);
+        assert_eq!(source.read(2352+16,2048).unwrap()[0],(2368%251) as u8);
     }
 }
 

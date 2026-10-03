@@ -23,6 +23,7 @@ sound_events,interface,sound_events.csv,Riptide game events and the H2Overdrive 
 h2_hud,interface,game/h2_hud.csv,H2Overdrive CSHudCard layout (1360x768 virtual screen; X Anchor 0 left 1 centre 2 right)
 h2_font_glyphs,interface,game/h2_font_glyphs.csv,Bitmap font glyph tables (data.<font>) for fonts whose atlas ships
 hud,interface,hud.csv,Which H2Overdrive HUD cards Riptide draws (in this order) and what drives each
+track_previews,interface,track_previews.csv,Original track-select scenes cropped for the Riptide menu; other courses use locally rendered scenery
 boat_tuning,tuning,boat_tuning.csv,Per-boat stat multipliers on top of the boat def (test boats)
 h2_motifs,content,game/h2_motifs.csv,H2Overdrive CSMotifDef colours (data.global_Motifs)
 h2_rocket_layers,content,game/h2_rocket_layers.csv,H2Overdrive CRocketFlameLayerDef particle layers (data.global_RocketLayerDefs)

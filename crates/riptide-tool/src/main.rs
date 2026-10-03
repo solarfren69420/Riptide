@@ -246,6 +246,7 @@ fn main() -> Result<()> {
                 ((p[0] - q[0]).powi(2) + (p[1] - q[1]).powi(2)).sqrt()
             }).sum();
             println!("{}: {} tris, {} parts, path {} edges ({len:.0} units, looped {}), {} instances, {} starts", a(2)?, t.terrain.triangle_count(), t.terrain.parts.len(), t.path.len(), t.looped, t.instances.len(), t.starts.len());
+            println!("  river: {} sectors (including side routes), {} drops over 40 Riptide units", t.river.len(), t.river.iter().filter(|[a,b]| (a.water-b.water)*1.6 > 40.0).count());
             if let Some((lo, hi)) = t.terrain.bounds() { println!("  bounds {lo:?} .. {hi:?}"); }
             if let (Some(f), Some(l)) = (t.path.first(), t.path.last()) { println!("  path first {:?}..{:?} last {:?}", f.start, f.end, l.start); }
             if let Some(s) = t.starts.first() { println!("  start {:?}", s); }

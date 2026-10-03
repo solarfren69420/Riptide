@@ -39,6 +39,8 @@ pub struct HtTrack {
     pub terrain: Model,
     /// River cross-sections in driving order (right-handed, Z mirrored like the models).
     pub path: Vec<Edge>,
+    /// Every river sector, including shortcuts omitted from the AI route.
+    pub river: Vec<[Edge; 2]>,
     /// Per cross-section, the AI driving band as fractions from `start` to `end`.
     pub lanes: Vec<[f32; 2]>,
     /// The course closes on itself.
@@ -178,8 +180,25 @@ pub fn decode_track(obj: &R2Object) -> Result<HtTrack> {
         inst.push(HtInstance { geometry: geometry.to_string(), name, position: [x, y, -z], yaw, scale });
     }
 
+    // Some files also contain disconnected placeholder river strips far outside the world.
+    // Keep the whole connected course graph, including side routes and the start apron.
+    let mut adjacent: HashMap<usize, Vec<usize>> = HashMap::new();
+    for (i, &(a, b)) in links.iter().enumerate() {
+        adjacent.entry(a).or_default().push(i);
+        adjacent.entry(b).or_default().push(i);
+    }
+    let mut connected = std::collections::HashSet::new();
+    let mut todo = vec![origin];
+    while let Some(i) = todo.pop() {
+        if !connected.insert(i) { continue; }
+        for p in [links[i].0, links[i].1] {
+            todo.extend(adjacent.get(&p).into_iter().flatten().copied().filter(|j| !connected.contains(j)));
+        }
+    }
+    let river = links.iter().enumerate().filter(|(i, _)| connected.contains(i))
+        .filter_map(|(_, &(a, b))| Some([portal(a)?.0, portal(b)?.0])).collect();
     let terrain = decode_geometry_at(obj, 0x1cc, true)?;
-    Ok(HtTrack { terrain, path, lanes, looped, instances: inst, starts })
+    Ok(HtTrack { terrain, path, river, lanes, looped, instances: inst, starts })
 }
 
 /// Longest simple chain of sectors from `origin` following exit -> entry portal links.

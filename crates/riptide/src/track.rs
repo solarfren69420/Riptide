@@ -23,6 +23,8 @@ pub struct Track {
     pub finish: Option<(Vec2, Vec2, f32)>,
     /// Open water (Hackworld): no banks, floors anywhere, the line only guides the AI.
     pub open: bool,
+    /// Additional playable corridors; the main path still defines AI and race progress.
+    pub branches: Vec<[Edge; 2]>,
 }
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -35,10 +37,34 @@ pub struct TrackPos {
     pub progress: f32,
     /// Unit vector along the track (XZ).
     pub forward: Vec2,
+    /// Physical side-route sector and its local along fraction.
+    pub branch: Option<(usize, f32)>,
 }
 
 fn v2(p: [f32; 3]) -> Vec2 {
     Vec2::new(p[0], p[2])
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    fn edge(x: f32, z: f32, water: f32) -> Edge {
+        Edge { start: [x,water,z], end: [x+10.0,water,z], water }
+    }
+    #[test]
+    fn side_route_keeps_its_water_and_bank_position() {
+        let mut track = Track::new(vec![edge(0.0,0.0,0.0),edge(0.0,10.0,0.0),edge(0.0,20.0,0.0)]);
+        track.branches.push([edge(12.0,0.0,30.0),edge(12.0,10.0,20.0)]);
+        let at = track.locate(Vec3::new(15.0,25.0,5.0),0);
+        assert_eq!(at.branch, Some((0,0.5)));
+        assert!((at.water-25.0).abs()<0.001);
+        assert!((at.u-0.3).abs()<0.001);
+        assert_eq!(track.point_at(at,0.0),Vec3::new(12.0,25.0,5.0));
+        let outside = track.locate(Vec3::new(23.0,25.0,5.0),0);
+        assert!(outside.branch.is_some());
+        assert_eq!(track.point_at(outside,1.0).x,22.0);
+        assert!(track.locate(Vec3::new(5.0,0.0,5.0),0).branch.is_none());
+    }
 }
 
 impl Track {
@@ -49,7 +75,7 @@ impl Track {
             dist.push(dist[i - 1] + d);
         }
         let looped = edges.len() > 3 && Self::mid_of(&edges[0]).distance(Self::mid_of(&edges[edges.len() - 1])) < 2500.0;
-        Self { edges, dist, looped, laps: if looped { 3 } else { 1 }, starts: Vec::new(), lanes: Vec::new(), finish: None, open: false }
+        Self { edges, dist, looped, laps: if looped { 3 } else { 1 }, starts: Vec::new(), lanes: Vec::new(), finish: None, open: false, branches: Vec::new() }
     }
 
     /// Total race distance covered by a boat on `lap` at `progress`.
@@ -85,6 +111,16 @@ impl Track {
         let r = v2(a.end).lerp(v2(b.end), s);
         let p = l.lerp(r, u);
         Vec3::new(p.x, a.water + (b.water - a.water) * s, p.y)
+    }
+
+    pub fn point_at(&self, at: TrackPos, u: f32) -> Vec3 {
+        if let Some((i, s)) = at.branch {
+            let [a, b] = self.branches[i];
+            let p = Vec3::from(a.start).lerp(Vec3::from(a.end), u)
+                .lerp(Vec3::from(b.start).lerp(Vec3::from(b.end), u), s.clamp(0.0, 1.0));
+            return p;
+        }
+        self.point(at.seg, at.s.clamp(0.0, 1.0), u)
     }
 
     /// Locate `p` with no hint: the segment whose quad holds it, else the nearest cross-section.
@@ -136,7 +172,7 @@ impl Track {
         let ma = Self::mid_of(a);
         let mb = Self::mid_of(b);
         let forward = (mb - ma).normalize_or(Vec2::NEG_Y);
-        TrackPos {
+        let mut at = TrackPos {
             seg,
             s,
             u,
@@ -144,12 +180,38 @@ impl Track {
             water: if a.water - b.water > crate::sheets::physics::WATERFALL_DROP { a.water } else { a.water + (b.water - a.water) * sc },
             progress: self.dist[seg] + (self.dist[seg + 1] - self.dist[seg]) * s,
             forward,
+            branch: None,
+        };
+        if !self.contains(seg, q) {
+            let nearest = |a: &Edge, b: &Edge| {
+                let s = Self::along_edges(a, b, q).clamp(0.0, 1.0);
+                let l = v2(a.start).lerp(v2(b.start), s);
+                let r = v2(a.end).lerp(v2(b.end), s);
+                let u = (q-l).dot(r-l)/(r-l).length_squared().max(1.0);
+                q.distance_squared(l.lerp(r, u.clamp(0.0, 1.0)))
+            };
+            if let Some((i, [a, b])) = self.branches.iter().enumerate()
+                .filter(|(_, [ba, bb])| Self::contains_edges(ba, bb, q) || nearest(ba, bb) < nearest(a, b))
+                .min_by(|(_, [a, b]), (_, [c, d])| nearest(a,b).total_cmp(&nearest(c,d))) {
+                let s = Self::along_edges(a, b, q).clamp(0.0, 1.0);
+                let l = v2(a.start).lerp(v2(b.start), s);
+                let r = v2(a.end).lerp(v2(b.end), s);
+                at.u = (q - l).dot(r - l) / (r - l).length_squared().max(1.0);
+                at.water = if a.water - b.water > crate::sheets::physics::WATERFALL_DROP { a.water } else { a.water + (b.water - a.water) * s };
+                at.forward = (Self::mid_of(b) - Self::mid_of(a)).normalize_or(forward);
+                at.branch = Some((i, s));
+            }
         }
+        at
     }
 
     /// Is `q` inside the quad between cross-sections `seg` and `seg + 1`?
     fn contains(&self, seg: usize, q: Vec2) -> bool {
         let (a, b) = (&self.edges[seg], &self.edges[seg + 1]);
+        Self::contains_edges(a, b, q)
+    }
+
+    fn contains_edges(a: &Edge, b: &Edge, q: Vec2) -> bool {
         let (p0, p1, p2, p3) = (v2(a.start), v2(a.end), v2(b.end), v2(b.start));
         let tri = |a: Vec2, b: Vec2, c: Vec2| {
             let (d1, d2, d3) = ((b - a).perp_dot(q - a), (c - b).perp_dot(q - b), (a - c).perp_dot(q - c));
@@ -162,6 +224,10 @@ impl Track {
     /// measured along the bisector of the two cross-sections so neighbouring segments agree.
     fn along(&self, seg: usize, q: Vec2) -> f32 {
         let (a, b) = (&self.edges[seg], &self.edges[seg + 1]);
+        Self::along_edges(a, b, q)
+    }
+
+    fn along_edges(a: &Edge, b: &Edge, q: Vec2) -> f32 {
         let (ma, mb) = (Self::mid_of(a), Self::mid_of(b));
         // Signed distance from each cross-section line, oriented along travel.
         let da = Self::side(a, q, mb - ma);

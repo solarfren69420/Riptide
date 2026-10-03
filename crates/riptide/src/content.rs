@@ -7,7 +7,7 @@ use bevy::image::{ImageAddressMode, ImageFilterMode, ImageSampler, ImageSamplerD
 use bevy::mesh::{Indices, PrimitiveTopology};
 use bevy::prelude::*;
 use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
-use crate::sheets::{BoatsGame, BoatsRow, BOAT_TUNING, H2BoatdefsRow, TracksGame, TracksRow, BOATS, H2_BOATDEFS, H2_LEVELS, HT_TRACKS, TRACKS};
+use crate::sheets::{BoatsGame, BoatsRow, BOAT_TUNING, H2BoatdefsRow, TracksGame, TracksRow, BOATS, H2_BOATDEFS, H2_LEVELS, HT_TRACKS, TRACKS, TRACK_PREVIEWS};
 use riptide_assets::h2mesh::decode_mesh;
 use riptide_assets::ht::HydroThunder;
 use riptide_assets::image::RgbaImage;
@@ -150,6 +150,15 @@ pub struct ModelCache {
     rigs: HashMap<String, Option<Arc<Rig>>>,
     clips: HashMap<String, Option<Arc<riptide_assets::h2anim::Clip>>>,
     textures: HashMap<String, Option<(Handle<Image>, TexAlpha)>>,
+    deferred: Vec<DeferredMaterial>,
+}
+
+struct DeferredMaterial {
+    handle: Handle<StandardMaterial>,
+    source: Source,
+    texture: String,
+    shader: String,
+    blend: Blend,
 }
 
 impl ModelCache {
@@ -157,6 +166,7 @@ impl ModelCache {
     pub fn forget_ht(&mut self) {
         self.models.retain(|k, _| !k.starts_with("ht:"));
         self.textures.retain(|k, _| !k.starts_with("ht:"));
+        self.deferred.retain(|m| m.source != Source::Ht);
     }
 }
 
@@ -195,6 +205,18 @@ pub enum Source {
 }
 
 impl Models<'_> {
+    /// Original H2 select artwork. Other courses get a rendered scene in the menu.
+    pub fn track_preview(&mut self, choice: &TrackChoice) -> Option<(Handle<Image>, Option<Rect>)> {
+        if let Some(row) = TRACK_PREVIEWS.iter().find(|r| r.track.is_some_and(|i| TRACKS[i].id == choice.id)) {
+            let image = self.lux_texture(row.image.strip_prefix("lux:txtr1.")?)?;
+            let size = self.images.get(&image)?.size();
+            let rect = Rect::new(row.x as f32, row.y as f32,
+                ((row.x + row.width) as f32).min(size.x as f32), ((row.y + row.height) as f32).min(size.y as f32));
+            return Some((image, Some(rect)));
+        }
+        None
+    }
+
     /// A miss may only mean the bytes aren't fetched yet (browser build): don't remember it.
     fn pending(&self) -> bool {
         self.content.lux.pending() || self.content.ht.as_ref().is_some_and(|h| h.pending())
@@ -424,20 +446,9 @@ impl Models<'_> {
             mesh.insert_indices(Indices::U32(part.indices.clone()));
 
             let tex = part.texture.as_deref().and_then(|t| self.texture(source, t));
-            let is_prop_tex = source == Source::Lux && part.texture.as_deref().is_some_and(|t| t.to_ascii_lowercase().starts_with("pt_"));
             let shader = part.shader.as_deref().unwrap_or("");
-            let alpha_mode = match (part.blend, tex.as_ref().map(|t| t.1)) {
-                (Blend::Add, _) => AlphaMode::Add,
-                (Blend::Blend, _) => AlphaMode::Blend,
-                (Blend::Cutout, _) => AlphaMode::Mask(0.5),
-                // H2Overdrive opaque shaders ending in `A` alpha-test their diffuse map, and prop
-                // art (`pt_*`: tree cards, fences, signs) is cut out. Boat and world textures use
-                // alpha for gloss, so they stay opaque.
-                (_, Some(TexAlpha::Binary)) if source == Source::Ht || shader.ends_with('A') || is_prop_tex => AlphaMode::Mask(0.5),
-                (_, Some(TexAlpha::Smooth)) if source == Source::Ht => AlphaMode::Mask(0.4),
-                (_, Some(TexAlpha::Smooth)) if shader.ends_with('A') || is_prop_tex => AlphaMode::Mask(0.35),
-                _ => AlphaMode::Opaque,
-            };
+            let alpha_mode = material_alpha(source, part.texture.as_deref().unwrap_or(""), shader, part.blend, tex.as_ref().map(|t| t.1));
+            let deferred = tex.is_none() && part.texture.is_some() && self.pending();
             let material = StandardMaterial {
                 base_color: if tex.is_some() { Color::WHITE } else { Color::srgb(0.55, 0.55, 0.58) },
                 base_color_texture: tex.map(|t| t.0),
@@ -450,9 +461,47 @@ impl Models<'_> {
                 fog_enabled: !unlit,
                 ..default()
             };
-            out.push(Piece { mesh: self.meshes.add(mesh), material: self.materials.add(material), bone: part.bone });
+            let handle = self.materials.add(material);
+            if deferred {
+                self.cache.deferred.push(DeferredMaterial {
+                    handle: handle.clone(), source, texture: part.texture.clone().unwrap(), shader: shader.to_string(), blend: part.blend,
+                });
+            }
+            out.push(Piece { mesh: self.meshes.add(mesh), material: handle, bone: part.bone });
         }
         out
+    }
+}
+
+/// Repair already-spawned materials when a browser's local file read finishes.
+pub fn finish_textures(mut models: Models) {
+    for m in std::mem::take(&mut models.cache.deferred) {
+        if let Some((image, alpha)) = models.texture(m.source, &m.texture) {
+            if let Some(material) = models.materials.get_mut(&m.handle) {
+                material.base_color = Color::WHITE;
+                material.base_color_texture = Some(image);
+                material.alpha_mode = material_alpha(m.source, &m.texture, &m.shader, m.blend, Some(alpha));
+            }
+        } else if models.pending() {
+            models.cache.deferred.push(m);
+        } else {
+            warn!("texture {} could not be decoded", m.texture);
+        }
+    }
+}
+
+fn material_alpha(source: Source, texture: &str, shader: &str, blend: Blend, alpha: Option<TexAlpha>) -> AlphaMode {
+    let is_prop_tex = source == Source::Lux && texture.to_ascii_lowercase().starts_with("pt_");
+    match (blend, alpha) {
+        (Blend::Add, _) => AlphaMode::Add,
+        (Blend::Blend, _) => AlphaMode::Blend,
+        (Blend::Cutout, _) => AlphaMode::Mask(0.5),
+        // Boat and world texture alpha stores gloss. Prop art and shaders ending
+        // in A use it for cutout coverage instead.
+        (_, Some(TexAlpha::Binary)) if source == Source::Ht || shader.ends_with('A') || is_prop_tex => AlphaMode::Mask(0.5),
+        (_, Some(TexAlpha::Smooth)) if source == Source::Ht => AlphaMode::Mask(0.4),
+        (_, Some(TexAlpha::Smooth)) if shader.ends_with('A') || is_prop_tex => AlphaMode::Mask(0.35),
+        _ => AlphaMode::Opaque,
     }
 }
 

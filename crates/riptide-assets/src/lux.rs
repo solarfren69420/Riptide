@@ -113,6 +113,32 @@ impl LuxArchive {
         self.by_name.contains_key(&name.to_ascii_lowercase())
     }
 
+    /// Queue roots and their mesh texture references before constructing render materials.
+    /// Call again after filling sparse-source misses to discover dependencies of newly read meshes.
+    pub fn prefetch(&self, names: impl IntoIterator<Item = impl AsRef<str>>) {
+        let mut todo: Vec<String> = names.into_iter().map(|n| n.as_ref().to_string()).collect();
+        let mut seen = BTreeSet::new();
+        while let Some(name) = todo.pop() {
+            if !seen.insert(name.to_ascii_lowercase()) { continue; }
+            let Some(blob) = self.get(&name) else { continue };
+            if !name.to_ascii_lowercase().starts_with("mesh32.") || blob.len() < 0x14 || &blob[12..16] != b"MESH" {
+                continue;
+            }
+            let count = u32_at(blob, 8) as usize;
+            let Some(table) = blob.get(0x14..0x14usize.saturating_add(count.saturating_mul(0x2c))) else { continue };
+            for record in table.chunks_exact(0x2c).filter(|r| u32_at(r, 0) == 0) {
+                let reference = cstr(&record[12..]);
+                if reference.to_ascii_lowercase().starts_with("txtr1.") {
+                    if self.contains(&reference) {
+                        todo.push(reference);
+                    } else if let Some((pre, rest)) = reference.split_once('_') {
+                        todo.push(format!("{pre}_com_{rest}"));
+                    }
+                }
+            }
+        }
+    }
+
     /// Names (without the `kind.` prefix) of every entry of one kind, e.g. `"mesh32"`.
     pub fn names_of_kind<'a>(&'a self, kind: &'a str) -> impl Iterator<Item = &'a str> + 'a {
         self.entries.iter().filter_map(move |e| {
@@ -148,4 +174,45 @@ pub fn take_recorded() -> Vec<String> {
 /// Entries read since [`record`], recording continuing.
 pub fn recorded() -> Vec<String> {
     RECORD.lock().unwrap().as_ref().map(|s| s.iter().cloned().collect()).unwrap_or_default()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::source::SparseSource;
+    use std::sync::Arc;
+
+    #[test]
+    fn sparse_prefetch_discovers_textures_after_mesh_read() {
+        let mut mesh = vec![0; 0x14 + 0x2c];
+        mesh[8..12].copy_from_slice(&1u32.to_le_bytes());
+        mesh[12..16].copy_from_slice(b"MESH");
+        mesh[0x20..0x20 + 10].copy_from_slice(b"txtr1.test");
+        let toc = DATA_START as usize + mesh.len() + 4;
+        let mut bytes = vec![0; toc + 2 * TOC_RECORD];
+        bytes[4..8].copy_from_slice(&2u32.to_le_bytes());
+        bytes[8..12].copy_from_slice(&(toc as u32).to_le_bytes());
+        bytes[0x30..0x34].copy_from_slice(b"LUX!");
+        bytes[DATA_START as usize..DATA_START as usize + mesh.len()].copy_from_slice(&mesh);
+        for (i, (name, size)) in [("mesh32.test", mesh.len()), ("txtr1.test", 4)].into_iter().enumerate() {
+            let r = toc + i * TOC_RECORD;
+            bytes[r..r+name.len()].copy_from_slice(name.as_bytes());
+            bytes[r+0x40..r+0x48].copy_from_slice(&(size as u64).to_le_bytes());
+            bytes[r+0x50..r+0x58].copy_from_slice(&(i as u64).to_le_bytes());
+        }
+        let source = Arc::new(SparseSource::new(bytes.len() as u64));
+        source.insert(0, bytes[..0x40].to_vec());
+        source.insert(toc as u64, bytes[toc..].to_vec());
+        let archive = LuxArchive::from_source(Box::new(source.clone())).unwrap();
+        archive.prefetch(["mesh32.test"]);
+        let misses = source.take_misses();
+        assert_eq!(misses, vec![(DATA_START, DATA_START + mesh.len() as u64)]);
+        for (a,b) in misses { source.insert(a, bytes[a as usize..b as usize].to_vec()); }
+        archive.prefetch(["mesh32.test"]);
+        let misses = source.take_misses();
+        assert_eq!(misses, vec![(toc as u64 - 4, toc as u64)]);
+        for (a,b) in misses { source.insert(a, bytes[a as usize..b as usize].to_vec()); }
+        archive.prefetch(["mesh32.test"]);
+        assert!(!source.pending());
+    }
 }

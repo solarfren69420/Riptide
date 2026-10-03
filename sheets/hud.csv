@@ -1,20 +1,20 @@
-id,card,role,scale,pivot_x,pivot_y,status,note
-@types,ref:h2_hud,enum:static|speed_needle|boost_needle|mph_text|race_time|time_remaining|position|radar_map|radar_blips|banner_time_extended|banner_go,f32,f32,f32,status,str
-speed_dial,Speed2,static,1.0,0,0,ok,speedometer face (ht_speed2_D)
-speed_needle,SpeedNeedle,speed_needle,0.66,0,0,ok,angle from speed x Needle MPH Scale Factor
-speed_glass,SpeedGlass,static,1.0,0,0,n/a: Photoshop blend mode 4 (Color Burn) has no Bevy UI equivalent,glass over the dial
-speed_text,SpeedText,mph_text,1.0,0,0,ok,digital MPH (speed x Digital MPH Scale Factor) in ht_font06
-boost_dial,Boost,static,1.0,0,0,ok,boost gauge face (ht_boost_D)
-boost_needle,BoostNeedle,boost_needle,0.44,91,337,ok,pivot and scale from the small off-centre ring in ht_boost_D; angle from boost fuel / Boost Fuel Max Regular
-boost_glass,BoostGlass,static,1.0,0,0,n/a: Photoshop blend mode 4 (Color Burn) has no Bevy UI equivalent,glass over the boost gauge
-radar_disk,RadarDisk,static,1.0,0,0,ok,radar background
-radar_map,RadarMap,radar_map,1.0,0,0,ok,ht_radar_map_<level> scrolled to the player via CLevelInfo Map Texel/World
-radar_grid,RadarGrid,static,1.0,0,0,ok,radar rings
-radar_blips,RadarBlip,radar_blips,1.0,0,0,ok,rival boats (ht_radar_markers)
-radar_frame,Radar,static,1.0,0,0,ok,radar bezel (ht_radar_D)
-radar_glass,RadarGlass,static,1.0,0,0,n/a: Photoshop blend mode 4 (Color Burn) has no Bevy UI equivalent,glass over the radar
-race_time,RaceTime,race_time,1.0,0,0,ok,elapsed race time (ht_font02)
-time_remaining,TimeRemaining,time_remaining,1.0,0,0,ok,arcade countdown (ht_font04)
-position,PositionB,position,1.0,0,0,ok,place / racers (ht_font04)
-time_extended,TimeExtended,banner_time_extended,1.0,0,0,ok,shown for 2 s at a checkpoint
-go,RACE_GO,banner_go,1.0,0,0,ok,shown as the race starts
+id,card,role,scale,pivot_x,pivot_y,angle_min,angle_span,status,note
+@types,ref:h2_hud,enum:static|speed_needle|boost_needle|mph_text|race_time|time_remaining|position|radar_map|radar_blips|banner_time_extended|banner_go,f32,f32,f32,f32,f32,status,str
+speed_dial,Speed2,static,1.0,0,0,0,0,ok,speedometer face (ht_speed2_D)
+speed_needle,SpeedNeedle,speed_needle,0.66,0,0,0,200,ok,angle from speed x Needle MPH Scale Factor
+speed_glass,SpeedGlass,static,1.0,0,0,0,0,n/a: Photoshop blend mode 4 (Color Burn) has no Bevy UI equivalent,glass over the dial
+speed_text,SpeedText,mph_text,1.0,0,0,0,0,ok,digital MPH (speed x Digital MPH Scale Factor) in ht_font06
+boost_dial,Boost,static,1.0,0,0,0,0,ok,boost gauge face (ht_boost_D)
+boost_needle,BoostNeedle,boost_needle,0.44,91,337,-45,270,ok,pivot and scale from the small off-centre ring in ht_boost_D; angle from boost fuel / Boost Fuel Max Regular; the face is a 270-degree gauge from bottom-left (empty) over the top to bottom-right (full)
+boost_glass,BoostGlass,static,1.0,0,0,0,0,n/a: Photoshop blend mode 4 (Color Burn) has no Bevy UI equivalent,glass over the boost gauge
+radar_disk,RadarDisk,static,1.0,0,0,0,0,ok,radar background
+radar_map,RadarMap,radar_map,1.0,0,0,0,0,ok,ht_radar_map_<level> scrolled to the player via CLevelInfo Map Texel/World
+radar_grid,RadarGrid,static,1.0,0,0,0,0,ok,radar rings
+radar_blips,RadarBlip,radar_blips,1.0,0,0,0,0,ok,rival boats (ht_radar_markers)
+radar_frame,Radar,static,1.0,0,0,0,0,ok,radar bezel (ht_radar_D)
+radar_glass,RadarGlass,static,1.0,0,0,0,0,n/a: Photoshop blend mode 4 (Color Burn) has no Bevy UI equivalent,glass over the radar
+race_time,RaceTime,race_time,1.0,0,0,0,0,ok,elapsed race time (ht_font02)
+time_remaining,TimeRemaining,time_remaining,1.0,0,0,0,0,ok,arcade countdown (ht_font04)
+position,PositionB,position,1.0,0,0,0,0,ok,place / racers (ht_font04)
+time_extended,TimeExtended,banner_time_extended,1.0,0,0,0,0,ok,shown for 2 s at a checkpoint
+go,RACE_GO,banner_go,1.0,0,0,0,0,ok,shown as the race starts

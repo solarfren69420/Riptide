@@ -5,6 +5,7 @@
 
 use crate::content::{Content, CourseSource};
 use crate::{Screen, Selection};
+use crate::sheets::{BOATS, H2_UPGRADES, TRACK_PREVIEWS};
 use anyhow::{anyhow, Result};
 use bevy::prelude::*;
 use riptide_assets::gdi::GdRom;
@@ -96,6 +97,18 @@ pub async fn start(lux: web_sys::File, disc: js_sys::Array) -> Result<(), JsValu
     let lux_src = back(lux);
     let archive = fill(|| LuxArchive::from_source(Box::new(lux_src.clone()))).await.map_err(fail)?;
 
+    // Menu entities are constructed once: load their models AND texture dependencies first.
+    // Otherwise a successful mesh read permanently caches materials with grey fallback colours.
+    let mut startup: Vec<String> = manifest("boats").map(str::to_string).collect();
+    startup.extend(TRACK_PREVIEWS.iter().filter_map(|row| row.image.strip_prefix("lux:")).map(str::to_string));
+    for row in BOATS {
+        startup.extend([row.model, row.anim].into_iter().filter_map(|n| n.strip_prefix("lux:")).map(str::to_string));
+    }
+    for row in H2_UPGRADES {
+        startup.extend([row.mesh, row.anim].into_iter().filter_map(|n| n.strip_prefix("lux:")).map(str::to_string));
+    }
+    fill(|| { archive.prefetch(&startup); Ok(()) }).await.map_err(fail)?;
+
     let files: Vec<web_sys::File> = disc.iter().filter_map(|v| v.dyn_into().ok()).collect();
     let ht = match files.iter().find(|f| f.name().to_ascii_lowercase().ends_with(".gdi")) {
         Some(gdi) => {
@@ -155,9 +168,7 @@ fn begin_loading(mut commands: Commands, sel: Res<Selection>, content: Res<Conte
     let names: Vec<&'static str> = manifest(choice.id).chain(manifest("boats")).collect();
     spawn_local(async move {
         let touch = || {
-            for n in &names {
-                lux.get(n);
-            }
+            lux.prefetch(&names);
             if let (CourseSource::Ht { file, entry, .. }, Some(ht)) = (&choice.source, &ht) {
                 ht.has_track(file, entry);
             }

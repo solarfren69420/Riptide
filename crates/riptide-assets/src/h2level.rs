@@ -163,6 +163,8 @@ pub struct H2Level {
     /// Racing line: AI sector cross-sections in driving order (first lap).
     pub path: Vec<Edge>,
     pub water: Vec<Quad>,
+    /// Vertical curtains at river drops (generated for Hydro Thunder sector portals).
+    pub waterfalls: Vec<Quad>,
     pub skyboxes: Vec<Placement>,
     /// Centre of the finish-line buoys (`*Finish*` game meshes), when the level has them.
     pub finish: Option<[f32; 3]>,

@@ -161,7 +161,8 @@ wild_america txtr1.wt_wa_riverbed1
 wild_america txtr1.wt_wa_sawmill
 wild_america txtr1.wt_wa_sky
 wild_america txtr1.wt_wa_trainbridge
-wild_america txtr1.wt_wa_tunnelhong_kong_buoy coll4.wc_hk
+wild_america txtr1.wt_wa_tunnel
+hong_kong_buoy coll4.wc_hk
 hong_kong_buoy data.global_GameMeshDef
 hong_kong_buoy data.hk_ai
 hong_kong_buoy data.hk_level
@@ -344,7 +345,8 @@ hong_kong_buoy txtr1.wt_hk_whitelight_LM
 hong_kong_buoy txtr1.wt_lo_WaterLine1
 hong_kong_buoy txtr1.wt_qc_OldTown_01
 hong_kong_buoy txtr1.wt_tl_RustedBldgs
-hong_kong_buoy txtr1.wt_wa_UniTile03temple_of_flume coll4.wc_tf
+hong_kong_buoy txtr1.wt_wa_UniTile03
+temple_of_flume coll4.wc_tf
 temple_of_flume data.global_GameMeshDef
 temple_of_flume data.tf_ai
 temple_of_flume data.tf_level
@@ -520,7 +522,8 @@ temple_of_flume txtr1.wt_tf_SnakeStatue01
 temple_of_flume txtr1.wt_tf_SpikePoleSkull
 temple_of_flume txtr1.wt_tf_brickBLUE
 temple_of_flume txtr1.wt_tf_brickVines01
-temple_of_flume txtr1.wt_tf_brickdirtylondon_underground coll4.wc_lo
+temple_of_flume txtr1.wt_tf_brickdirty
+london_underground coll4.wc_lo
 london_underground data.global_GameMeshDef
 london_underground data.lo_ai
 london_underground data.lo_level
@@ -692,7 +695,8 @@ london_underground txtr1.wt_lo_ships1
 london_underground txtr1.wt_lo_sky
 london_underground txtr1.wt_lo_water
 london_underground txtr1.wt_lo_water_NM
-london_underground txtr1.wt_qc_OldTown_01quake_canyon coll4.wc_qc
+london_underground txtr1.wt_qc_OldTown_01
+quake_canyon coll4.wc_qc
 quake_canyon data.global_GameMeshDef
 quake_canyon data.qc_ai
 quake_canyon data.qc_level
@@ -908,7 +912,8 @@ quake_canyon txtr1.wt_qc_dam_parts
 quake_canyon txtr1.wt_qc_dirt
 quake_canyon txtr1.wt_qc_dirtyobjects
 quake_canyon txtr1.wt_qc_sky
-quake_canyon txtr1.wt_qc_waterrevenge_of_the_nile coll4.wc_rn
+quake_canyon txtr1.wt_qc_water
+revenge_of_the_nile coll4.wc_rn
 revenge_of_the_nile data.global_GameMeshDef
 revenge_of_the_nile data.rn_level
 revenge_of_the_nile data.rn_sectors
@@ -977,7 +982,8 @@ revenge_of_the_nile txtr1.ut_font_Timer
 revenge_of_the_nile txtr1.ut_start_go
 revenge_of_the_nile txtr1.wt_lo_SkyEndFull2
 revenge_of_the_nile txtr1.wt_qc_water
-revenge_of_the_nile txtr1.wt_rn_Bricks01frozen_tundra coll4.wc_tl
+revenge_of_the_nile txtr1.wt_rn_Bricks01
+frozen_tundra coll4.wc_tl
 frozen_tundra data.global_GameMeshDef
 frozen_tundra data.tl_ai
 frozen_tundra data.tl_level
@@ -1089,7 +1095,8 @@ frozen_tundra txtr1.wt_tl_SubUSSR
 frozen_tundra txtr1.wt_tl_TriEnginePlane
 frozen_tundra txtr1.wt_tl_TundraSkyNight
 frozen_tundra txtr1.wt_tl_TundraSkyNight2
-frozen_tundra txtr1.wt_tl_icebreakerdown_underdrive coll4.wc_du
+frozen_tundra txtr1.wt_tl_icebreaker
+down_underdrive coll4.wc_du
 down_underdrive data.du_ai
 down_underdrive data.du_level
 down_underdrive data.du_sectors
@@ -1203,7 +1210,8 @@ down_underdrive txtr1.wt_du_sky02
 down_underdrive txtr1.wt_lo_IndBlds4
 down_underdrive txtr1.wt_qc_OldTown_01
 down_underdrive txtr1.wt_qc_water
-down_underdrive txtr1.wt_tl_RustedBldgsreverse_tundra coll4.wc_rt
+down_underdrive txtr1.wt_tl_RustedBldgs
+reverse_tundra coll4.wc_rt
 reverse_tundra data.global_GameMeshDef
 reverse_tundra data.rt_ai
 reverse_tundra data.rt_level
@@ -1311,7 +1319,8 @@ reverse_tundra txtr1.wt_tl_Snow02
 reverse_tundra txtr1.wt_tl_SoftCutouts
 reverse_tundra txtr1.wt_tl_SubUSSR
 reverse_tundra txtr1.wt_tl_TriEnginePlane
-reverse_tundra txtr1.wt_tl_icebreakerreverse_sydney coll4.wc_rs
+reverse_tundra txtr1.wt_tl_icebreaker
+reverse_sydney coll4.wc_rs
 reverse_sydney data.global_GameMeshDef
 reverse_sydney data.rs_ai
 reverse_sydney data.rs_level
@@ -1416,7 +1425,8 @@ reverse_sydney txtr1.wt_lo_IndBlds5
 reverse_sydney txtr1.wt_lo_MetalStrips2
 reverse_sydney txtr1.wt_lo_ships1
 reverse_sydney txtr1.wt_qc_OldTown_01
-reverse_sydney txtr1.wt_qc_waterthunder_park fbnk.com_mp3
+reverse_sydney txtr1.wt_qc_water
+thunder_park fbnk.com_mp3
 thunder_park fbnk.com_wav
 thunder_park mesh32.BG_Atomic
 thunder_park mesh32.BG_FireStorm
@@ -1469,7 +1479,8 @@ thunder_park txtr1.pt_com_waterwhite_flip57
 thunder_park txtr1.pt_tst_water_normal
 thunder_park txtr1.ut_CGothic_36_I
 thunder_park txtr1.ut_font_Timer
-thunder_park txtr1.ut_start_golost_island fbnk.com_mp3
+thunder_park txtr1.ut_start_go
+lost_island fbnk.com_mp3
 lost_island fbnk.com_wav
 lost_island mesh32.BG_Atomic
 lost_island mesh32.BG_FireStorm
@@ -1522,7 +1533,8 @@ lost_island txtr1.pt_com_waterwhite_flip57
 lost_island txtr1.pt_tst_water_normal
 lost_island txtr1.ut_CGothic_36_I
 lost_island txtr1.ut_font_Timer
-lost_island txtr1.ut_start_golake_powell fbnk.com_mp3
+lost_island txtr1.ut_start_go
+lake_powell fbnk.com_mp3
 lake_powell fbnk.com_wav
 lake_powell mesh32.BG_Atomic
 lake_powell mesh32.BG_FireStorm
@@ -1575,7 +1587,8 @@ lake_powell txtr1.pt_com_waterwhite_flip57
 lake_powell txtr1.pt_tst_water_normal
 lake_powell txtr1.ut_CGothic_36_I
 lake_powell txtr1.ut_font_Timer
-lake_powell txtr1.ut_start_goarctic_circle fbnk.com_mp3
+lake_powell txtr1.ut_start_go
+arctic_circle fbnk.com_mp3
 arctic_circle fbnk.com_wav
 arctic_circle mesh32.BG_Atomic
 arctic_circle mesh32.BG_FireStorm
@@ -1628,7 +1641,8 @@ arctic_circle txtr1.pt_com_waterwhite_flip57
 arctic_circle txtr1.pt_tst_water_normal
 arctic_circle txtr1.ut_CGothic_36_I
 arctic_circle txtr1.ut_font_Timer
-arctic_circle txtr1.ut_start_gogreek_isles fbnk.com_mp3
+arctic_circle txtr1.ut_start_go
+greek_isles fbnk.com_mp3
 greek_isles fbnk.com_wav
 greek_isles mesh32.BG_Atomic
 greek_isles mesh32.BG_FireStorm
@@ -1681,7 +1695,8 @@ greek_isles txtr1.pt_com_waterwhite_flip57
 greek_isles txtr1.pt_tst_water_normal
 greek_isles txtr1.ut_CGothic_36_I
 greek_isles txtr1.ut_font_Timer
-greek_isles txtr1.ut_start_goship_graveyard fbnk.com_mp3
+greek_isles txtr1.ut_start_go
+ship_graveyard fbnk.com_mp3
 ship_graveyard fbnk.com_wav
 ship_graveyard mesh32.BG_Atomic
 ship_graveyard mesh32.BG_FireStorm
@@ -1734,7 +1749,8 @@ ship_graveyard txtr1.pt_com_waterwhite_flip57
 ship_graveyard txtr1.pt_tst_water_normal
 ship_graveyard txtr1.ut_CGothic_36_I
 ship_graveyard txtr1.ut_font_Timer
-ship_graveyard txtr1.ut_start_govenice_canals fbnk.com_mp3
+ship_graveyard txtr1.ut_start_go
+venice_canals fbnk.com_mp3
 venice_canals fbnk.com_wav
 venice_canals mesh32.BG_Atomic
 venice_canals mesh32.BG_FireStorm
@@ -1787,7 +1803,8 @@ venice_canals txtr1.pt_com_waterwhite_flip57
 venice_canals txtr1.pt_tst_water_normal
 venice_canals txtr1.ut_CGothic_36_I
 venice_canals txtr1.ut_font_Timer
-venice_canals txtr1.ut_start_gofar_east fbnk.com_mp3
+venice_canals txtr1.ut_start_go
+far_east fbnk.com_mp3
 far_east fbnk.com_wav
 far_east mesh32.BG_Atomic
 far_east mesh32.BG_FireStorm
@@ -1840,7 +1857,8 @@ far_east txtr1.pt_com_waterwhite_flip57
 far_east txtr1.pt_tst_water_normal
 far_east txtr1.ut_CGothic_36_I
 far_east txtr1.ut_font_Timer
-far_east txtr1.ut_start_gonew_york_disaster fbnk.com_mp3
+far_east txtr1.ut_start_go
+new_york_disaster fbnk.com_mp3
 new_york_disaster fbnk.com_wav
 new_york_disaster mesh32.BG_Atomic
 new_york_disaster mesh32.BG_FireStorm
@@ -1893,7 +1911,8 @@ new_york_disaster txtr1.pt_com_waterwhite_flip57
 new_york_disaster txtr1.pt_tst_water_normal
 new_york_disaster txtr1.ut_CGothic_36_I
 new_york_disaster txtr1.ut_font_Timer
-new_york_disaster txtr1.ut_start_gonile_adventure fbnk.com_mp3
+new_york_disaster txtr1.ut_start_go
+nile_adventure fbnk.com_mp3
 nile_adventure fbnk.com_wav
 nile_adventure mesh32.BG_Atomic
 nile_adventure mesh32.BG_FireStorm
@@ -1946,7 +1965,8 @@ nile_adventure txtr1.pt_com_waterwhite_flip57
 nile_adventure txtr1.pt_tst_water_normal
 nile_adventure txtr1.ut_CGothic_36_I
 nile_adventure txtr1.ut_font_Timer
-nile_adventure txtr1.ut_start_gohydro_speedway fbnk.com_mp3
+nile_adventure txtr1.ut_start_go
+hydro_speedway fbnk.com_mp3
 hydro_speedway fbnk.com_wav
 hydro_speedway mesh32.BG_Atomic
 hydro_speedway mesh32.BG_FireStorm
@@ -1999,7 +2019,8 @@ hydro_speedway txtr1.pt_com_waterwhite_flip57
 hydro_speedway txtr1.pt_tst_water_normal
 hydro_speedway txtr1.ut_CGothic_36_I
 hydro_speedway txtr1.ut_font_Timer
-hydro_speedway txtr1.ut_start_gocastle_von_dandy fbnk.com_mp3
+hydro_speedway txtr1.ut_start_go
+castle_von_dandy fbnk.com_mp3
 castle_von_dandy fbnk.com_wav
 castle_von_dandy mesh32.BG_Atomic
 castle_von_dandy mesh32.BG_FireStorm
@@ -2052,7 +2073,8 @@ castle_von_dandy txtr1.pt_com_waterwhite_flip57
 castle_von_dandy txtr1.pt_tst_water_normal
 castle_von_dandy txtr1.ut_CGothic_36_I
 castle_von_dandy txtr1.ut_font_Timer
-castle_von_dandy txtr1.ut_start_gocatacomb fbnk.com_mp3
+castle_von_dandy txtr1.ut_start_go
+catacomb fbnk.com_mp3
 catacomb fbnk.com_wav
 catacomb mesh32.BG_Atomic
 catacomb mesh32.BG_FireStorm
@@ -2105,7 +2127,8 @@ catacomb txtr1.pt_com_waterwhite_flip57
 catacomb txtr1.pt_tst_water_normal
 catacomb txtr1.ut_CGothic_36_I
 catacomb txtr1.ut_font_Timer
-catacomb txtr1.ut_start_gopractice fbnk.com_mp3
+catacomb txtr1.ut_start_go
+practice fbnk.com_mp3
 practice fbnk.com_wav
 practice mesh32.BG_Atomic
 practice mesh32.BG_FireStorm
@@ -2158,7 +2181,8 @@ practice txtr1.pt_com_waterwhite_flip57
 practice txtr1.pt_tst_water_normal
 practice txtr1.ut_CGothic_36_I
 practice txtr1.ut_font_Timer
-practice txtr1.ut_start_gohackworld data.global_GameMeshDef
+practice txtr1.ut_start_go
+hackworld data.global_GameMeshDef
 hackworld data.wa_ai
 hackworld data.wa_level
 hackworld data.wa_sectors
@@ -2359,7 +2383,8 @@ hackworld txtr1.wt_wa_UniTile01
 hackworld txtr1.wt_wa_UniTile02
 hackworld txtr1.wt_wa_WoodMetal01
 hackworld txtr1.wt_wa_buildings01
-hackworld txtr1.wt_wa_skyboats fbnk.com_wav
+hackworld txtr1.wt_wa_sky
+boats fbnk.com_wav
 boats fbnk.wn_mp3
 boats mesh32.BG_Atomic
 boats mesh32.BG_Cat

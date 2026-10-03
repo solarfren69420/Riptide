@@ -343,7 +343,16 @@ fn spawn_race(mut commands: Commands, mut models: Models, sel: Res<Selection>, m
                         .iter()
                         .map(|e| riptide_assets::h2level::Edge { start: sc(e.start), end: sc(e.end), water: e.water * s })
                         .collect();
-                    let level = H2Level { code: code.clone(), title: choice.name.clone(), path, ..Default::default() };
+                    let mut level = H2Level { code: code.clone(), title: choice.name.clone(), path, ..Default::default() };
+                    // The AI path excludes shortcuts. Every original river sector needs a surface.
+                    for [a, b] in &t.river {
+                        let drop = (a.water - b.water) * s > phy::WATERFALL_DROP;
+                        let lift = |p: [f32; 3], y: f32| [p[0] * s, y * s, p[2] * s];
+                        level.water.push(Quad { corners: [sc(a.start), sc(a.end), lift(b.end, if drop { a.water } else { b.water }), lift(b.start, if drop { a.water } else { b.water })] });
+                        if drop {
+                            level.waterfalls.push(Quad { corners: [lift(b.start, a.water), lift(b.end, a.water), sc(b.end), sc(b.start)] });
+                        }
+                    }
                     (level, Some((t, *laps)))
                 }
                 Err(e) => {
@@ -387,6 +396,8 @@ fn spawn_race(mut commands: Commands, mut models: Models, sel: Res<Selection>, m
             let s = phy::HT_WORLD_SCALE;
             track.starts = t.starts.iter().map(|(p, yaw)| (Vec3::from(*p) * s, *yaw)).collect();
             track.lanes = t.lanes.clone();
+            track.branches = t.river.iter().filter(|[a, b]| !t.path.windows(2).any(|w| w[0].start == a.start && w[1].start == b.start))
+                .map(|[a, b]| [*a, *b].map(|e| Edge { start: e.start.map(|v| v * s), end: e.end.map(|v| v * s), water: e.water * s })).collect();
         }
         _ => {}
     }
@@ -514,7 +525,7 @@ fn spawn_race(mut commands: Commands, mut models: Models, sel: Res<Selection>, m
         }
         _ => Vec::new(),
     };
-    spawn_water(&mut commands, &mut models, &level, &track, water_tex);
+    spawn_water(&mut commands, &mut models, &level, &track, water_tex, !matches!(choice.source, CourseSource::Ht { .. }));
     if let CourseSource::Ht { sky: Some(first), .. } = &choice.source {
         spawn_ht_sky(&mut commands, &mut models, first, scope.clone());
     }
@@ -580,6 +591,11 @@ fn spawn_race(mut commands: Commands, mut models: Models, sel: Res<Selection>, m
         }
     }
     let player_slot = racers - 2;
+    // Optional local capture pose: x,y,z,yaw-degrees. Never used by browser/player sessions.
+    let capture_pose = sel.render_target.as_ref().and_then(|_| std::env::var("RIPTIDE_SHOT_AT").ok()).and_then(|s| {
+        let p: Vec<f32> = s.split(',').filter_map(|n| n.trim().parse().ok()).collect();
+        (p.len() == 4 && p.iter().all(|n| n.is_finite())).then(|| (Vec3::new(p[0],p[1],p[2]),p[3].to_radians()))
+    });
     let mut seed = 0x9e37_79b9u32 ^ (sel.level as u32 * 7919);
     let mut rand = move || {
         seed ^= seed << 13;
@@ -592,9 +608,9 @@ fn spawn_race(mut commands: Commands, mut models: Models, sel: Res<Selection>, m
         let info = roster[bi].clone();
         let player = i == 0;
         let slot = if player { player_slot } else { slot_of.next().unwrap_or(i) };
-        let (pos, yaw) = track.grid(slot);
+        let (pos, yaw) = if player { capture_pose.unwrap_or_else(|| track.grid(slot)) } else { track.grid(slot) };
         let lane = 0.2 + 0.2 * (slot % 4) as f32;
-        let tp = track.locate(pos, 0);
+        let tp = if player && capture_pose.is_some() { track.locate_anywhere(pos) } else { track.locate(pos, 0) };
         let pieces = models.boat(&info);
         let e = commands
             .spawn((
@@ -650,7 +666,7 @@ fn spawn_race(mut commands: Commands, mut models: Models, sel: Res<Selection>, m
     }
 
     // Camera.
-    let (p0, yaw0) = track.grid(player_slot);
+    let (p0, yaw0) = capture_pose.unwrap_or_else(|| track.grid(player_slot));
     let fwd = Quat::from_rotation_y(yaw0) * Vec3::NEG_Z;
     // A sky to reflect: a generated cubemap in the course's colours with the sun in it.
     let sky_map = models.images.add(sky_cubemap(sun_rot * Vec3::Z, sun_color));
@@ -716,7 +732,7 @@ fn spawn_race(mut commands: Commands, mut models: Models, sel: Res<Selection>, m
     commands.insert_resource(track);
 }
 
-fn spawn_water(commands: &mut Commands, models: &mut Models, level: &H2Level, track: &Track, frames: Vec<Handle<Image>>) {
+fn spawn_water(commands: &mut Commands, models: &mut Models, level: &H2Level, track: &Track, frames: Vec<Handle<Image>>, add_ribbon: bool) {
     let mut positions: Vec<[f32; 3]> = Vec::new();
     let mut uvs: Vec<[f32; 2]> = Vec::new();
     let mut indices: Vec<u32> = Vec::new();
@@ -745,7 +761,7 @@ fn spawn_water(commands: &mut Commands, models: &mut Models, level: &H2Level, tr
         quad(q.corners);
     }
     // The racing line's own ribbon fills any gap between water sectors.
-    let ribbon = if track.open { 0 } else { track.edges.len() - 1 };
+    let ribbon = if track.open || !add_ribbon { 0 } else { track.edges.len() - 1 };
     for i in 0..ribbon {
         let (a, b) = (&track.edges[i], &track.edges[i + 1]);
         let lift = |p: [f32; 3], h: f32| [p[0], h - 1.5, p[2]];
@@ -792,6 +808,25 @@ fn spawn_water(commands: &mut Commands, models: &mut Models, level: &H2Level, tr
     };
     let material = models.materials.add(material);
     commands.insert_resource(WaterMaterial { material: material.clone(), frames, mesh: mesh.clone(), base });
+    if !level.waterfalls.is_empty() {
+        let mut positions = Vec::new();
+        let mut uvs = Vec::new();
+        let mut indices = Vec::new();
+        for q in &level.waterfalls {
+            let offset = positions.len() as u32;
+            positions.extend(q.corners);
+            let width = Vec3::from(q.corners[0]).distance(Vec3::from(q.corners[1])) / 350.0;
+            let height = Vec3::from(q.corners[0]).distance(Vec3::from(q.corners[3])) / 350.0;
+            uvs.extend([[0.0, 0.0], [width, 0.0], [width, height], [0.0, height]]);
+            indices.extend([offset, offset + 1, offset + 2, offset, offset + 2, offset + 3]);
+        }
+        let mut falls = Mesh::new(PrimitiveTopology::TriangleList, RenderAssetUsages::RENDER_WORLD);
+        falls.insert_attribute(Mesh::ATTRIBUTE_POSITION, positions);
+        falls.insert_attribute(Mesh::ATTRIBUTE_UV_0, uvs);
+        falls.insert_indices(Indices::U32(indices));
+        falls.compute_normals();
+        commands.spawn((Mesh3d(models.meshes.add(falls)), MeshMaterial3d(material.clone()), Name::new("waterfalls"), DespawnOnExit(Screen::Race)));
+    }
     commands.spawn((
         Mesh3d(mesh),
         MeshMaterial3d(material),
@@ -1209,8 +1244,7 @@ fn boat_physics(
         // Banks: a real impact costs `Hit Wall Speed Penalty Mult`, a glancing scrape just drags.
         if !track.open && (tp.u < phy::WALL_MARGIN || tp.u > 1.0 - phy::WALL_MARGIN) {
             let u = tp.u.clamp(phy::WALL_MARGIN, 1.0 - phy::WALL_MARGIN);
-            let sc = tp.s.clamp(0.0, 1.0);
-            let on = track.point(tp.seg, sc, u);
+            let on = track.point_at(tp, u);
             b.pos.x = on.x;
             b.pos.z = on.z;
             let across = Vec2::new(-tp.forward.y, tp.forward.x);
@@ -1451,7 +1485,7 @@ fn chase_camera(
     // Stay inside the river corridor so cliffs never swallow the view (open water has none).
     let at = track.locate(tf.translation, b.tp.seg);
     if !track.open && (at.u < 0.02 || at.u > 0.98) {
-        let on = track.point(at.seg, at.s.clamp(0.0, 1.0), at.u.clamp(0.02, 0.98));
+        let on = track.point_at(at, at.u.clamp(0.02, 0.98));
         tf.translation.x = on.x;
         tf.translation.z = on.z;
     }
@@ -1497,7 +1531,8 @@ fn hud(
         super_notice.last = 0.0;
         super_notice.until = 0.0;
     } else {
-        if p.super_time > super_notice.last + 0.5 {
+        // Only when gold boost switches on: cheats and pickups top it up while it runs.
+        if p.super_time > 0.0 && super_notice.last <= 0.0 {
             super_notice.until = clock.t + 1.5;
         }
         super_notice.last = p.super_time;

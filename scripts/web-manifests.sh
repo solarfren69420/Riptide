@@ -16,7 +16,7 @@ run() { # run <record file> <env...>
 : > web/manifests.txt.new
 for t in $(awk -F, 'NR>2 && $7=="ok" && $8=="ok" {print $1}' sheets/tracks.csv); do
     run "$tmp/$t" RIPTIDE_TRACK="$t" RIPTIDE_SHOT_FRAMES=160
-    sed "s/^/$t /" "$tmp/$t" >> web/manifests.txt.new
+    awk -v track="$t" 'NF { print track, $0 }' "$tmp/$t" >> web/manifests.txt.new
     echo "$t: $(wc -l < "$tmp/$t") entries"
 done
 awk -F, 'NR>2 && $11=="ok" {print $3}' sheets/boats.csv | while read -r b; do

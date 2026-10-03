@@ -37,6 +37,11 @@ impl HydroThunder {
         self.disc.pending()
     }
 
+    /// Menu scenes use the main archive's course assets rather than the previous race's overrides.
+    pub fn clear_track(&self) {
+        if let Ok(mut track) = self.track.write() { *track = None; }
+    }
+
     fn archives(&self) -> Vec<Arc<R2Archive>> {
         self.track.read().ok().and_then(|t| t.clone()).into_iter().collect()
     }
