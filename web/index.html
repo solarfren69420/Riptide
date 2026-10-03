@@ -72,6 +72,7 @@
 
 <script type="module">
   import init, { startGame } from "./pkg/riptide.js";
+  import { loadEngine } from "./engine.js";
 
   const $ = (id) => document.getElementById(id);
   const status = (text, error = false) => { $("status").textContent = text; $("status").className = error ? "error" : ""; };
@@ -91,7 +92,7 @@
     $("go").disabled = true;
     status("Loading the engine…");
     try {
-      await init();
+      await loadEngine(init);
       status("Reading your game files…");
       await startGame(lux, disc);
       $("setup").remove();

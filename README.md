@@ -177,15 +177,27 @@ scripts/build-web.sh
 python3 -m http.server -d web 8080
 ```
 
-Open `http://localhost:8080`. For public hosting, publish `web/index.html` and `web/pkg/`
-over HTTPS with the `.wasm` MIME type `application/wasm`. The page uses relative paths,
+Open `http://localhost:8080`. To prepare a public deployment, run `scripts/package-web.sh`
+and publish the contents of `out/site/` over HTTPS. The package contains a gzip-compressed
+engine that the browser decompresses automatically. The page uses relative paths,
 so it can live at `/riptide/` on an existing site or on a static host such as GitHub Pages.
 There is no backend or upload endpoint. Publish the built site; `web/pkg/` is ignored by Git.
 
-The current engine build is approximately 73 MB before HTTP compression (about 14 MB with gzip).
-Enable compression and caching on the host. Each player downloads the engine, then reads their own game files
+The current engine build is approximately 73 MB uncompressed (about 14 MB downloaded in the package).
+Enable caching on the host. Each player downloads the engine, then reads their own game files
 locally. The host's storage does not grow with player game files. Browser play requires WebGPU;
 desktop builds remain available for unsupported browsers.
+
+### GitHub Pages
+
+The built site is published on the repository's `gh-pages` branch. In GitHub, open
+**Settings → Pages**, choose **Deploy from a branch**, and select **gh-pages / (root)**.
+After GitHub's deployment finishes, the expected URL is
+`https://solarfren69420.github.io/Riptide/`.
+
+For later releases, rebuild with `scripts/build-web.sh`, run `scripts/package-web.sh`,
+and commit the resulting site contents to `gh-pages`. Changes to `main` alone do not
+update the deployed engine. Game archives and extracted assets must stay out of that branch.
 
 ## 🎮 Controls
 
