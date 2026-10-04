@@ -79,17 +79,17 @@ Every course, measured by two automatic tests (headless, run on the current buil
 |---|---|---|---|---|---|---|---|
 | 1 | Wild America | H2Overdrive | classic | 🟡 90% | 168 | 7.2s | ⏱️ time up at 67% after 200.01s |
 | 2 | Hong Kong Buoy | H2Overdrive | classic | 🔴 49% | 841 | 38.6s | ⏱️ time up at 44% after 110.05s |
-| 3 | Temple of Flume | H2Overdrive | classic | 🟡 92% | 13 | 11.5s | ✅ finished 8 of 8 in 111.75s |
-| 4 | London Underground | H2Overdrive | classic | 🟡 91% | 175 | 5.7s | ✅ finished 7 of 8 in 111.05s |
+| 3 | Temple of Flume | H2Overdrive | classic | 🟡 92% | 13 | 11.5s | ✅ finished 6 of 8 in 109.85s (nav line) |
+| 4 | London Underground | H2Overdrive | classic | 🟡 91% | 175 | 5.7s | ✅ finished 8 of 8 in 102.15s (nav line) |
 | 5 | Quake Canyon | H2Overdrive | classic | 🔴 45% | 1612 | 72.2s | ⏱️ time up at 45% after 170.01s |
-| 6 | Revenge of the Nile | H2Overdrive | classic | 🟢 99% | 1902 | 11.7s | ❌ DNF furthest seg 4 |
-| 7 | Frozen Tundra | H2Overdrive | parry | 🟡 75% | 437 | 10.3s | ✅ finished 5 of 8 in 141.60s |
+| 6 | Revenge of the Nile | H2Overdrive | classic | 🟢 99% | 1902 | 11.7s | ✅ finished 3 of 8 in 87.05s (nav line) |
+| 7 | Frozen Tundra | H2Overdrive | parry | 🟡 75% | 437 | 10.3s | ✅ finished 4 of 8 in 115.75s (nav line) |
 | 8 | Down Underdrive | H2Overdrive | parry | 🟡 71% | 818 | 40.6s | ✅ finished 2 of 8 in 153.25s |
 | 9 | Frozen Tundra Backward | H2Overdrive | classic | 🟢 100% | 142 | 3.3s | ✅ finished 2 of 8 in 110.25s |
 | 10 | Down Underdrive Backward | H2Overdrive | parry | 🟡 82% | 811 | 25.1s | ⏱️ time up at 8% after 90.00s |
 | 11 | Thunder Park | Hydro Thunder | parry | 🟡 69% | 643 | 47.7s | ✅ finished 2 of 8 in 287.20s |
 | 12 | Lost Island | Hydro Thunder | classic | 🔴 34% | 1219 | 12.8s | ✅ finished 4 of 8 in 268.86s |
-| 13 | Lake Powell | Hydro Thunder | classic | 🟡 94% | 23 | 11.1s | ❌ DNF furthest seg 77 |
+| 13 | Lake Powell | Hydro Thunder | classic | 🟡 94% | 23 | 11.1s | ✅ finished 2 of 8 in 223.71s (nav line) |
 | 14 | Arctic Circle | Hydro Thunder | parry | 🔴 46% | 1741 | 15.3s | ❌ DNF furthest seg 58 |
 | 15 | Greek Isles | Hydro Thunder | classic | 🔴 33% | 1242 | 37.1s | ❌ DNF furthest seg 20 |
 | 16 | Ship Graveyard | Hydro Thunder | classic | 🟡 92% | 76 | 7.4s | ❌ DNF furthest seg 84 |
@@ -98,12 +98,14 @@ Every course, measured by two automatic tests (headless, run on the current buil
 | 19 | New York Disaster | Hydro Thunder | classic | 🟡 78% | 740 | 13.1s | ❌ DNF furthest seg 57 |
 | 20 | Nile Adventure | Hydro Thunder | parry | 🔴 34% | 711 | 40.7s | ❌ DNF furthest seg 70 |
 | 21 | Hydro Speedway | Hydro Thunder | classic | 🟢 99% | 255 | 9.1s | ✅ finished 8 of 8 in 129.20s |
-| 22 | Castle Von Dandy | Hydro Thunder | classic | 🟢 100% | 139 | 10.0s | ✅ finished 6 of 8 in 156.20s |
+| 22 | Castle Von Dandy | Hydro Thunder | classic | 🟢 100% | 139 | 10.0s | ✅ finished 8 of 8 in 147.20s (nav line) |
 | 23 | Catacomb | Hydro Thunder | classic | 🟡 89% | 117 | 9.3s | ✅ finished 6 of 8 in 169.91s |
-| 24 | Practice | Hydro Thunder | classic | 🔴 39% | 598 | 40.4s | ❌ DNF furthest seg 50 |
+| 24 | Practice | Hydro Thunder | classic | 🔴 39% | 598 | 40.4s | ✅ finished 4 of 8 in 231.51s (nav line, finish fix) |
 | 25 | Hackworld | Sandbox | classic | 🔴 1% | 0 | 16.4s | ❌ DNF furthest seg 70 |
 
-**Totals:** 10 of 25 AI races finished (8 with either collision system alone). Hackworld is an open-water sandbox with a 99-lap ring, so it never "finishes". Lost Island finishing despite a low racing-line score means the AI found a better line than the dead centre.
+**Totals:** 13 of 25 AI races finished (10 before the navigation line and the Hydro Thunder finish fix; 8 with either collision system alone).
+
+**Nav line:** on courses marked _(nav line)_ (`ai_line` column in `sheets/tracks.csv`) the AI follows a path computed from the collision geometry when the race loads (`crates/riptide/src/nav.rs`), keeping clear of pillars, piers and wrecks. Elsewhere it follows the racing line, which measured better there. `RIPTIDE_NAV=1` forces it on, and `RIPTIDE_NAV_DUMP=grid.png` draws the grid and the path. Hackworld is an open-water sandbox with a 99-lap ring, so it never "finishes". Lost Island finishing despite a low racing-line score means the AI found a better line than the dead centre.
 
 ## 🚧 What still needs to be done
 

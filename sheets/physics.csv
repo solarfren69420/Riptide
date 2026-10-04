@@ -115,3 +115,21 @@ water_gloss,f32,0.12,roughness,riptide design: how mirror-like the water gets at
 net_send_hz,f32,20,1/s,riptide design: online races send the player's boat state this many times a second
 net_extrapolate,f32,0.25,s,riptide design: a remote boat keeps moving on its last velocity for at most this long while waiting for the next update
 net_smooth,f32,10,1/s,riptide design: how quickly a remote boat closes the gap to where its updates say it is
+ht_finish_back,f32,800,units,riptide design: Hydro Thunder finish plane this far before the decoded line's last cross-section (Practice's line ends in a corner no boat reaches; finish data not decoded)
+nav_cell,f32,40,units,riptide design: grid cell size of the AI navigation line (nav.rs)
+nav_max_cells,f32,4000000,cells,riptide design: largest navigation grid; bigger courses use coarser cells
+nav_avoid,f32,4,x,riptide design: extra path cost per step right next to an obstacle (falls off with the square of the clearance)
+nav_smooth,f32,6,passes,riptide design: smoothing passes over the navigation line's grid staircase
+nav_land_cap,f32,2500,units above the waterline,riptide design: the navigation line looks for a riverbed up to this far above the waterline interpolated between cross-sections (Practice steps 2174 units inside one segment)
+nav_land_depth,f32,2500,units below the waterline,riptide design: and down to this far below it; no surface in that window is land (nothing exists behind Hydro Thunder banks)
+nav_step_window,f32,1500,units,riptide design: the navigation path only steps between cells this close along the course (no jumping across a loop or a hairpin)
+nav_land_cost,f32,20,x,riptide design: path cost multiplier over land with no riverbed (squeezes through where it must but never runs behind the banks)
+nav_min_length,f32,0.85,fraction of the course,riptide design: a navigation line shorter than this is a shortcut through overlapping cross-sections and is not used
+wall_low_cut,f32,0.35,fraction of the wall probe height,riptide engine: walls are also cut this low so low walls and slopes catch (pre-sheet constant)
+ht_wall_low_cut,f32,0.35,fraction of the wall probe height,riptide design: same as wall_low_cut; with none Lake Powell and Lost Island and Castle Von Dandy boats ran into low obstacles (2026-10-04 race-all)
+water_detail_size,f32,45,units,riptide design: world size of the third and finest ripple layer (keeps distant water from smearing)
+water_shore_width,f32,30,units,riptide design: foam where the water is shallower than this (banks and rocks; needs the depth prepass)
+water_depth_fade,f32,320,units,riptide design: water this thick and more shows its full deep colour
+water_deep_darken,f32,0.45,x colour,riptide design: deep water's colour as a fraction of the water texture's
+water_shallow_alpha,f32,0.3,0-1,riptide design: opacity at the very edge of the water (clear shallows)
+water_sky_reflect,f32,0.55,0-1,riptide design: how much of the sky the water reflects (the generated sky washed it out at 1)

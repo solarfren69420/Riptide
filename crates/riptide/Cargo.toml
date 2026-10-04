@@ -15,6 +15,7 @@ ewebsock = "0.8"
 riptide-sheets = { path = "../riptide-sheets" }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+png = "0.18"
 ewebsock = { version = "0.8", features = ["tls"] }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]

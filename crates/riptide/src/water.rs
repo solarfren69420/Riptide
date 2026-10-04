@@ -1,6 +1,7 @@
 //! The water material: Bevy's StandardMaterial extended with a GPU water shader (water.wgsl):
-//! waves on the GPU (the same formula the boats bob on), two scrolling layers of the level's
-//! water normal map, fresnel and crest foam. Settings come from the `physics` sheet.
+//! waves on the GPU (the same formula the boats bob on), three scrolling layers of the level's
+//! water normal map, fresnel, crest foam, and (with the camera's depth prepass) shore foam,
+//! clear shallows and darker deep water. Settings come from the `physics` sheet.
 
 use crate::sheets::physics as phy;
 use bevy::pbr::{ExtendedMaterial, MaterialExtension};
@@ -29,6 +30,12 @@ pub struct WaterParams {
     pub normal_strength: f32,
     pub foam: f32,
     pub gloss: f32,
+    pub detail_scale: f32,
+    pub shore_width: f32,
+    pub depth_fade: f32,
+    pub deep_darken: f32,
+    pub shallow_alpha: f32,
+    pub sky_reflect: f32,
 }
 
 impl Default for WaterParams {
@@ -42,6 +49,12 @@ impl Default for WaterParams {
             normal_strength: phy::WATER_RIPPLE_STRENGTH,
             foam: phy::WATER_FOAM,
             gloss: phy::WATER_GLOSS,
+            detail_scale: 1.0 / phy::WATER_DETAIL_SIZE.max(1.0),
+            shore_width: phy::WATER_SHORE_WIDTH,
+            depth_fade: phy::WATER_DEPTH_FADE,
+            deep_darken: phy::WATER_DEEP_DARKEN,
+            shallow_alpha: phy::WATER_SHALLOW_ALPHA,
+            sky_reflect: phy::WATER_SKY_REFLECT,
         }
     }
 }

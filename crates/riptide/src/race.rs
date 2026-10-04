@@ -3,7 +3,7 @@
 use crate::cheats::{Cheats, Tuning};
 use crate::content::{attach, BoatInfo, CourseSource, Models};
 use crate::controls::Input;
-use crate::sheets::{controls_ids as ctl, physics as phy, CheatsEffect, TracksCollision, CHECKPOINTS, HackworldKind, HACKWORLD, H2_GLOBALS, H2_LEVELS, H2_TRIPWIRES, PICKUPS, TRACKS};
+use crate::sheets::{controls_ids as ctl, physics as phy, CheatsEffect, TracksAiLine, TracksCollision, CHECKPOINTS, HackworldKind, HACKWORLD, H2_GLOBALS, H2_LEVELS, H2_TRIPWIRES, PICKUPS, TRACKS};
 use crate::track::{Track, TrackPos};
 use crate::{Autopilot, Screen, Selection};
 use bevy::camera::visibility::NoFrustumCulling;
@@ -146,6 +146,8 @@ pub struct Brain {
     /// Seconds spent nearly stopped (racing), and seconds left of backing off.
     pub stuck: f32,
     pub reverse: f32,
+    /// Last nearest point on the navigation line (usize::MAX: not looked up yet).
+    pub nav: usize,
 }
 
 #[derive(Component)]
@@ -363,6 +365,16 @@ fn spawn_race(
         let mid = |e: &riptide_assets::h2level::Edge| Vec2::new((e.start[0] + e.end[0]) * 0.5, (e.start[2] + e.end[2]) * 0.5);
         let (a, b) = (mid(&track.edges[n.saturating_sub(2)]), mid(&track.edges[n - 1]));
         track.finish = Some((b, (b - a).normalize_or(Vec2::NEG_Y), track.length()));
+        // Hydro Thunder's decoded line runs right into the end wall (Practice ends in a
+        // narrowing corner a boat can't reach): finish `ht_finish_back` short of it.
+        if ht_course.is_some() && n >= 2 {
+            let at = (track.length() - phy::HT_FINISH_BACK).max(0.0);
+            let seg = track.dist.windows(2).position(|w| at < w[1]).unwrap_or(n - 2);
+            let span = (track.dist[seg + 1] - track.dist[seg]).max(1e-3);
+            let p = track.point(seg, ((at - track.dist[seg]) / span).clamp(0.0, 1.0), 0.5).xz();
+            let dir = (mid(&track.edges[seg + 1]) - mid(&track.edges[seg])).normalize_or(Vec2::NEG_Y);
+            track.finish = Some((p, dir, at));
+        }
     }
     match (&choice.source, &ht_course) {
         // Laps come from the level's CLevelInfo (0 = point to point).
@@ -485,7 +497,7 @@ fn spawn_race(
             }
             solid.push(placed);
         }
-        commands.insert_resource(Collider { probe: phy::HT_WALL_PROBE_HEIGHT, ..Collider::from_models(&solid, s, phy::HT_WALL_STEEPNESS) });
+        commands.insert_resource(Collider { probe: phy::HT_WALL_PROBE_HEIGHT, low_cut: phy::HT_WALL_LOW_CUT, ..Collider::from_models(&solid, s, phy::HT_WALL_STEEPNESS) });
         let terrain = models.ht_model(t.terrain.clone());
         attach(&mut commands, world, &terrain);
         for inst in &t.instances {
@@ -640,7 +652,7 @@ fn spawn_race(
                     finished: None,
                     timed_out: false,
                     control: Control::default(),
-                    brain: Brain { lane, lane_target: lane, skill: 0.90 + 0.08 * rand(), lane_timer: rand() * 3.0, stuck: 0.0, reverse: 0.0 },
+                    brain: Brain { lane, lane_target: lane, skill: 0.90 + 0.08 * rand(), lane_timer: rand() * 3.0, stuck: 0.0, reverse: 0.0, nav: usize::MAX },
                     roll: 0.0,
                     pitch: 0.0,
                     airborne: false,
@@ -714,6 +726,12 @@ fn spawn_race(
         scope.clone(),
     ));
     cam.insert(bevy::light::GeneratedEnvironmentMapLight { environment_map: sky_map, intensity: phy::ENV_INTENSITY, ..default() });
+    // The water shader can read the scene's depth behind it (shore foam, shallows: crate::water)
+    // when the camera has a depth prepass. Off: with it Hydro Thunder's cut-out terrain and sky
+    // vanished and London went black (2026-10-04, lavapipe). RIPTIDE_PREPASS=1 to try it.
+    if std::env::var_os("RIPTIDE_PREPASS").is_some() {
+        cam.insert(bevy::core_pipeline::prepass::DepthPrepass);
+    }
     if let Some(target) = sel.render_target.clone() {
         cam.insert(target);
     }
@@ -982,6 +1000,7 @@ fn ai_drive(
     clock: Res<RaceClock>,
     collider: Option<Res<Collider>>,
     tuning: Res<Tuning>,
+    nav: Option<Res<crate::nav::NavLine>>,
     autopilot: Option<Res<Autopilot>>,
     mut boats: Query<&mut Boat, Without<crate::net::Remote>>,
 ) {
@@ -1007,7 +1026,13 @@ fn ai_drive(
         brain.lane += (brain.lane_target - brain.lane) * (dt * 0.6).min(1.0);
         // Aim a speed-dependent distance down the line.
         let look = (phy::AI_LOOK + b.speed.abs() * phy::AI_LOOK_PER_SPEED).min(phy::AI_LOOK_MAX);
-        let aim = aim_point(&track, tp, look, brain.lane);
+        let aim = match &nav {
+            Some(n) => {
+                brain.nav = n.nearest(b.pos, brain.nav);
+                n.aim(brain.nav, look, brain.lane)
+            }
+            None => aim_point(&track, tp, look, brain.lane),
+        };
         let to = Vec2::new(aim.x - b.pos.x, aim.z - b.pos.z);
         let heading = Vec2::new(-b.yaw.sin(), -b.yaw.cos());
         let cross = heading.perp_dot(to.normalize_or_zero());
@@ -1256,7 +1281,7 @@ fn boat_physics(
             let touch = if col.parry.is_some() {
                 col.hull(b.pos, r, Some(fwd)).map(|(p, n, _)| (p, n))
             } else {
-                [col.probe, col.probe * 0.35].iter().find_map(|&h| col.walls_id(b.pos, r, b.pos.y + h, Some(fwd)).map(|(p, n, _)| (p, n)))
+                col.cuts().into_iter().find_map(|h| col.walls_id(b.pos, r, b.pos.y + h, Some(fwd)).map(|(p, n, _)| (p, n)))
             };
             let hit = touch.filter(|(push, _)| {
                 // Hydro Thunder collides with its visual terrain: there the corridor owns the
@@ -1274,7 +1299,7 @@ fn boat_physics(
                 b.contacts += 1;
                 if b.player && std::env::var_os("RIPTIDE_DEBUG").is_some() {
                     let before = b.pos - Vec3::new(push.x, 0.0, push.y);
-                    let h = [col.probe, col.probe * 0.35].iter().find_map(|&h| col.walls_id(before, r, before.y + h, Some(fwd)));
+                    let h = col.cuts().into_iter().find_map(|h| col.walls_id(before, r, before.y + h, Some(fwd)));
                     let tri = h.map(|(_, _, id)| (col.tris[id as usize], col.barrier[id as usize], fwd));
                     info!("wall contact at {:?} push {:.1} normal {:?} tri {:?}", b.pos, push.length(), n, tri);
                 }
@@ -1803,6 +1828,8 @@ pub struct Collider {
     tris: Vec<[Vec3; 3]>,
     /// Height above the waterline the walls are cut at.
     probe: f32,
+    /// A second, lower cut (fraction of `probe`; 0 = none), so low walls and slopes catch too.
+    low_cut: f32,
     /// The game's own collision mesh (H2Overdrive): never second-guessed.
     trusted: bool,
     /// Per triangle: a giant scripted barrier (see physics.barrier_height).
@@ -1883,7 +1910,7 @@ impl Collider {
             walls.len(),
             barrier.iter().filter(|b| **b).count()
         );
-        Self { cell: Self::CELL, grid, tris, walls, floors, probe: phy::WALL_PROBE_HEIGHT, trusted: false, barrier, steep_tri, floor_tri, parry: None }
+        Self { cell: Self::CELL, grid, tris, walls, floors, probe: phy::WALL_PROBE_HEIGHT, low_cut: phy::WALL_LOW_CUT, trusted: false, barrier, steep_tri, floor_tri, parry: None }
     }
 
     /// First hit along `a -> b` as a fraction of the segment.
@@ -2238,6 +2265,35 @@ fn race_audio(
 }
 
 impl Collider {
+    /// No riverbed at `p` (on the waterline): no surface between `nav_land_depth` below it and
+    /// `nav_land_cap` above it. Behind a Hydro Thunder bank there is no surface at all. The
+    /// waterline is interpolated between cross-sections, so the window is generous (rivers climb
+    /// in steps). For the navigation line (nav.rs).
+    /// The heights above the waterline walls are cut at: `probe`, and the lower cut if any.
+    pub(crate) fn cuts(&self) -> Vec<f32> {
+        if self.low_cut > 0.0 { vec![self.probe, self.probe * self.low_cut] } else { vec![self.probe] }
+    }
+
+    pub(crate) fn land(&self, p: Vec3) -> bool {
+        self.floor(p.x, p.z, p.y + phy::NAV_LAND_CAP).is_none_or(|y| y < p.y - phy::NAV_LAND_DEPTH)
+    }
+
+    /// The wall triangle [`Self::blocked`] finds at `p` (classic collision), for diagnostics.
+    pub(crate) fn blocker(&self, p: Vec3, r: f32, course: Vec2) -> Option<(f32, u32, [Vec3; 3])> {
+        self.cuts()
+            .into_iter()
+            .find_map(|h| self.walls_id(p, r, p.y + h, Some(course)).map(|(_, _, id)| (h, id, self.tris[id as usize])))
+    }
+
+    /// Would a boat of radius `r` at `p` (on the water) touch a wall, by the same test the boat
+    /// physics uses (parry hull, or walls cut at two heights)? For the navigation line (nav.rs).
+    pub(crate) fn blocked(&self, p: Vec3, r: f32, course: Vec2) -> bool {
+        if self.parry.is_some() {
+            return self.hull(p, r, Some(course)).is_some();
+        }
+        self.cuts().into_iter().any(|h| self.walls_id(p, r, p.y + h, Some(course)).is_some())
+    }
+
     /// Push a circle of radius `r` at `p` out of the walls cut at height `y`: the summed push
     /// (XZ) and the normal of the deepest contact, or `None` when clear.
     fn walls(&self, p: Vec3, r: f32, y: f32) -> Option<(Vec2, Vec2)> {
@@ -2536,7 +2592,14 @@ impl Collider {
 
 /// Collision per course (`tracks.collision`): classic, or parry (crate::collide). The test
 /// switch RIPTIDE_COLLISION=classic|parry forces one everywhere.
-fn choose_collision(collider: Option<ResMut<Collider>>, track: Option<Res<Track>>, sel: Res<Selection>, content: Res<crate::content::Content>) {
+fn choose_collision(
+    mut commands: Commands,
+    collider: Option<ResMut<Collider>>,
+    track: Option<Res<Track>>,
+    sel: Res<Selection>,
+    content: Res<crate::content::Content>,
+) {
+    commands.remove_resource::<crate::nav::NavLine>();
     let Some(mut col) = collider else { return };
     let row = content.tracks.get(sel.level).and_then(|c| TRACKS.iter().find(|t| t.id == c.id));
     let parry = match std::env::var("RIPTIDE_COLLISION").ok().as_deref() {
@@ -2548,6 +2611,18 @@ fn choose_collision(collider: Option<ResMut<Collider>>, track: Option<Res<Track>
         col.enable_parry(track.as_deref());
     } else {
         info!("collision: classic");
+    }
+    // The AI's way round what is in the water, where `tracks.ai_line` measured it better than
+    // the bare racing line (RIPTIDE_NAV=1 / 0 forces it on / off).
+    let nav = match std::env::var("RIPTIDE_NAV").ok().as_deref() {
+        Some("1") => true,
+        Some("0") => false,
+        _ => row.is_some_and(|t| t.ai_line == TracksAiLine::Nav),
+    };
+    if let Some(t) = track.as_deref().filter(|_| nav) {
+        if let Some(nav) = crate::nav::NavLine::build(t, &col) {
+            commands.insert_resource(nav);
+        }
     }
 }
 
@@ -2643,6 +2718,20 @@ fn probe(time: Res<Time>, clock: Res<RaceClock>, track: Res<Track>, collider: Op
             "STUCK at {:.0} {:.0} {:.0} seg {} s {:.2} u {:.2} water {:.0} above {:.0} wall {:?} speed {:.0} air {} forward {:?}",
             b.pos.x, b.pos.y, b.pos.z, b.tp.seg, b.tp.s, b.tp.u, b.tp.water, b.pos.y - b.tp.water,
             touch.map(|(_, n)| n), b.speed, b.airborne, b.tp.forward
+        );
+        // What the boat is doing about it: controls, the AI's plan, and what blocks it at the
+        // two wall-test heights the physics uses and along the AI's obstacle ray.
+        let heading = Vec2::new(-b.yaw.sin(), -b.yaw.cos());
+        let (r, c) = (phy::BOAT_RADIUS * b.info.scale.min(1.3), b.control);
+        let (walls, ray) = collider.as_ref().map_or((Vec::new(), None), |col| {
+            let at = |h: f32| col.walls_id(b.pos, r, b.pos.y + h, Some(b.tp.forward)).map(|(_, n, id)| (h, n, id, col.tris[id as usize]));
+            let eye = b.pos + Vec3::Y * col.probe.min(phy::WALL_PROBE_HEIGHT * 2.0);
+            let reach = (b.speed.abs() * phy::AI_PROBE_TIME).max(phy::AI_PROBE_MIN);
+            (col.cuts().into_iter().map(at).collect::<Vec<_>>(), col.hit(eye, eye + Vec3::new(heading.x, 0.0, heading.y) * reach).map(|f| f * reach))
+        });
+        info!(
+            "STUCK detail heading {:?} throttle {:.2} steer {:.2} boost {} lane {:.2}->{:.2} reverse {:.1} stuck {:.1} contacts {} ray {:?} walls {:?}",
+            heading, c.throttle, c.steer, c.boost, b.brain.lane, b.brain.lane_target, b.brain.reverse, b.brain.stuck, b.contacts, ray, walls
         );
     }
     st.prev = Some(b.pos);

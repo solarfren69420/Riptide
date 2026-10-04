@@ -4468,6 +4468,7 @@ dependencies = [
  "ewebsock",
  "js-sys",
  "parry3d",
+ "png",
  "riptide-assets",
  "riptide-net",
  "riptide-sheets",

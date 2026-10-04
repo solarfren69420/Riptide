@@ -272,6 +272,16 @@ fn main() -> Result<()> {
                     }
                 }
             }
+            // NEAR="x,z" (Riptide world units): the instances (placed scenery) within 400 of it.
+            if let Some((px, pz)) = std::env::var("NEAR").ok().and_then(|s| { let (a, b) = s.split_once(',')?; Some((a.parse::<f32>().ok()? / 1.6, b.parse::<f32>().ok()? / 1.6)) }) {
+                for inst in &t.instances {
+                    let d = ((inst.position[0] - px).powi(2) + (inst.position[2] - pz).powi(2)).sqrt();
+                    if d < 400.0 / 1.6 {
+                        let bounds = h.geometry(&inst.geometry).ok().and_then(|m| m.bounds());
+                        println!("  instance {} at {:?} (world {:.0}, {:.0}) yaw {:.2} scale {:.2} bounds {bounds:?}", inst.geometry, inst.position, inst.position[0] * 1.6, inst.position[2] * 1.6, inst.yaw, inst.scale);
+                    }
+                }
+            }
             // PROBE="x,z" (Riptide world units, HT scale 1.6 applied): steep triangles near that point.
             if let Some((px, pz)) = std::env::var("PROBE").ok().and_then(|s| { let (a, b) = s.split_once(',')?; Some((a.parse::<f32>().ok()? / 1.6, b.parse::<f32>().ok()? / 1.6)) }) {
                 for part in &t.terrain.parts {

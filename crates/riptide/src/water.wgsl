@@ -1,12 +1,16 @@
 // Riptide water: Bevy's standard PBR lighting with
 // - waves moved on the GPU (the same three travelling sines the boats bob on, race.rs);
-// - two scrolling layers of the level's water normal map for ripples;
-// - fresnel (clearer looking down, glossy and opaque at grazing angles) and crest foam.
+// - three scrolling layers of the level's water normal map for ripples (the finest keeps
+//   distant water from smearing);
+// - fresnel (clearer looking down, glossy and opaque at grazing angles) and crest foam;
+// - with the camera's depth prepass: how thick the water is in front of what lies behind it,
+//   for foam along banks and rocks, clear shallows and darker deep water.
 
 #import bevy_pbr::{
     mesh_functions,
     forward_io::{Vertex, VertexOutput, FragmentOutput},
-    view_transformations::position_world_to_clip,
+    view_transformations::{position_world_to_clip, depth_ndc_to_view_z},
+    prepass_utils,
     pbr_fragment::pbr_input_from_standard_material,
     pbr_functions::{alpha_discard, apply_pbr_lighting, main_pass_post_lighting_processing},
 }
@@ -20,6 +24,12 @@ struct WaterParams {
     normal_strength: f32,
     foam: f32,
     gloss: f32,
+    detail_scale: f32,
+    shore_width: f32,
+    depth_fade: f32,
+    deep_darken: f32,
+    shallow_alpha: f32,
+    sky_reflect: f32,
 };
 
 @group(#{MATERIAL_BIND_GROUP}) @binding(100) var<uniform> water: WaterParams;
@@ -65,15 +75,25 @@ fn vertex(vertex: Vertex) -> VertexOutput {
 }
 
 @fragment
-fn fragment(in: VertexOutput, @builtin(front_facing) is_front: bool) -> FragmentOutput {
+fn fragment(
+    in: VertexOutput,
+    @builtin(front_facing) is_front: bool,
+#ifdef MULTISAMPLED
+    @builtin(sample_index) sample_index: u32,
+#endif
+) -> FragmentOutput {
+#ifndef MULTISAMPLED
+    let sample_index = 0u;
+#endif
     var pbr_input = pbr_input_from_standard_material(in, is_front);
 
-    // Ripples: two layers of the normal map drifting across each other.
+    // Ripples: three layers of the normal map drifting across each other.
     let p = in.world_position.xz * water.normal_scale;
     let t = water.time;
     let n1 = textureSample(ripple_texture, ripple_sampler, p + vec2<f32>(0.021, 0.013) * t).xyz * 2.0 - 1.0;
     let n2 = textureSample(ripple_texture, ripple_sampler, p * 1.73 + vec2<f32>(-0.017, 0.026) * t).xyz * 2.0 - 1.0;
-    let ripple = vec2<f32>(n1.x + n2.x, n1.y + n2.y) * water.normal_strength;
+    let n3 = textureSample(ripple_texture, ripple_sampler, in.world_position.xz * water.detail_scale + vec2<f32>(0.031, -0.022) * t).xyz * 2.0 - 1.0;
+    let ripple = vec2<f32>(n1.x + n2.x + 0.6 * n3.x, n1.y + n2.y + 0.6 * n3.y) * water.normal_strength;
     let n = normalize(in.world_normal + vec3<f32>(ripple.x, 0.0, ripple.y));
     pbr_input.N = n;
     pbr_input.world_normal = n;
@@ -83,8 +103,26 @@ fn fragment(in: VertexOutput, @builtin(front_facing) is_front: bool) -> Fragment
     let ndv = clamp(dot(n, pbr_input.V), 0.0, 1.0);
     let fres = pow(1.0 - ndv, 5.0);
     pbr_input.material.perceptual_roughness = mix(pbr_input.material.perceptual_roughness, water.gloss, fres);
+    // Less of the (generated, pale) sky: it washed the water out.
+    pbr_input.specular_occlusion = water.sky_reflect;
     var color = pbr_input.material.base_color;
+
+    // How much water lies in front of the riverbed or bank behind this pixel (view-space depth
+    // difference): clear and light in the shallows, darker when deep, foam along the edges.
+    var thick = water.depth_fade;
+#ifdef DEPTH_PREPASS
+    let behind = depth_ndc_to_view_z(prepass_utils::prepass_depth(in.position, sample_index));
+    let here = depth_ndc_to_view_z(in.position.z);
+    thick = max(here - behind, 0.0);
+#endif
+    let deep = smoothstep(0.0, water.depth_fade, thick);
+    color = vec4<f32>(color.rgb * mix(1.0, water.deep_darken, deep), mix(water.shallow_alpha, color.a, deep));
     color.a = mix(color.a, 1.0, fres);
+    // Shore foam, broken up by the ripple texture so it isn't a flat band.
+    let edge = 1.0 - smoothstep(0.0, water.shore_width, thick);
+    let lace = smoothstep(0.35, 0.75, 0.5 + 0.25 * (n1.x + n3.y) + 0.5 * edge);
+    let shore = edge * lace;
+    color = vec4<f32>(mix(color.rgb, vec3<f32>(0.93, 0.97, 1.0), shore), max(color.a, shore * 0.95));
 
     // Foam on the crests.
     let w = wave(in.world_position.xz);

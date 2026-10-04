@@ -19,6 +19,7 @@ mod effects;
 mod hud;
 mod controls;
 mod menu;
+mod nav;
 mod net;
 mod race;
 mod sheets;
