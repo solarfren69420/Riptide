@@ -370,14 +370,18 @@ fn spawn_race(
                         .collect();
                     let mut level = H2Level { code: code.clone(), title: choice.name.clone(), path, ..Default::default() };
                     // The AI path excludes shortcuts. Every original river sector needs a surface.
+                    let mut river = Vec::new();
                     for [a, b] in &t.river {
                         let drop = (a.water - b.water) * s > phy::WATERFALL_DROP;
                         let lift = |p: [f32; 3], y: f32| [p[0] * s, y * s, p[2] * s];
                         level.water.push(Quad { corners: [lift(a.start, a.water), lift(a.end, a.water), lift(b.end, if drop { a.water } else { b.water }), lift(b.start, if drop { a.water } else { b.water })] });
+                        let bw = if drop { a.water } else { b.water };
+                        river.push((sc(a.start), sc(a.end), a.water * s, sc(b.start), sc(b.end), bw * s));
                         if drop {
                             level.waterfalls.push(Quad { corners: [lift(b.start, a.water), lift(b.end, a.water), sc(b.end), sc(b.start)] });
                         }
                     }
+                    crate::h2water::edges_from_river(&mut level, &river);
                     (level, Some((t, *laps)))
                 }
                 Err(e) => {
@@ -883,6 +887,12 @@ fn spawn_water(commands: &mut Commands, models: &mut Models, level: &H2Level, tr
     let h2 = std::env::var("RIPTIDE_H2WATER").map_or(true, |v| v != "0")
         && !level.water_sectors.is_empty()
         && models.content.lux.get("shad4.FX_Water2").and_then(|blob| crate::h2water::install(&mut models.shaders, blob)).is_some_and(|sh| {
+            // Hydro Thunder: generated edges, coloured from the course's own water art.
+            let mut level = level.clone();
+            if let Some(img) = frames.first().and_then(|f| models.images.get(f)) {
+                crate::h2water::tint_from(&mut level, img);
+            }
+            let level = &level;
             let bump = models.lux_normal_map("wavesbump").unwrap_or_default();
             if let Some(img) = models.images.get_mut(&bump) {
                 img.sampler = bevy::image::ImageSampler::Descriptor(crate::content::repeat_sampler());

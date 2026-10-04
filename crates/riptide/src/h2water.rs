@@ -499,3 +499,69 @@ impl H2Waves {
         None
     }
 }
+
+/// Water edges and sectors for a course with none of its own (Hydro Thunder): one edge per river
+/// cross-section (shared between neighbouring sectors, so the flow spline joins up) and one
+/// sector per river sector, with the look of an ordinary H2Overdrive river edge. The water colour
+/// comes from the course's own water art later (`tint_from`).
+pub fn edges_from_river(level: &mut H2Level, river: &[([f32; 3], [f32; 3], f32, [f32; 3], [f32; 3], f32)]) {
+    use riptide_assets::h2level::{WaterLight, WaterSector};
+    let mut index: Vec<(([i32; 3], [i32; 3], i32), usize)> = Vec::new();
+    let key = |s: [f32; 3], e: [f32; 3], w: f32| (s.map(|v| v.round() as i32), e.map(|v| v.round() as i32), w.round() as i32);
+    let mut edge = |level: &mut H2Level, s: [f32; 3], e: [f32; 3], w: f32| -> usize {
+        let k = key(s, e, w);
+        if let Some((_, i)) = index.iter().find(|(kk, _)| *kk == k) {
+            return *i;
+        }
+        let i = level.water_edges.len();
+        level.water_edges.push(WaterEdge {
+            name: format!("river{i}"),
+            start: s,
+            end: e,
+            water: w,
+            wave_type: "Normal".into(),
+            wave_intensity: phy::HT_WATER_WAVE_INTENSITY,
+            wave_direction: 0.0,
+            bump_direction: 0.0,
+            bump_speed: 0.0,
+            flow_speed: phy::HT_WATER_FLOW_SPEED,
+            opaqueness: phy::HT_WATER_OPAQUENESS,
+            reflection_type: "Real".into(),
+            water_color: [0.05, 0.2, 0.25, 1.0],
+            whitewash_color: [0.8, 0.8, 0.8, 0.0],
+            specular_color: [0.65, 0.65, 0.65, 1.0],
+            reflection_tint: [phy::HT_WATER_REFLECTION, phy::HT_WATER_REFLECTION, phy::HT_WATER_REFLECTION, 1.0],
+            light: Some(WaterLight { direction: [-0.5, -0.7, 0.3], color: [1.0, 0.95, 0.85, 1.0], intensity: 1.0, ambient: [0.75, 0.8, 0.85, 1.0], ambient_intensity: 0.4 }),
+        });
+        index.push((k, i));
+        i
+    };
+    for &(a0, a1, aw, b0, b1, bw) in river {
+        let leading = edge(level, a0, a1, aw);
+        let trailing = edge(level, b0, b1, bw);
+        if leading != trailing {
+            level.water_sectors.push(WaterSector { leading, trailing });
+        }
+    }
+}
+
+/// Give generated edges (`edges_from_river`) the average colour of the course's water art.
+pub fn tint_from(level: &mut H2Level, image: &Image) {
+    let Some(data) = image.data.as_ref() else { return };
+    if data.len() < 4 {
+        return;
+    }
+    let mut sum = [0f64; 3];
+    for px in data.chunks_exact(4) {
+        for c in 0..3 {
+            sum[c] += px[c] as f64;
+        }
+    }
+    let n = (data.len() / 4) as f64 * 255.0;
+    // The art is sRGB; the shader works in linear.
+    let lin = |v: f64| ((v / n) as f32).powf(2.2);
+    let color = [lin(sum[0]), lin(sum[1]), lin(sum[2]), 1.0];
+    for e in level.water_edges.iter_mut().filter(|e| e.name.starts_with("river")) {
+        e.water_color = color;
+    }
+}

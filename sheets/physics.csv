@@ -169,3 +169,7 @@ h2water_flow_visibility,f32,2,per unit Flow Speed,riptide design (stand-in until
 thrust_room_weight,f32,0,-,observed (EVD_BOOST_SPEED): thrust no longer fades near top speed; drag sets cruising speed so boost thrust (2x) is a real speed-up
 ai_boost_lookahead,f32,1.2,s,riptide design: AI boats look this many seconds ahead (at their speed) before boosting
 ai_boost_straight,f32,0.9,cos of angle,riptide design: AI boats only boost when the course ahead turns less than about 25 degrees
+ht_water_wave_intensity,f32,0.3,-,riptide design: Hydro Thunder courses on the H2Overdrive water shader: wave intensity of their generated edges (an ordinary H2 river edge)
+ht_water_flow_speed,f32,0.25,-,riptide design: Hydro Thunder generated water edges: flow speed (as H2 river edges)
+ht_water_opaqueness,f32,0.85,-,riptide design: Hydro Thunder generated water edges: mostly the course own water colour with a little of the riverbed showing
+ht_water_reflection,f32,0.55,-,riptide design: Hydro Thunder generated water edges: reflection tint
