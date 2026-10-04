@@ -173,3 +173,4 @@ ht_water_wave_intensity,f32,0.3,-,riptide design: Hydro Thunder courses on the H
 ht_water_flow_speed,f32,0.25,-,riptide design: Hydro Thunder generated water edges: flow speed (as H2 river edges)
 ht_water_opaqueness,f32,0.85,-,riptide design: Hydro Thunder generated water edges: mostly the course own water colour with a little of the riverbed showing
 ht_water_reflection,f32,0.55,-,riptide design: Hydro Thunder generated water edges: reflection tint
+h2water_clip_lift,f32,2,units,riptide design: the reflection camera clips everything this little above the water surface and below (no seam where geometry meets the water)

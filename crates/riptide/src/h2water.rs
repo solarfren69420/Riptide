@@ -117,6 +117,20 @@ pub struct H2WaterShaders {
 /// Translate `shad4.FX_Water2` (its fullest vertex / pixel pair: leading and trailing edges,
 /// lights, tidal waves) and install it as the material's shaders.
 pub fn install(shaders: &mut Assets<Shader>, blob: &[u8]) -> Option<H2WaterShaders> {
+    // Once per run: inserting the shaders again (a restart) replaced them under the materials of
+    // the new race, which then drew as a flat mirror.
+    static DONE: std::sync::OnceLock<H2WaterShaders> = std::sync::OnceLock::new();
+    if let Some(sh) = DONE.get() {
+        if shaders.contains(&VERTEX) && shaders.contains(&FRAGMENT) {
+            return Some(sh.clone());
+        }
+    }
+    let sh = install_once(shaders, blob)?;
+    let _ = DONE.set(sh.clone());
+    Some(sh)
+}
+
+fn install_once(shaders: &mut Assets<Shader>, blob: &[u8]) -> Option<H2WaterShaders> {
     let progs = d3d9_shader::programs(blob);
     let vs = progs.iter().filter(|p| !p.pixel).max_by_key(|p| p.tokens.len())?.clone();
     let ps = progs.iter().filter(|p| p.pixel).max_by_key(|p| p.tokens.len())?.clone();
@@ -419,6 +433,13 @@ fn follow_reflection(
     t.translation = Vec3::new(cam.translation.x, 2.0 * h - cam.translation.y, cam.translation.z);
     t.rotation = Quat::from_mat3(&Mat3::from_cols(mirror(x), -mirror(y), mirror(z))).normalize();
     *p = proj.clone();
+    // Oblique near plane on the water (Lengyel; Bevy's near_clip_plane): nothing below the surface
+    // (riverbed, the bases of rocks) is mirrored up into the reflection. A plane transforms into
+    // view space by the transpose of world-from-view.
+    if let Projection::Perspective(pp) = &mut *p {
+        let plane = Vec4::new(0.0, 1.0, 0.0, -(h + phy::H2WATER_CLIP_LIFT));
+        pp.near_clip_plane = t.to_matrix().transpose() * plane;
+    }
 }
 
 /// The render layer foam wakes go on under this water: only the whitewash camera sees them.

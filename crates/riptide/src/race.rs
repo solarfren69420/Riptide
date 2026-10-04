@@ -894,8 +894,12 @@ fn spawn_water(commands: &mut Commands, models: &mut Models, level: &H2Level, tr
             }
             let level = &level;
             let bump = models.lux_normal_map("wavesbump").unwrap_or_default();
-            if let Some(img) = models.images.get_mut(&bump) {
-                img.sampler = bevy::image::ImageSampler::Descriptor(crate::content::repeat_sampler());
+            // Repeat sampler, set once: touching the image again (a restart) re-uploads it, and its
+            // pixels live only in the render world, so the ripples came back blank (a flat mirror).
+            if models.images.get(&bump).is_some_and(|i| !matches!(i.sampler, bevy::image::ImageSampler::Descriptor(_))) {
+                if let Some(img) = models.images.get_mut(&bump) {
+                    img.sampler = bevy::image::ImageSampler::Descriptor(crate::content::repeat_sampler());
+                }
             }
             let n = crate::h2water::spawn(commands, level, &sh, &mut models.meshes, &mut models.h2water, &mut models.images, bump, phy::WATER_CELL.max(1.0));
             info!("h2water: {n} sectors with shad4.FX_Water2");
@@ -1935,6 +1939,14 @@ fn race_keys(
     mut intro: ResMut<Intro>,
     mut sfx: crate::sound::Sfx,
 ) {
+    // Test hook: RIPTIDE_TEST_RESTART=secs restarts the race once, that long into it.
+    if let Some(at) = std::env::var("RIPTIDE_TEST_RESTART").ok().and_then(|s| s.parse::<f32>().ok()) {
+        static DONE: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+        if clock.t > at && !online.racing() && !DONE.swap(true, std::sync::atomic::Ordering::Relaxed) {
+            info!("test restart");
+            next.set(Screen::Restart);
+        }
+    }
     if sel.render_target.is_some() || cheats.menu_open {
         return;
     }
