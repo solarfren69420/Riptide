@@ -10,7 +10,7 @@ revenge_of_the_nile,h2,Revenge of the Nile,7,rn,-,ok,ok,sdaemon.exe string table
 frozen_tundra,h2,Frozen Tundra,8,tl,-,ok,ok,exe PS_FrozenTundra + VO 'Track Frozen Tundra'; triton_levels [Tundra Loop],ok,tl_main,parry,nav
 down_underdrive,h2,Down Underdrive,9,du,-,ok,ok,exe PS_DownUnderdrive + VO 'Track Down Under'; triton_levels [Down Under Loop],ok,du_main,parry,racing
 reverse_tundra,h2,Frozen Tundra Backward,10,rt,-,ok,ok,sdaemon.exe audit track names (TRACK_RT); triton_levels [Reverse Tundra],ok,rt_main,classic,racing
-reverse_sydney,h2,Down Underdrive Backward,11,rs,-,ok,ok,sdaemon.exe audit track names (TRACK_RS); triton_levels [Reverse Sydney],ok,rs_main,parry,racing
+reverse_sydney,h2,Down Underdrive Backward,11,rs,-,ok,ok,sdaemon.exe audit track names (TRACK_RS); triton_levels [Reverse Sydney],ok,rs_main,classic,racing
 physics_playground,h2,Physics Playground,12,pp,-,n/a: dev level - no data.pp_ai,ok,triton_levels [Physics Playground],n/a: no checkpoint data,com_music_theme,classic,racing
 particle_world,h2,Particle World,13,pw,-,n/a: dev level - no data.pw_ai,ok,triton_levels [Particle World],n/a: no checkpoint data,com_music_theme,classic,racing
 test_level,h2,Test Level,14,xx,-,n/a: dev level - no data.xx_ai,ok,triton_levels [Test Level],n/a: no checkpoint data,com_music_theme,classic,racing

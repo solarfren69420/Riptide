@@ -22,6 +22,7 @@ mod menu;
 mod nav;
 mod net;
 mod race;
+mod recovery;
 mod sheets;
 mod sound;
 mod track;

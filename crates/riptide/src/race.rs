@@ -37,6 +37,7 @@ impl Plugin for RacePlugin {
                     ai_drive,
                     boat_physics,
                     boat_contacts,
+                    crate::recovery::recover,
                     crate::net::send_state,
                     crate::net::apply_remote,
                     pickups,
@@ -120,6 +121,9 @@ pub struct Boat {
     /// Running counts for sound cues: boats blasted by this one's Hull Crusher, hard wall hits.
     pub smashes: u32,
     pub wall_hits: u32,
+    /// Boost / gold boost pickups collected (sound cues: heard even with a full tank).
+    pub pickups: u32,
+    pub super_pickups: u32,
     /// Frames this boat was pushed out of a wall (collision check, RIPTIDE_PROBE).
     pub contacts: u32,
     /// Jumps since leaving the water, and seconds since the last one.
@@ -148,6 +152,9 @@ pub struct Brain {
     pub reverse: f32,
     /// Last nearest point on the navigation line (usize::MAX: not looked up yet).
     pub nav: usize,
+    /// Wall contacts seen so far, and seconds left of steering clear after the last one.
+    pub contacts: u32,
+    pub scrape: f32,
 }
 
 #[derive(Component)]
@@ -652,7 +659,7 @@ fn spawn_race(
                     finished: None,
                     timed_out: false,
                     control: Control::default(),
-                    brain: Brain { lane, lane_target: lane, skill: 0.90 + 0.08 * rand(), lane_timer: rand() * 3.0, stuck: 0.0, reverse: 0.0, nav: usize::MAX },
+                    brain: Brain { lane, lane_target: lane, skill: 0.90 + 0.08 * rand(), lane_timer: rand() * 3.0, stuck: 0.0, reverse: 0.0, nav: usize::MAX, contacts: 0, scrape: 0.0 },
                     roll: 0.0,
                     pitch: 0.0,
                     airborne: false,
@@ -662,6 +669,8 @@ fn spawn_race(
                     catchup: 0.0,
                     smashes: 0,
                     wall_hits: 0,
+                    pickups: 0,
+                    super_pickups: 0,
                     contacts: 0,
                     jumps: 0,
                     jump_t: 0.0,
@@ -670,9 +679,10 @@ fn spawn_race(
                 Name::new(info.name.clone()),
             ))
             .id();
-        if let Some(id) = remote {
-            commands.entity(e).insert(crate::net::Remote { id });
-        }
+        match remote {
+            Some(id) => commands.entity(e).insert(crate::net::Remote { id }),
+            None => commands.entity(e).insert(crate::recovery::Recovery::default()),
+        };
         // Hull depth below the origin, for the ride height (place_boats).
         let hull = info.row.model.strip_prefix("lux:mesh32.").and_then(|m| {
             let b = models.content.lux.get(&format!("mesh32.{m}"))?;
@@ -1014,6 +1024,11 @@ fn ai_drive(
         let tp = b.tp;
         let mut brain = b.brain;
         brain.lane_timer -= dt;
+        if b.contacts > brain.contacts {
+            brain.scrape = phy::AI_SCRAPE_TIME;
+        }
+        brain.contacts = b.contacts;
+        brain.scrape = (brain.scrape - dt).max(0.0);
         if brain.lane_timer <= 0.0 {
             let h = (tp.seg as f32 * 12.9898 + brain.skill * 78.233).sin() * 43758.545;
             brain.lane_target = 0.25 + 0.5 * h.fract().abs();
@@ -1031,7 +1046,22 @@ fn ai_drive(
                 brain.nav = n.nearest(b.pos, brain.nav);
                 n.aim(brain.nav, look, brain.lane)
             }
-            None => aim_point(&track, tp, look, brain.lane),
+            // The racing line's cross-sections can reach past the banks on bends: while scraping a
+            // wall, if one stands between the boat and its aim point, aim down the middle, then closer.
+            None if brain.scrape <= 0.0 => aim_point(&track, tp, look, brain.lane),
+            None => {
+                let clear = |p: Vec3| {
+                    collider.as_ref().is_none_or(|col| {
+                        let h = Vec3::Y * col.probe.min(phy::WALL_PROBE_HEIGHT * 2.0);
+                        col.hit(b.pos + h, Vec3::new(p.x, b.pos.y, p.z) + h).is_none()
+                    })
+                };
+                [(look, brain.lane), (look, 0.5), (look * 0.5, 0.5)]
+                    .into_iter()
+                    .map(|(ahead, lane)| aim_point(&track, tp, ahead, lane))
+                    .find(|p| clear(*p))
+                    .unwrap_or_else(|| aim_point(&track, tp, look, brain.lane))
+            }
         };
         let to = Vec2::new(aim.x - b.pos.x, aim.z - b.pos.z);
         let heading = Vec2::new(-b.yaw.sin(), -b.yaw.cos());
@@ -1520,8 +1550,13 @@ fn pickups(
             if b.pos.distance(pk.base) < phy::PICKUP_RADIUS {
                 if row.fills_super {
                     b.super_time = (b.super_time + fuel).min(g.boost_fuel_max_super);
+                    b.super_pickups += 1;
                 } else {
                     b.fuel = (b.fuel + fuel).min(g.boost_fuel_max_regular);
+                    b.pickups += 1;
+                }
+                if b.player && std::env::var_os("RIPTIDE_PROBE").is_some() {
+                    info!("PICKUP {} (boost {}, gold {}) fuel {:.1}", row.id, b.pickups, b.super_pickups, b.fuel);
                 }
                 pk.cooldown = phy::PICKUP_RESPAWN;
                 break;
@@ -2140,7 +2175,8 @@ struct HeardState {
     smashes: u32,
     wall_hits: u32,
     fuel: f32,
-    super_time: f32,
+    pickups: u32,
+    super_pickups: u32,
     wipeout: bool,
     crushing: bool,
     stowing: bool,
@@ -2169,10 +2205,12 @@ fn race_audio(
     if !last.started {
         *last = HeardState { fuel: p.fuel, started: true, ..default() };
     }
-    if p.fuel > last.fuel + 0.5 {
+    // Pickups by count, not by the tank rising: a full tank (or the infinite boost cheat) still
+    // hears them.
+    if p.pickups > last.pickups {
         sfx.event(ev::BOOST_PICKUP);
     }
-    if p.super_time > last.super_time + 0.5 {
+    if p.super_pickups > last.super_pickups {
         sfx.event(ev::SUPER_PICKUP);
     }
     if p.fuel < g.boost_fuel_max_regular * 0.15 && last.fuel >= g.boost_fuel_max_regular * 0.15 && clock.t > 0.0 {
@@ -2255,7 +2293,8 @@ fn race_audio(
         last.low_time = low;
     }
     last.fuel = p.fuel;
-    last.super_time = p.super_time;
+    last.pickups = p.pickups;
+    last.super_pickups = p.super_pickups;
     last.wipeout = p.wipeout > 0.0;
     last.crushing = crushing;
     last.lap = p.lap;
