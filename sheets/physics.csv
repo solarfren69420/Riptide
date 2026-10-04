@@ -135,3 +135,4 @@ water_shallow_alpha,f32,0.3,0-1,riptide design: opacity at the very edge of the 
 water_sky_reflect,f32,0.55,0-1,riptide design: how much of the sky the water reflects (the generated sky washed it out at 1)
 ai_scrape_time,f32,1,s,riptide design: for this long after touching a wall the AI checks that its aim point is not behind one
 recovery_player,f32,1,0/1,riptide design: H2Overdrive recovery (Slow Driver / Wrong Way / AntiStuck) also applies to the player (which boats the original flags is not decoded)
+race_intro,f32,15.6,s,riptide calibration: the 3-2-1 countdown starts this long into the pre-race checklist (user recording of the original: evidence EVD_GONOGO); skipped by accelerate / boost / start

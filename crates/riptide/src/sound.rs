@@ -135,9 +135,27 @@ impl Sfx<'_, '_> {
         }
     }
 
-    /// Stop a looping sound started by [`Self::event_loop`].
+    /// Play a `sound_events` row's sound once (first variant at its own volume), returning its
+    /// entity so it can be cut short with [`Self::stop`].
+    pub fn event_once(&mut self, ev: usize, scope: impl Bundle) -> Option<Entity> {
+        let row = &SOUND_EVENTS[ev];
+        let def = row.sounddef.or(row.global.and_then(|g| H2_GLOBALSOUNDS[g].sounddef))?;
+        let d = &H2_SOUNDDEFS[def];
+        let v = variant(d, 0)?;
+        let src = self.source(v.sample)?;
+        if std::env::var_os("RIPTIDE_DEBUG").is_some() {
+            info!("sound: play {}", d.id);
+        }
+        if muted() {
+            return None;
+        }
+        let settings = PlaybackSettings::DESPAWN.with_volume(Volume::Linear(d.volume_2d * v.volume));
+        Some(self.commands.spawn((AudioPlayer(src), settings, scope)).id())
+    }
+
+    /// Stop a sound started by [`Self::event_loop`] or [`Self::event_once`].
     pub fn stop(&mut self, e: Entity) {
-        self.commands.entity(e).despawn();
+        self.commands.entity(e).try_despawn();
     }
 
     /// Loop a `sound_events` row's sound (first variant at its own volume) until the returned

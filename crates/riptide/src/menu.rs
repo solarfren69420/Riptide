@@ -236,6 +236,7 @@ pub(crate) fn menu_input(
     mut exit: MessageWriter<AppExit>,
     mut last_boat: Local<usize>,
     mut last_level: Local<usize>,
+    mut warnings: Local<(Option<Entity>, Option<Entity>)>,
 ) {
     if cheats.menu_open || online.typing.is_some() {
         return;
@@ -293,10 +294,26 @@ pub(crate) fn menu_input(
             Some(def) => sfx.def(def, 1.0),
             None => sfx.event(crate::sheets::sound_events_ids::MENU_TICK),
         }
+        // A hard boat: warning beeps while it stays highlighted (the announcer is busy naming it).
+        if let Some(e) = warnings.1.take() {
+            sfx.stop(e);
+        }
+        if matches!(boats[sel.boat].row.tier, crate::sheets::BoatsTier::Hard | crate::sheets::BoatsTier::Secret) {
+            warnings.1 = sfx.event_loop(crate::sheets::sound_events_ids::BOAT_WARNING, DespawnOnExit(Screen::Menu));
+        }
     }
     if sel.level != *last_level {
         *last_level = sel.level;
         sfx.event(crate::sheets::sound_events_ids::MENU_TICK);
+        // A hard course: warning beeps while it stays highlighted, and the announcer's verdict.
+        if let Some(e) = warnings.0.take() {
+            sfx.stop(e);
+        }
+        let id = models.content.tracks[sel.level].id;
+        if crate::sheets::TRACKS.iter().any(|t| t.id == id && matches!(t.difficulty, crate::sheets::TracksDifficulty::Hard | crate::sheets::TracksDifficulty::Expert)) {
+            warnings.0 = sfx.event_loop(crate::sheets::sound_events_ids::TRACK_WARNING, DespawnOnExit(Screen::Menu));
+            sfx.event(crate::sheets::sound_events_ids::TRACK_CRAZY);
+        }
     }
     if input.just_pressed(ctl::MENU_START) && online.room.is_some() {
         // In a room the host starts everyone's race; the server says when.

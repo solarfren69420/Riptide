@@ -747,7 +747,11 @@ fn spawn_race(
     }
 
     spawn_hud(&mut commands, &level);
-    commands.insert_resource(RaceClock { t: -phy::COUNTDOWN, finish_order: Vec::new() });
+    // The pre-race checklist plays on the grid before the countdown (not in captures unless
+    // RIPTIDE_INTRO is set, nor online).
+    let intro = if (sel.render_target.is_none() || std::env::var_os("RIPTIDE_INTRO").is_some()) && !online.racing() { phy::RACE_INTRO } else { 0.0 };
+    commands.insert_resource(RaceClock { t: -phy::COUNTDOWN - intro, finish_order: Vec::new() });
+    commands.insert_resource(Intro::default());
     // Arcade timer: the level's `Starting Seconds`, topped up by its checkpoints (sheets).
     let timer_ok = TRACKS.iter().find(|t| t.id == choice.id).is_some_and(|t| t.timer.is_ok());
     let mut timer = ArcadeTimer { enabled: false, left: 0.0, gates: Vec::new(), banner: None };
@@ -1718,6 +1722,8 @@ fn hud(
             HudText::Center => {
                 if online.waiting() {
                     "Waiting for every racer to load the course...".to_string()
+                } else if clock.t < -phy::COUNTDOWN {
+                    "GET READY".to_string()
                 } else if clock.t < 0.0 {
                     let n = (-clock.t).ceil() as i32;
                     if n <= 3 { n.to_string() } else { String::new() }
@@ -1779,9 +1785,19 @@ fn race_keys(
     mut next: ResMut<NextState<Screen>>,
     sel: Res<Selection>,
     boats: Query<&Boat>,
+    mut clock: ResMut<RaceClock>,
+    mut intro: ResMut<Intro>,
+    mut sfx: crate::sound::Sfx,
 ) {
     if sel.render_target.is_some() || cheats.menu_open {
         return;
+    }
+    // Accelerate, boost or start skips the pre-race checklist to the countdown.
+    if clock.t < -phy::COUNTDOWN && [ctl::THROTTLE, ctl::BOOST, ctl::MENU_START].iter().any(|k| input.just_pressed(*k)) {
+        clock.t = -phy::COUNTDOWN;
+        if let Some(e) = intro.0.take() {
+            sfx.stop(e);
+        }
     }
     if input.just_pressed(ctl::LEAVE_RACE) {
         // Online: quitting before the finish leaves the room; afterwards it's back to the lobby.
@@ -2149,7 +2165,18 @@ fn arcade_timer(
 }
 
 /// The player's engine loops (from its boatdef's `Engine Def`) and the countdown voice.
-fn start_race_audio(mut sfx: crate::sound::Sfx, boats: Query<(Entity, &Boat)>, sel: Res<Selection>, content: Res<crate::content::Content>) {
+/// The pre-race checklist playing (cut short when the player skips it).
+#[derive(Resource, Default)]
+pub struct Intro(Option<Entity>);
+
+fn start_race_audio(
+    mut sfx: crate::sound::Sfx,
+    boats: Query<(Entity, &Boat)>,
+    sel: Res<Selection>,
+    content: Res<crate::content::Content>,
+    clock: Res<RaceClock>,
+    mut intro: ResMut<Intro>,
+) {
     // The track's music (tracks sheet).
     let music = content.tracks.get(sel.level).and_then(|c| TRACKS.iter().find(|t| t.id == c.id)).and_then(|t| t.music);
     if let Some(m) = music {
@@ -2160,7 +2187,12 @@ fn start_race_audio(mut sfx: crate::sound::Sfx, boats: Query<(Entity, &Boat)>, s
             crate::sound::start_engine(&mut sfx, e, engine, DespawnOnExit(Screen::Race));
         }
     }
-    sfx.event(crate::sheets::sound_events_ids::COUNTDOWN);
+    // The pre-race checklist: the original picks it by the boat's engine (boat def Hydro Engine).
+    if clock.t < -phy::COUNTDOWN {
+        let hydro = boats.iter().find(|(_, b)| b.player).is_some_and(|(_, b)| b.info.def.hydro_engine);
+        let ev = if hydro { crate::sheets::sound_events_ids::RACE_CHECKLIST_HYDRO } else { crate::sheets::sound_events_ids::RACE_CHECKLIST_GAS };
+        intro.0 = sfx.event_once(ev, DespawnOnExit(Screen::Race));
+    }
 }
 
 fn engine_audio(boats: Query<&Boat>, mut layers: Query<(&crate::sound::EngineLayer, &crate::sound::EngineOf, &mut bevy::audio::AudioSink)>) {
@@ -2170,6 +2202,10 @@ fn engine_audio(boats: Query<&Boat>, mut layers: Query<(&crate::sound::EngineLay
 /// What the player's boat did last frame, to turn state changes into sound events.
 #[derive(Default)]
 struct HeardState {
+    /// Race clock last frame.
+    t: f32,
+    /// The 3-2-1 countdown voice has played (when the clock reaches the countdown).
+    counted: bool,
     boosting: bool,
     super_on: bool,
     smashes: u32,
@@ -2192,6 +2228,7 @@ struct HeardState {
 
 fn race_audio(
     mut sfx: crate::sound::Sfx,
+    mut intro: ResMut<Intro>,
     track: Res<Track>,
     clock: Res<RaceClock>,
     timer: Option<Res<ArcadeTimer>>,
@@ -2202,8 +2239,24 @@ fn race_audio(
     use crate::sheets::sound_events_ids as ev;
     let Some(p) = boats.iter().find(|b| b.player) else { return };
     let g = &tuning.0;
-    if !last.started {
+    // A new race (or a restart): the clock went back. Start over, or the last race's finish,
+    // laps and countdown would silence this one's.
+    if !last.started || clock.t < last.t - 0.5 {
+        if let Some(old) = last.riff.take() {
+            sfx.stop(old);
+        }
         *last = HeardState { fuel: p.fuel, started: true, ..default() };
+    }
+    last.t = clock.t;
+    if !last.counted && clock.t >= -phy::COUNTDOWN - 1e-3 {
+        last.counted = true;
+        sfx.event(ev::COUNTDOWN);
+    }
+    // The checklist file runs on past the countdown: it ends at GO.
+    if clock.t >= 0.0 {
+        if let Some(e) = intro.0.take() {
+            sfx.stop(e);
+        }
     }
     // Pickups by count, not by the tank rising: a full tank (or the infinite boost cheat) still
     // hears them.

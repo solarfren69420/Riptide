@@ -1,37 +1,37 @@
-id,game,display_name,menu_order,h2_level,ht_track,racing_line,geometry,name_source,timer,music,collision,ai_line
-@types,enum:h2|ht|sandbox,str,i32,ref:h2_levels,ref:ht_tracks,status,status,str,status,ref:h2_samples,enum:classic|parry,enum:racing|nav
-wild_america,h2,Wild America,1,wa,-,ok,ok,sdaemon.exe track string table (case 0x1d); triton_levels [Wild America],ok,wa_main,classic,racing
-hong_kong_buoy,h2,Hong Kong Buoy,2,hk,-,ok,ok,sdaemon.exe string table (0x1e); triton_levels [Hong Kong Buoy],ok,hk_main,classic,racing
-temple_of_flume,h2,Temple of Flume,3,tf,-,ok,ok,sdaemon.exe string table (0x1f); triton_levels [Temple of Flume],ok,tf_main,classic,nav
-london_underground,h2,London Underground,4,lo,-,ok,ok,sdaemon.exe string table (0x20); triton_levels [London],ok,lo_main,classic,nav
-devils_triangle,h2,Devil's Triangle,5,-,-,n/a: no level data for this menu entry in triton.lux,n/a: no level data for this menu entry in triton.lux,sdaemon.exe string table (0x21); track-select art ut_Track_DT_L,n/a: no checkpoint data,com_music_theme,classic,racing
-quake_canyon,h2,Quake Canyon,6,qc,-,ok,ok,sdaemon.exe string table (0x22); triton_levels [Quake Canyon],ok,qc_main,classic,racing
-revenge_of_the_nile,h2,Revenge of the Nile,7,rn,-,ok,ok,sdaemon.exe string table (0x23); triton_levels [Revenge of the Nile],n/a: no checkpoint data,com_music_theme,classic,nav
-frozen_tundra,h2,Frozen Tundra,8,tl,-,ok,ok,exe PS_FrozenTundra + VO 'Track Frozen Tundra'; triton_levels [Tundra Loop],ok,tl_main,parry,nav
-down_underdrive,h2,Down Underdrive,9,du,-,ok,ok,exe PS_DownUnderdrive + VO 'Track Down Under'; triton_levels [Down Under Loop],ok,du_main,parry,racing
-reverse_tundra,h2,Frozen Tundra Backward,10,rt,-,ok,ok,sdaemon.exe audit track names (TRACK_RT); triton_levels [Reverse Tundra],ok,rt_main,classic,racing
-reverse_sydney,h2,Down Underdrive Backward,11,rs,-,ok,ok,sdaemon.exe audit track names (TRACK_RS); triton_levels [Reverse Sydney],ok,rs_main,classic,racing
-physics_playground,h2,Physics Playground,12,pp,-,n/a: dev level - no data.pp_ai,ok,triton_levels [Physics Playground],n/a: no checkpoint data,com_music_theme,classic,racing
-particle_world,h2,Particle World,13,pw,-,n/a: dev level - no data.pw_ai,ok,triton_levels [Particle World],n/a: no checkpoint data,com_music_theme,classic,racing
-test_level,h2,Test Level,14,xx,-,n/a: dev level - no data.xx_ai,ok,triton_levels [Test Level],n/a: no checkpoint data,com_music_theme,classic,racing
-test_level_xy,h2,Test Level XY,15,xy,-,n/a: dev level - no data.xy_ai,ok,triton_levels [Test Level XY],n/a: no checkpoint data,com_music_theme,classic,racing
-ms1,h2,MS1,16,m1,-,n/a: dev level - no data files,n/a: dev level - no data files,triton_levels [MS1],n/a: no checkpoint data,com_music_theme,classic,racing
-h2os,h2,H20s,17,h2,-,n/a: dev level - no data.h2_ai,ok,triton_levels [H20s],n/a: no checkpoint data,com_music_theme,classic,racing
-wrapper,h2,Wrapper,18,wr,-,n/a: attract/menu backdrop level not a race,ok,triton_levels [Wrapper],n/a: no checkpoint data,com_music_theme,classic,racing
-wrapper_new,h2,Wrapper New,19,wn,-,n/a: attract/menu backdrop level not a race,ok,triton_levels [Wrapper New],n/a: no checkpoint data,com_music_theme,classic,racing
-thunder_park,ht,Thunder Park,20,-,loo1,ok,ok,ht_tracks.loo1,n/a: HT checkpoint times not decoded,com_music_theme,parry,racing
-lost_island,ht,Lost Island,21,-,amaz,ok,ok,ht_tracks.amaz,n/a: HT checkpoint times not decoded,com_music_theme,classic,racing
-lake_powell,ht,Lake Powell,22,-,pwel,ok,ok,ht_tracks.pwel,n/a: HT checkpoint times not decoded,com_music_theme,classic,nav
-arctic_circle,ht,Arctic Circle,23,-,arct,ok,ok,ht_tracks.arct,n/a: HT checkpoint times not decoded,com_music_theme,parry,racing
-greek_isles,ht,Greek Isles,24,-,gree,ok,ok,ht_tracks.gree,n/a: HT checkpoint times not decoded,com_music_theme,classic,racing
-ship_graveyard,ht,Ship Graveyard,25,-,grav,ok,ok,ht_tracks.grav,n/a: HT checkpoint times not decoded,com_music_theme,classic,racing
-venice_canals,ht,Venice Canals,26,-,veni,ok,ok,ht_tracks.veni,n/a: HT checkpoint times not decoded,com_music_theme,classic,racing
-far_east,ht,Far East,27,-,chin,ok,ok,ht_tracks.chin,n/a: HT checkpoint times not decoded,com_music_theme,classic,racing
-new_york_disaster,ht,New York Disaster,28,-,newy,ok,ok,ht_tracks.newy,n/a: HT checkpoint times not decoded,com_music_theme,classic,racing
-nile_adventure,ht,Nile Adventure,29,-,nile,ok,ok,ht_tracks.nile,n/a: HT checkpoint times not decoded,com_music_theme,parry,racing
-hydro_speedway,ht,Hydro Speedway,30,-,loo2,ok,ok,ht_tracks.loo2,n/a: HT checkpoint times not decoded,com_music_theme,classic,racing
-castle_von_dandy,ht,Castle Von Dandy,31,-,loo3,ok,ok,ht_tracks.loo3 (name inferred from select icon GWWCAST__H1),n/a: HT checkpoint times not decoded,com_music_theme,classic,nav
-catacomb,ht,Catacomb,32,-,cata,ok,ok,ht_tracks.cata (internal CAVERN),n/a: HT checkpoint times not decoded,com_music_theme,classic,racing
-practice,ht,Practice,33,-,prac,ok,ok,ht_tracks.prac,n/a: HT checkpoint times not decoded,com_music_theme,classic,nav
-ht_test,ht,TEST,34,-,losa,n/a: debug table entry; test.r2 not on disc,n/a: debug table entry; test.r2 not on disc,ht_tracks.losa,n/a: HT checkpoint times not decoded,com_music_theme,classic,racing
-hackworld,sandbox,Hackworld,99,wa,-,ok,ok,user request: open-water sandbox (sheets/hackworld.csv),n/a: sandbox has no timer,com_music_theme,classic,racing
+id,game,display_name,menu_order,h2_level,ht_track,racing_line,geometry,name_source,timer,music,collision,ai_line,difficulty
+@types,enum:h2|ht|sandbox,str,i32,ref:h2_levels,ref:ht_tracks,status,status,str,status,ref:h2_samples,enum:classic|parry,enum:racing|nav,enum:easy|medium|hard|expert|unknown
+wild_america,h2,Wild America,1,wa,-,ok,ok,sdaemon.exe track string table (case 0x1d); triton_levels [Wild America],ok,wa_main,classic,racing,unknown
+hong_kong_buoy,h2,Hong Kong Buoy,2,hk,-,ok,ok,sdaemon.exe string table (0x1e); triton_levels [Hong Kong Buoy],ok,hk_main,classic,racing,unknown
+temple_of_flume,h2,Temple of Flume,3,tf,-,ok,ok,sdaemon.exe string table (0x1f); triton_levels [Temple of Flume],ok,tf_main,classic,nav,unknown
+london_underground,h2,London Underground,4,lo,-,ok,ok,sdaemon.exe string table (0x20); triton_levels [London],ok,lo_main,classic,nav,unknown
+devils_triangle,h2,Devil's Triangle,5,-,-,n/a: no level data for this menu entry in triton.lux,n/a: no level data for this menu entry in triton.lux,sdaemon.exe string table (0x21); track-select art ut_Track_DT_L,n/a: no checkpoint data,com_music_theme,classic,racing,unknown
+quake_canyon,h2,Quake Canyon,6,qc,-,ok,ok,sdaemon.exe string table (0x22); triton_levels [Quake Canyon],ok,qc_main,classic,racing,unknown
+revenge_of_the_nile,h2,Revenge of the Nile,7,rn,-,ok,ok,sdaemon.exe string table (0x23); triton_levels [Revenge of the Nile],n/a: no checkpoint data,com_music_theme,classic,nav,unknown
+frozen_tundra,h2,Frozen Tundra,8,tl,-,ok,ok,exe PS_FrozenTundra + VO 'Track Frozen Tundra'; triton_levels [Tundra Loop],ok,tl_main,parry,nav,unknown
+down_underdrive,h2,Down Underdrive,9,du,-,ok,ok,exe PS_DownUnderdrive + VO 'Track Down Under'; triton_levels [Down Under Loop],ok,du_main,parry,racing,unknown
+reverse_tundra,h2,Frozen Tundra Backward,10,rt,-,ok,ok,sdaemon.exe audit track names (TRACK_RT); triton_levels [Reverse Tundra],ok,rt_main,classic,racing,unknown
+reverse_sydney,h2,Down Underdrive Backward,11,rs,-,ok,ok,sdaemon.exe audit track names (TRACK_RS); triton_levels [Reverse Sydney],ok,rs_main,classic,racing,unknown
+physics_playground,h2,Physics Playground,12,pp,-,n/a: dev level - no data.pp_ai,ok,triton_levels [Physics Playground],n/a: no checkpoint data,com_music_theme,classic,racing,unknown
+particle_world,h2,Particle World,13,pw,-,n/a: dev level - no data.pw_ai,ok,triton_levels [Particle World],n/a: no checkpoint data,com_music_theme,classic,racing,unknown
+test_level,h2,Test Level,14,xx,-,n/a: dev level - no data.xx_ai,ok,triton_levels [Test Level],n/a: no checkpoint data,com_music_theme,classic,racing,unknown
+test_level_xy,h2,Test Level XY,15,xy,-,n/a: dev level - no data.xy_ai,ok,triton_levels [Test Level XY],n/a: no checkpoint data,com_music_theme,classic,racing,unknown
+ms1,h2,MS1,16,m1,-,n/a: dev level - no data files,n/a: dev level - no data files,triton_levels [MS1],n/a: no checkpoint data,com_music_theme,classic,racing,unknown
+h2os,h2,H20s,17,h2,-,n/a: dev level - no data.h2_ai,ok,triton_levels [H20s],n/a: no checkpoint data,com_music_theme,classic,racing,unknown
+wrapper,h2,Wrapper,18,wr,-,n/a: attract/menu backdrop level not a race,ok,triton_levels [Wrapper],n/a: no checkpoint data,com_music_theme,classic,racing,unknown
+wrapper_new,h2,Wrapper New,19,wn,-,n/a: attract/menu backdrop level not a race,ok,triton_levels [Wrapper New],n/a: no checkpoint data,com_music_theme,classic,racing,unknown
+thunder_park,ht,Thunder Park,20,-,loo1,ok,ok,ht_tracks.loo1,n/a: HT checkpoint times not decoded,com_music_theme,parry,racing,easy
+lost_island,ht,Lost Island,21,-,amaz,ok,ok,ht_tracks.amaz,n/a: HT checkpoint times not decoded,com_music_theme,classic,racing,easy
+lake_powell,ht,Lake Powell,22,-,pwel,ok,ok,ht_tracks.pwel,n/a: HT checkpoint times not decoded,com_music_theme,classic,nav,medium
+arctic_circle,ht,Arctic Circle,23,-,arct,ok,ok,ht_tracks.arct,n/a: HT checkpoint times not decoded,com_music_theme,parry,racing,easy
+greek_isles,ht,Greek Isles,24,-,gree,ok,ok,ht_tracks.gree,n/a: HT checkpoint times not decoded,com_music_theme,classic,racing,medium
+ship_graveyard,ht,Ship Graveyard,25,-,grav,ok,ok,ht_tracks.grav,n/a: HT checkpoint times not decoded,com_music_theme,classic,racing,hard
+venice_canals,ht,Venice Canals,26,-,veni,ok,ok,ht_tracks.veni,n/a: HT checkpoint times not decoded,com_music_theme,classic,racing,hard
+far_east,ht,Far East,27,-,chin,ok,ok,ht_tracks.chin,n/a: HT checkpoint times not decoded,com_music_theme,classic,racing,medium
+new_york_disaster,ht,New York Disaster,28,-,newy,ok,ok,ht_tracks.newy,n/a: HT checkpoint times not decoded,com_music_theme,classic,racing,hard
+nile_adventure,ht,Nile Adventure,29,-,nile,ok,ok,ht_tracks.nile,n/a: HT checkpoint times not decoded,com_music_theme,parry,racing,expert
+hydro_speedway,ht,Hydro Speedway,30,-,loo2,ok,ok,ht_tracks.loo2,n/a: HT checkpoint times not decoded,com_music_theme,classic,racing,expert
+castle_von_dandy,ht,Castle Von Dandy,31,-,loo3,ok,ok,ht_tracks.loo3 (name inferred from select icon GWWCAST__H1),n/a: HT checkpoint times not decoded,com_music_theme,classic,nav,easy
+catacomb,ht,Catacomb,32,-,cata,ok,ok,ht_tracks.cata (internal CAVERN),n/a: HT checkpoint times not decoded,com_music_theme,classic,racing,easy
+practice,ht,Practice,33,-,prac,ok,ok,ht_tracks.prac,n/a: HT checkpoint times not decoded,com_music_theme,classic,nav,easy
+ht_test,ht,TEST,34,-,losa,n/a: debug table entry; test.r2 not on disc,n/a: debug table entry; test.r2 not on disc,ht_tracks.losa,n/a: HT checkpoint times not decoded,com_music_theme,classic,racing,unknown
+hackworld,sandbox,Hackworld,99,wa,-,ok,ok,user request: open-water sandbox (sheets/hackworld.csv),n/a: sandbox has no timer,com_music_theme,classic,racing,unknown

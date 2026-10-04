@@ -24,3 +24,8 @@ hullcrush_attack,-,com_hullcrusher_wpn_attack,ok,Hull Crusher blasts a boat
 wall_hit,-,com_hull_vs_cement_hit,ok,Boat hits a wall hard
 hullcrush_riff,HullCrusher Rif,-,ok,Hull Crusher riff: loops while the crusher is out
 hullcrush_stow,-,com_hullcrusher_metal,ok,Hull Crusher retracts
+race_checklist_gas,Go No Go Gas,-,ok,Pre-race systems checklist (go / no go) for boats without a hydro engine
+race_checklist_hydro,Go No Go Hydro,-,ok,Pre-race systems checklist (go / no go) for hydro-engine boats
+track_warning,Expert Track Warning,-,ok,Warning beeps while a hard course is highlighted (looped)
+track_crazy,Youre Crazy,-,ok,Announcer when a hard course is highlighted
+boat_warning,Expert Boat Warning,-,ok,Warning beeps while a hard boat is highlighted (looped)
