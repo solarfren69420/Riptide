@@ -30,6 +30,8 @@ pub struct Cheats {
     level: Vec<usize>,
     pub menu_open: bool,
     cursor: usize,
+    /// Online races: every cheat reads as off, and the hotkeys and the menu do nothing.
+    pub locked: bool,
 }
 
 /// H2Overdrive globals with active cheat overrides applied.
@@ -48,7 +50,7 @@ impl Cheats {
     fn load() -> Self {
         let saved = config_path().and_then(|p| std::fs::read_to_string(p).ok()).unwrap_or_default();
         let on = CHEATS.iter().map(|c| saved.lines().any(|l| l.trim() == c.id)).collect();
-        Self { on, level: vec![0; CHEATS.len()], menu_open: false, cursor: 0 }
+        Self { on, level: vec![0; CHEATS.len()], menu_open: false, cursor: 0, locked: false }
     }
 
     fn save(&self) {
@@ -64,7 +66,7 @@ impl Cheats {
 
     /// Is any cheat with this effect switched on?
     pub fn active(&self, effect: CheatsEffect) -> bool {
-        CHEATS.iter().zip(&self.on).any(|(c, on)| *on && c.effect == effect)
+        !self.locked && CHEATS.iter().zip(&self.on).any(|(c, on)| *on && c.effect == effect)
     }
 
     /// The selected level of the first switched-on cheat with this effect (1 when none).
@@ -72,7 +74,7 @@ impl Cheats {
         CHEATS
             .iter()
             .enumerate()
-            .find(|(i, c)| self.on[*i] && c.effect == effect && !c.params.is_empty())
+            .find(|(i, c)| !self.locked && self.on[*i] && c.effect == effect && !c.params.is_empty())
             .map_or(1.0, |(i, c)| c.params[self.level[i] % c.params.len()])
     }
 
@@ -105,7 +107,7 @@ impl Cheats {
     fn tuning(&self) -> H2GlobalsValues {
         let mut t = H2_GLOBALS_DEFAULT;
         for o in CHEAT_OVERRIDES {
-            if o.cheat.is_some_and(|c| self.on[c]) {
+            if !self.locked && o.cheat.is_some_and(|c| self.on[c]) {
                 let id = o.global.map(|g| crate::sheets::H2_GLOBALS[g].id).unwrap_or("");
                 match t.field_mut(id) {
                     Some(f) => *f = o.value,
@@ -118,6 +120,12 @@ impl Cheats {
 }
 
 fn hotkeys(input: Input, mut cheats: ResMut<Cheats>) {
+    if cheats.locked {
+        if cheats.menu_open {
+            cheats.menu_open = false;
+        }
+        return;
+    }
     let mut changed = false;
     for (i, c) in CHEATS.iter().enumerate() {
         if c.hotkey.iter().any(|k| input.keys.just_pressed(*k)) {
@@ -225,9 +233,32 @@ fn draw_menu(
     if let Ok((mut vis, children)) = badge.single_mut() {
         *vis = if cheats.menu_open { Visibility::Hidden } else { Visibility::Visible };
         let active = cheats.on.iter().filter(|on| **on).count();
-        let s = if active == 0 { "Tab: cheats".to_string() } else { format!("CHEATS x{active}") };
+        let s = if cheats.locked {
+            "ONLINE: cheats off".to_string()
+        } else if active == 0 {
+            "Tab: cheats".to_string()
+        } else {
+            format!("CHEATS x{active}")
+        };
         if let Some(mut t) = children.first().and_then(|c| texts.get_mut(*c).ok()) {
             t.0 = s;
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn locked_cheats_read_as_off() {
+        let mut c = Cheats { on: vec![true; CHEATS.len()], level: vec![1; CHEATS.len()], menu_open: false, cursor: 0, locked: false };
+        assert!(CHEATS.iter().any(|ch| c.active(ch.effect)));
+        c.locked = true;
+        assert!(CHEATS.iter().all(|ch| !c.active(ch.effect)));
+        assert_eq!(c.speed(), 1.0);
+        assert_eq!(c.zoom(), 1.0);
+        let (stock, locked) = (format!("{:?}", H2_GLOBALS_DEFAULT), format!("{:?}", c.tuning()));
+        assert_eq!(stock, locked, "online tuning must be the stock globals");
     }
 }

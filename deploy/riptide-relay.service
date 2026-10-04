@@ -1,0 +1,19 @@
+[Unit]
+Description=Riptide online race relay (WebSocket rooms)
+After=network.target
+
+[Service]
+User=riptide
+Group=riptide
+Environment=RIPTIDE_RELAY_ADDR=127.0.0.1:3020
+ExecStart=/opt/riptide-relay/current/riptide-server
+Restart=always
+RestartSec=2
+MemoryMax=128M
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

@@ -112,3 +112,6 @@ water_ripple_size,f32,170,units,riptide design: world size of one tile of the le
 water_ripple_strength,f32,0.6,normal tilt,riptide design: how strongly the two ripple layers bend the water's surface
 water_foam,f32,0.3,0-1,riptide design: foam whiteness on wave crests
 water_gloss,f32,0.12,roughness,riptide design: how mirror-like the water gets at grazing angles (fresnel)
+net_send_hz,f32,20,1/s,riptide design: online races send the player's boat state this many times a second
+net_extrapolate,f32,0.25,s,riptide design: a remote boat keeps moving on its last velocity for at most this long while waiting for the next update
+net_smooth,f32,10,1/s,riptide design: how quickly a remote boat closes the gap to where its updates say it is

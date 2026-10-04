@@ -1,0 +1,13 @@
+[package]
+name = "riptide-server"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+riptide-net = { path = "../riptide-net" }
+tokio = { version = "1.53", features = ["rt-multi-thread", "macros", "net", "sync", "time"] }
+tokio-tungstenite = "0.30"
+futures-util = "0.3.34"
+
+[dev-dependencies]
+tokio = { version = "1.53", features = ["rt-multi-thread", "macros", "net", "sync", "time"] }

@@ -19,6 +19,7 @@ mod effects;
 mod hud;
 mod controls;
 mod menu;
+mod net;
 mod race;
 mod sheets;
 mod sound;
@@ -140,7 +141,13 @@ pub fn run(content: Content) -> AppExit {
     if shot.is_some() {
         // Off-screen captures need a schedule runner, but no display or audio device.
         app.add_plugins(plugins.disable::<bevy::winit::WinitPlugin>().disable::<bevy::audio::AudioPlugin>());
-        app.add_plugins(bevy::app::ScheduleRunnerPlugin::default());
+        // Scripted online races run in real time: one RIPTIDE_SIM_DT step per frame, paced to the
+        // clock, so remote boats arrive when they would for a player.
+        let paced = std::env::var_os("RIPTIDE_ONLINE").and(std::env::var("RIPTIDE_SIM_DT").ok()).and_then(|s| s.parse::<f64>().ok());
+        app.add_plugins(match paced {
+            Some(dt) => bevy::app::ScheduleRunnerPlugin::run_loop(std::time::Duration::from_secs_f64(dt)),
+            None => bevy::app::ScheduleRunnerPlugin::default(),
+        });
         app.init_asset::<bevy::audio::AudioSource>();
     } else {
         app.add_plugins(plugins);
@@ -151,7 +158,7 @@ pub fn run(content: Content) -> AppExit {
         .init_resource::<ModelCache>()
         .init_state::<Screen>()
         .add_systems(Update, content::finish_textures)
-        .add_plugins((cheats::CheatsPlugin, menu::MenuPlugin, race::RacePlugin, sound::SoundPlugin, effects::EffectsPlugin, hud::HudPlugin, boatrig::BoatRigPlugin, water::WaterPlugin))
+        .add_plugins((cheats::CheatsPlugin, net::NetPlugin, menu::MenuPlugin, race::RacePlugin, sound::SoundPlugin, effects::EffectsPlugin, hud::HudPlugin, boatrig::BoatRigPlugin, water::WaterPlugin))
         .add_systems(OnEnter(Screen::Restart), |mut next: ResMut<NextState<Screen>>| next.set(Screen::Race));
     #[cfg(target_arch = "wasm32")]
     app.add_plugins(web::WebPlugin);
@@ -190,7 +197,10 @@ pub fn run(content: Content) -> AppExit {
             .add_systems(Update, shot_driver);
         if !menu {
             app.insert_resource(Autopilot);
-            app.insert_state(Screen::Race);
+            // Scripted online races (RIPTIDE_ONLINE) begin in the menu, where the lobby is.
+            if std::env::var_os("RIPTIDE_ONLINE").is_none() {
+                app.insert_state(Screen::Race);
+            }
         }
     }
     app.insert_resource(sel);

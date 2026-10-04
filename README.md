@@ -36,6 +36,7 @@ No game content ships in this repository.
 - **Original HUD** layout, fonts and dials, rebuilt from H2Overdrive's HUD data
 - **Effects** from the games' own definitions: rocket flames, Hull Crusher lightning, wakes, rooster tails
 - **Cheats menu**: infinite boost / gold / Hull Crusher, no wipeouts, no time limit, camera zoom, boat speed
+- **Online races** for up to 8 players, in the browser or on the desktop: host a room, share its 4-letter code, race (cheats off)
 
 ## 📊 How far along is it?
 
@@ -142,7 +143,8 @@ Pick anything here. Each item says what's missing and where to start.
 12. **Unverified guesses.** `sheets/evidence.csv` lists every claim about the original games still
     marked _hypothesis_ (ramp launch speeds, flame and lightning parameters, collision barriers).
     Confirming or correcting them against the original game's code or behaviour is valuable.
-13. **Multiplayer.** Split-screen or network play doesn't exist yet.
+13. **Multiplayer.** Online races work (see [Online races](#-online-races)). Still missing: split-screen,
+    hosts kicking players, and server-side checks of boat movement (each game is trusted with its own boat).
 
 ## 🛠️ What you need
 
@@ -345,6 +347,31 @@ For later releases, rebuild with `scripts/build-web.sh`, run `scripts/package-we
 and commit the resulting site contents to `gh-pages`. Changes to `main` alone do not
 update the deployed engine. Game archives and extracted assets must stay out of that branch.
 
+## 🏁 Online races
+
+On the course select screen press **O**. Then:
+
+- **H** hosts a room on the selected course and shows a 4-letter code. Send it to your friends.
+- **J** joins a friend's room: type their code.
+- **N** changes your racer name.
+- Everyone picks a boat with ↑ ↓. The host picks the course with ← → and presses **Enter** to start.
+
+The countdown starts once every racer has loaded the course. The race ends when everyone has
+finished, or 60 seconds after the winner. Up to 8 players per room. Each racer needs their own game
+files, plus the Hydro Thunder disc for its courses.
+
+**Cheats are off online.** In a room every cheat reads as off, the hotkeys and Tab menu do nothing,
+test boats and Hackworld are hidden, and there is no arcade time limit. (The relay trusts each game
+with its own boat, so a modified build could still cheat. Server-side movement checks are on the
+to-do list.)
+
+**The relay.** Games connect to `wss://solarfren.com/riptide/ws` by default. Run your own with
+`cargo run --release -p riptide-server` (listens on `127.0.0.1:3020`, set `RIPTIDE_RELAY_ADDR` to
+change it) and point the game at it: `RIPTIDE_SERVER=ws://127.0.0.1:3020` on the desktop, or
+`?server=wss://your.host/path` after the browser game's address. `?name=` presets your name.
+Put it behind nginx for `wss://` (see `deploy/`). `scripts/online-check.sh` races two headless
+games against each other through a local relay.
+
 ## 🎮 Controls
 
 | Action | Keyboard | Pad |
@@ -356,6 +383,7 @@ update the deployed engine. Game archives and extracted assets must stay out of 
 | **Jump** | Boost + tap ↓ (tap again in mid-air for a double jump) | |
 | Restart / leave race | R / Esc | Select |
 | Cheats menu | Tab | |
+| Online races (on the course select screen) | O, then H host / J join / N name / Enter start | X |
 
 **Cheat hotkeys:**
 
@@ -392,6 +420,9 @@ cheats, HUD cards), columns are properties, and every cell is checked before eac
 | `crates/riptide-assets` | Readers for the original formats: `triton.lux` meshes, textures, collision, FSB4 sound banks, Hydro Thunder R2 archives and tracks |
 | `crates/riptide-sheets` | Sheet loader, preflight and code generator |
 | `crates/riptide-tool` | Command-line tools: extract tables, dump assets, inspect tracks, generate Hackworld |
+| `crates/riptide-net` | The online race protocol (messages between the game and the relay) |
+| `crates/riptide-server` | The online race relay: rooms, join codes, ready check, finish order |
+| `deploy/` | The relay's systemd service, nginx snippet and deploy script |
 | `sheets/` | The hand-written sheets |
 | `scripts/` | Test helpers (headless race runs) |
 

@@ -8,13 +8,18 @@ anyhow.workspace = true
 parry3d = "0.31.1"
 bevy.workspace = true
 riptide-assets = { path = "../riptide-assets" }
+riptide-net = { path = "../riptide-net" }
+ewebsock = "0.8"
 
 [build-dependencies]
 riptide-sheets = { path = "../riptide-sheets" }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+ewebsock = { version = "0.8", features = ["tls"] }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 bevy = { workspace = true, features = ["webgpu"] }
 wasm-bindgen = "0.2.129"
 wasm-bindgen-futures = "0.4.79"
 js-sys = "0.3.106"
-web-sys = { version = "0.3.106", features = ["File", "Blob"] }
+web-sys = { version = "0.3.106", features = ["File", "Blob", "Window", "Location", "Storage"] }

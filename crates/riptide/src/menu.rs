@@ -34,6 +34,10 @@ pub struct Unlocks {
 
 impl Unlocks {
     pub fn visible(&self, cheats: &Cheats, b: &BoatInfo) -> bool {
+        // Online (cheats locked): no test boats.
+        if cheats.locked && b.row.tier == crate::sheets::BoatsTier::Test {
+            return false;
+        }
         b.row.unlock != BoatsUnlock::Secret || cheats.active(CheatsEffect::UnlockSecrets) || self.revealed.contains(&b.index())
     }
 }
@@ -114,7 +118,7 @@ fn spawn_menu(mut commands: Commands, sel: Res<Selection>, mut models: Models) {
             c.spawn((Node { position_type: PositionType::Absolute, left: percent(52), bottom: percent(24), width: percent(42), justify_content: JustifyContent::Center, ..default() },
                 children![(Text::new(""), TextFont { font_size: 24.0, ..default() }, TextLayout::new_with_justify(Justify::Center), TextShadow::default(), MenuText::Boat)]));
             c.spawn((Node { position_type: PositionType::Absolute, bottom: px(28), width: percent(100), justify_content: JustifyContent::Center, ..default() },
-                children![(Text::new("Left / Right  Track     Up / Down  Boat     Enter / Space  Start race\nV  Secret boat (press 3 times on its parent)     Tab  Cheats     Esc  Quit"), TextFont { font_size: 16.0, ..default() }, TextLayout::new_with_justify(Justify::Center), TextColor(Color::srgb(0.69,0.82,0.88)))]));
+                children![(Text::new("Left / Right  Track     Up / Down  Boat     Enter / Space  Start race\nV  Secret boat (press 3 times on its parent)     O  Online races     Tab  Cheats     Esc  Quit"), TextFont { font_size: 16.0, ..default() }, TextLayout::new_with_justify(Justify::Center), TextColor(Color::srgb(0.69,0.82,0.88)))]));
         });
 }
 
@@ -220,7 +224,7 @@ fn render_preview(commands: &mut Commands, models: &mut Models, choice: &TrackCh
     Some((root,image))
 }
 
-fn menu_input(
+pub(crate) fn menu_input(
     input: Input,
     mut sfx: crate::sound::Sfx,
     cheats: Res<Cheats>,
@@ -228,11 +232,12 @@ fn menu_input(
     mut sel: ResMut<Selection>,
     models: Models,
     mut next: ResMut<NextState<Screen>>,
+    mut online: ResMut<crate::net::Online>,
     mut exit: MessageWriter<AppExit>,
     mut last_boat: Local<usize>,
     mut last_level: Local<usize>,
 ) {
-    if cheats.menu_open {
+    if cheats.menu_open || online.typing.is_some() {
         return;
     }
     let boats = &models.content.boats;
@@ -259,11 +264,15 @@ fn menu_input(
     if input.just_pressed(ctl::MENU_NEXT_BOAT) {
         sel.boat = step(sel.boat, 1);
     }
-    if input.just_pressed(ctl::MENU_PREV_TRACK) {
-        sel.level = (sel.level + nl - 1) % nl;
-    }
-    if input.just_pressed(ctl::MENU_NEXT_TRACK) {
-        sel.level = (sel.level + 1) % nl;
+    // Online: Hackworld is a sandbox, not a race.
+    let sandbox = |i: usize| cheats.locked && matches!(models.content.tracks[i].source, CourseSource::Sandbox { .. });
+    for (key, d) in [(ctl::MENU_PREV_TRACK, nl - 1), (ctl::MENU_NEXT_TRACK, 1)] {
+        if input.just_pressed(key) {
+            sel.level = (sel.level + d) % nl;
+            if sandbox(sel.level) {
+                sel.level = (sel.level + d) % nl;
+            }
+        }
     }
     if input.just_pressed(ctl::MENU_VIEW) {
         let here = boats[sel.boat].index();
@@ -289,11 +298,16 @@ fn menu_input(
         *last_level = sel.level;
         sfx.event(crate::sheets::sound_events_ids::MENU_TICK);
     }
-    if input.just_pressed(ctl::MENU_START) {
+    if input.just_pressed(ctl::MENU_START) && online.room.is_some() {
+        // In a room the host starts everyone's race; the server says when.
+        if online.is_host() {
+            online.send(riptide_net::ClientMsg::Start);
+        }
+    } else if input.just_pressed(ctl::MENU_START) {
         // The browser build fetches the course from the player's files first.
         next.set(if cfg!(target_arch = "wasm32") { Screen::Loading } else { Screen::Race });
     }
-    if input.just_pressed(ctl::MENU_QUIT) && sel.render_target.is_none() {
+    if input.just_pressed(ctl::MENU_QUIT) && sel.render_target.is_none() && !online.open && online.room.is_none() {
         exit.write(AppExit::Success);
     }
 }

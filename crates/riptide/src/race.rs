@@ -29,7 +29,7 @@ pub struct RacePlugin;
 impl Plugin for RacePlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Update, probe.run_if(in_state(Screen::Race)))
-            .add_systems(OnEnter(Screen::Race), (spawn_race, choose_collision, start_race_audio).chain())
+            .add_systems(OnEnter(Screen::Race), (spawn_race, choose_collision, start_race_audio, crate::net::race_ready).chain())
             .add_systems(
                 Update,
                 (
@@ -37,6 +37,8 @@ impl Plugin for RacePlugin {
                     ai_drive,
                     boat_physics,
                     boat_contacts,
+                    crate::net::send_state,
+                    crate::net::apply_remote,
                     pickups,
                     race_clock,
                     arcade_timer,
@@ -270,7 +272,13 @@ pub struct RaceClock {
     pub finish_order: Vec<Entity>,
 }
 
-fn spawn_race(mut commands: Commands, mut models: Models, sel: Res<Selection>, mut fog_color: Local<Option<Color>>) {
+fn spawn_race(
+    mut commands: Commands,
+    mut models: Models,
+    sel: Res<Selection>,
+    online: Res<crate::net::Online>,
+    mut fog_color: Local<Option<Color>>,
+) {
     let Some(choice) = models.content.tracks.get(sel.level).cloned() else { return };
     commands.remove_resource::<Collider>();
     let code = choice.id.to_string();
@@ -580,7 +588,19 @@ fn spawn_race(mut commands: Commands, mut models: Models, sel: Res<Selection>, m
             picks.push(idx);
         }
     }
-    let player_slot = racers - 2;
+    let mut player_slot = racers - 2;
+    let mut slot_of = (0..racers).filter(|&s| s != player_slot);
+    // (roster index, grid slot, the other player driving it online).
+    let mut grid: Vec<(usize, usize, Option<u32>)> =
+        picks.iter().enumerate().map(|(i, &bi)| (bi, if i == 0 { player_slot } else { slot_of.next().unwrap_or(i) }, None)).collect();
+    // Online: the room's players in grid order, no AI. The player is always the first entry.
+    if let Some(race) = &online.race {
+        let boat_of = |p: &riptide_net::Player| roster.iter().position(|b| b.row.id == p.boat).unwrap_or(player_boat);
+        let me = race.players.iter().position(|p| p.id == online.id).unwrap_or(0);
+        player_slot = me;
+        grid = vec![(player_boat, me, None)];
+        grid.extend(race.players.iter().enumerate().filter(|(i, _)| *i != me).map(|(i, p)| (boat_of(p), i, Some(p.id))));
+    }
     // Optional local capture pose: x,y,z,yaw-degrees. Never used by browser/player sessions.
     let capture_pose = sel.render_target.as_ref().and_then(|_| std::env::var("RIPTIDE_SHOT_AT").ok()).and_then(|s| {
         let p: Vec<f32> = s.split(',').filter_map(|n| n.trim().parse().ok()).collect();
@@ -593,11 +613,9 @@ fn spawn_race(mut commands: Commands, mut models: Models, sel: Res<Selection>, m
         seed ^= seed << 5;
         (seed % 10_000) as f32 / 10_000.0
     };
-    let mut slot_of = (0..racers).filter(|&s| s != player_slot);
-    for (i, &bi) in picks.iter().enumerate() {
+    for (i, &(bi, slot, remote)) in grid.iter().enumerate() {
         let info = roster[bi].clone();
         let player = i == 0;
-        let slot = if player { player_slot } else { slot_of.next().unwrap_or(i) };
         let (pos, yaw) = if player { capture_pose.unwrap_or_else(|| track.grid(slot)) } else { track.grid(slot) };
         let lane = 0.2 + 0.2 * (slot % 4) as f32;
         let tp = if player && capture_pose.is_some() { track.locate_anywhere(pos) } else { track.locate(pos, 0) };
@@ -640,6 +658,9 @@ fn spawn_race(mut commands: Commands, mut models: Models, sel: Res<Selection>, m
                 Name::new(info.name.clone()),
             ))
             .id();
+        if let Some(id) = remote {
+            commands.entity(e).insert(crate::net::Remote { id });
+        }
         // Hull depth below the origin, for the ride height (place_boats).
         let hull = info.row.model.strip_prefix("lux:mesh32.").and_then(|m| {
             let b = models.content.lux.get(&format!("mesh32.{m}"))?;
@@ -704,7 +725,8 @@ fn spawn_race(mut commands: Commands, mut models: Models, sel: Res<Selection>, m
     let mut timer = ArcadeTimer { enabled: false, left: 0.0, gates: Vec::new(), banner: None };
     if let (true, CourseSource::H2(lvl)) = (timer_ok, &choice.source) {
         if let Some(row) = H2_LEVELS.iter().find(|l| l.id == *lvl) {
-            timer.enabled = row.starting_seconds > 0;
+            // Online races have no time limit: the server ends them a while after the first finish.
+            timer.enabled = row.starting_seconds > 0 && !online.racing();
             timer.left = row.starting_seconds as f32;
         }
         let len = track.length();
@@ -961,7 +983,7 @@ fn ai_drive(
     collider: Option<Res<Collider>>,
     tuning: Res<Tuning>,
     autopilot: Option<Res<Autopilot>>,
-    mut boats: Query<&mut Boat>,
+    mut boats: Query<&mut Boat, Without<crate::net::Remote>>,
 ) {
     let g = &tuning.0;
     let dt = time.delta_secs().min(1.0 / 20.0);
@@ -1074,7 +1096,7 @@ fn boat_physics(
     cheats: Res<Cheats>,
     tuning: Res<Tuning>,
     collider: Option<Res<Collider>>,
-    mut boats: Query<&mut Boat>,
+    mut boats: Query<&mut Boat, Without<crate::net::Remote>>,
 ) {
     let g = &tuning.0;
     let dt = time.delta_secs().min(1.0 / 20.0);
@@ -1342,8 +1364,8 @@ fn boat_physics(
             b.airborne = true;
         }
         // Test hook: RIPTIDE_TEST_LAUNCH=secs throws the player high once (checking the view from
-        // the air).
-        if b.player && !b.airborne {
+        // the air). Never online.
+        if b.player && !b.airborne && !cheats.locked {
             if let Some(t) = std::env::var("RIPTIDE_TEST_LAUNCH").ok().and_then(|s| s.parse::<f32>().ok()) {
                 if clock.t > t && clock.t < t + 0.2 {
                     b.vy = 900.0;
@@ -1454,7 +1476,7 @@ fn pickups(
     time: Res<Time>,
     tuning: Res<Tuning>,
     mut items: Query<(&mut Pickup, &mut Transform, &mut Visibility)>,
-    mut boats: Query<&mut Boat>,
+    mut boats: Query<&mut Boat, Without<crate::net::Remote>>,
 ) {
     let g = &tuning.0;
     let dt = time.delta_secs();
@@ -1579,6 +1601,7 @@ fn chase_camera(
 
 fn hud(
     clock: Res<RaceClock>,
+    online: Res<crate::net::Online>,
     timer: Option<Res<ArcadeTimer>>,
     track: Res<Track>,
     tuning: Res<Tuning>,
@@ -1633,7 +1656,9 @@ fn hud(
             HudText::Speed => format!("{:.0} MPH", p.vel.length() * g.digital_mph_scale_factor),
             HudText::Boat => format!("{} ({})", p.info.name, p.info.game),
             HudText::Center => {
-                if clock.t < 0.0 {
+                if online.waiting() {
+                    "Waiting for every racer to load the course...".to_string()
+                } else if clock.t < 0.0 {
                     let n = (-clock.t).ceil() as i32;
                     if n <= 3 { n.to_string() } else { String::new() }
                 } else if clock.t < 1.2 {
@@ -1646,7 +1671,11 @@ fn hud(
                         3 => "rd",
                         _ => "th",
                     };
-                    format!("FINISHED {place}{suffix}\n{}\nR: race again   Esc: menu", fmt(t))
+                    if online.racing() {
+                        format!("FINISHED {place}{suffix}\n{}\n\n{}", fmt(t), online.standings())
+                    } else {
+                        format!("FINISHED {place}{suffix}\n{}\nR: race again   Esc: menu", fmt(t))
+                    }
                 } else if p.timed_out {
                     "TIME UP!\nR: race again   Esc: menu".into()
                 } else if let Some((msg, _)) = timer.as_ref().and_then(|t| t.banner.clone()) {
@@ -1683,14 +1712,27 @@ fn hud(
     }
 }
 
-fn race_keys(input: Input, cheats: Res<Cheats>, mut next: ResMut<NextState<Screen>>, sel: Res<Selection>) {
+fn race_keys(
+    input: Input,
+    cheats: Res<Cheats>,
+    mut online: ResMut<crate::net::Online>,
+    mut next: ResMut<NextState<Screen>>,
+    sel: Res<Selection>,
+    boats: Query<&Boat>,
+) {
     if sel.render_target.is_some() || cheats.menu_open {
         return;
     }
     if input.just_pressed(ctl::LEAVE_RACE) {
+        // Online: quitting before the finish leaves the room; afterwards it's back to the lobby.
+        let done = boats.iter().any(|b| b.player && (b.finished.is_some() || b.timed_out));
+        if online.racing() && !done {
+            online.send(riptide_net::ClientMsg::Leave);
+            online.room = None;
+        }
         next.set(Screen::Menu);
     }
-    if input.just_pressed(ctl::RESTART) {
+    if input.just_pressed(ctl::RESTART) && !online.racing() {
         next.set(Screen::Restart);
     }
 }
@@ -1716,20 +1758,28 @@ fn race_clock(
     time: Res<Time>,
     mut clock: ResMut<RaceClock>,
     boats: Query<(Entity, &Boat)>,
+    online: Res<crate::net::Online>,
     autopilot: Option<Res<Autopilot>>,
     mut exit: MessageWriter<AppExit>,
 ) {
+    // Online: the countdown waits until every racer has loaded the course.
+    if online.waiting() {
+        clock.t = -phy::COUNTDOWN;
+        return;
+    }
     clock.t += time.delta_secs().min(1.0 / 20.0);
     let mut done: Vec<(f32, Entity)> =
         boats.iter().filter_map(|(e, b)| b.finished.map(|t| (t, e))).filter(|(_, e)| !clock.finish_order.contains(e)).collect();
     done.sort_by(|a, b| a.0.total_cmp(&b.0));
-    for (_, e) in done {
-        clock.finish_order.push(e);
+    for (t, e) in done {
+        // By finish time: online, another racer's earlier finish can arrive after ours.
+        let at = clock.finish_order.iter().position(|x| boats.get(*x).ok().and_then(|(_, b)| b.finished).is_some_and(|f| f > t)).unwrap_or(clock.finish_order.len());
+        clock.finish_order.insert(at, e);
         if let Ok((_, b)) = boats.get(e) {
             if b.player {
                 // One line for test scripts; capture runs (autopilot) stop here when asked to.
-                info!("RESULT finished {} of {} in {:.2}s", clock.finish_order.len(), boats.iter().count(), b.finished.unwrap_or(0.0));
-                if autopilot.is_some() && std::env::var_os("RIPTIDE_EXIT_ON_FINISH").is_some() {
+                info!("RESULT finished {} of {} in {:.2}s", at + 1, boats.iter().count(), b.finished.unwrap_or(0.0));
+                if autopilot.is_some() && !online.racing() && std::env::var_os("RIPTIDE_EXIT_ON_FINISH").is_some() {
                     exit.write(AppExit::Success);
                 }
             }

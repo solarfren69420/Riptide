@@ -14,6 +14,10 @@ menu_next_track,menu,ArrowRight,DPadRight,Next track
 menu_start,menu,Enter Space,Start South,Start race
 menu_view,menu,KeyV,North,View: press 3x on a parent boat to reveal its secret boat
 menu_quit,menu,Escape,-,Quit
+online,menu,KeyO,West,Online races: open or close the lobby
+lobby_host,menu,KeyH,-,Online lobby: host a room on the selected course
+lobby_join,menu,KeyJ,-,Online lobby: join a room by its 4-letter code
+lobby_name,menu,KeyN,-,Online lobby: change your racer name
 cheats_menu,global,Tab,-,Open/close the cheats menu
 cheats_all,global,F8,-,Toggle every cheat on/off
 cheats_up,cheats,ArrowUp,DPadUp,Cheats menu: previous cheat
