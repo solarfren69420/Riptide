@@ -3,8 +3,8 @@ id,type,value,unit,source
 gravity,f32,260,units/s^2,riptide engine (pre-sheet GRAVITY)
 speed_norm,f32,705,units/s,riptide engine (pre-sheet BASE_TOP_SPEED) - only for lean/camera scaling
 accel_per_thrust,f32,1200,units/s^2 per boatdef Thrust,riptide calibration: pre-sheet ACCEL 210 / H2 Thrust L1 0.175
-start_room_bias,f32,0.35,-,riptide engine (thrust taper: thrust x (bias + headroom))
-water_drag,f32,0.18,1/s,riptide engine
+start_room_bias,f32,1.0,-,observed: H2Overdrive thrust does not taper (thrust x (bias + thrust_room_weight x headroom)); see EVD_BOOST_SPEED
+water_drag,f32,0.59,1/s,observed (EVD_BOOST_SPEED): speed settles at Thrust x accel_per_thrust / drag = Thrust x 2029 boatdef units (L1 thrust 0.17 cruises ~345; boost thrust 0.35 hits the Max Speed Boost cap)
 overspeed_drag,f32,1.6,1/s,riptide engine
 reverse_max,f32,120,units/s,riptide engine
 brake_mult,f32,1.4,x accel,riptide engine
@@ -78,7 +78,7 @@ ai_stuck_time,f32,1.5,s,riptide design: how long before an AI boat backs off an 
 ai_reverse_time,f32,0.9,s,riptide design: how long it reverses (steering away) to get free
 floor_step_up,f32,24,units,riptide design: a boat climbs onto terrain floors up to this far above its hull (ramps / mounds)
 floor_min_normal,f32,0.75,normal y,riptide design: triangles facing up at least this much are floors a boat can ride
-speed_scale,f32,1.5,world units/s per boatdef speed unit,riptide calibration from the cabinet Scores.xml: default top-10 times 150-158 s need ~1.45x; HUD and impact thresholds divide it back out
+speed_scale,f32,1.75,world units/s per boatdef speed unit,riptide calibration from the cabinet Scores.xml: default top-10 times 150-158 s needed ~1.45x at full Max Speed L1; cruising is 0.85 of it under drag (EVD_BOOST_SPEED) so 1.75 keeps that pace; HUD and impact thresholds divide it back out
 floor_max_above_water,f32,250,units,riptide design: terrain higher than this above the water is never ridden (stops climbing rock faces at waterfalls)
 ai_probe_time,f32,0.6,s of travel,riptide design: AI looks this far ahead (at its speed) for obstacles
 ai_probe_min,f32,250,units,riptide design: shortest obstacle look-ahead
@@ -145,7 +145,7 @@ wall_hit_gap,f32,0.4,s,riptide design: at most one wall impact sound this often 
 ground_apron_size,f32,200000,units,riptide design: half-width of the ground plane laid under H2Overdrive levels (seen from big launches)
 ground_apron_tile,f32,1500,units,riptide design: one tile of the ground apron texture
 ground_apron_drop,f32,30,units,riptide design: the ground apron sits this far below the level lowest point
-ramp_find_min_ny,f32,0.15,normal y,riptide design: (ramp audit) floor triangles steeper than this are walls not ramps
+ramp_find_min_ny,f32,0.8,normal y,riptide design: (ramp audit) floor triangles steeper than this (about 37 degrees) are rock faces not ramps
 ramp_find_max_ny,f32,0.97,normal y,riptide design: (ramp audit) flatter than this is water or flat ground not a ramp
 ramp_find_min_rise,f32,25,units,riptide design: (ramp audit) a ramp rises at least this far above the water
 ramp_find_max_base,f32,80,units,riptide design: (ramp audit) and starts no higher than this above the water
@@ -160,3 +160,12 @@ recovery_progress,f32,300,units,riptide design: race progress a boat must make w
 recovery_no_progress_time,f32,6,s,riptide design: a boat making no progress this long (circling or wedged) is put back on the course
 ht_gravity,f32,260,units/s^2,riptide engine: gravity on Hydro Thunder courses until its own (HT GRAVITY_MIN / GRAVITY_MAX) is decoded; H2Overdrive courses use the boat def Gravity (-200 measured)
 ramp_climb_smooth,f32,0.12,s,riptide design: ramp climb rate averaged over this long before it launches a boat (per-frame triangle steps spiked launches to the ceiling)
+ramp_test_takeover,f32,900,units,riptide design: (ramp test) the autopilot drives the run-up until this close to the ramp then the boat heads up its slope
+ramp_test_past,f32,300,units,riptide design: (ramp test) passed once this far along the course beyond the ramp and back on the water
+ramp_find_headroom,f32,300,units,riptide design: (ramp audit) a slope with collision geometry this close above it (an arch or overhang) is not a ramp
+nav_widen,f32,600,units,riptide design: the AI nav grid reaches this far past each cross-section end (open water beside a pylon or rock that fills the AI corridor: Down Underdrive / Reverse Sydney / Arctic Circle had no way through)
+h2water_bob_max,f32,40,units,riptide design: under H2Overdrive water a boat is drawn at most this far off its physics height to sit on the drawn surface
+h2water_flow_visibility,f32,2,per unit Flow Speed,riptide design (stand-in until read from the running game): flow layer visibility per unit of an edge Flow Speed
+thrust_room_weight,f32,0,-,observed (EVD_BOOST_SPEED): thrust no longer fades near top speed; drag sets cruising speed so boost thrust (2x) is a real speed-up
+ai_boost_lookahead,f32,1.2,s,riptide design: AI boats look this many seconds ahead (at their speed) before boosting
+ai_boost_straight,f32,0.9,cos of angle,riptide design: AI boats only boost when the course ahead turns less than about 25 degrees

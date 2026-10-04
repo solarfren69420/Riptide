@@ -6,5 +6,7 @@ edition.workspace = true
 [dependencies]
 anyhow.workspace = true
 riptide-assets = { path = "../riptide-assets" }
+d3d9-shader = { path = "../d3d9-shader" }
+naga = { version = "27", features = ["wgsl-in"] }
 png = "0.18"
 roxmltree.workspace = true

@@ -10,7 +10,7 @@ icd=$(ls /usr/share/vulkan/icd.d/lvp_icd*.json 2>/dev/null | head -1)
 run() {
     RIPTIDE_TEST_RAMP=$1 RIPTIDE_RAMPS=1 VK_ICD_FILENAMES="$icd" XDG_CONFIG_HOME="$out/cfg" RIPTIDE_SHOT="$out/x" \
     RIPTIDE_SHOT_SIZE=64x36 RIPTIDE_SIM_DT=0.05 RIPTIDE_SHOT_FRAMES=100000 RIPTIDE_TRACK="$t" \
-        timeout 300 nice -n 19 "${BIN:-target/release/riptide}" 2>&1 | sed 's/\x1b\[[0-9;]*m//g'
+        LP_NUM_THREADS=2 timeout 300 scripts/light.sh "${BIN:-target/release/riptide}" 2>&1 | sed 's/\x1b\[[0-9;]*m//g'
 }
 count=$(run 99999 | grep -c 'RAMP [0-9]')
 last=${3:-$((count - 1))}

@@ -164,7 +164,9 @@ pub struct Brain {
 struct Pickup {
     /// Row in the `pickups` sheet.
     row: usize,
-    cooldown: f32,
+    /// Boats that took it and seconds until it is back for them: every racer gets every boost
+    /// (nobody can take one away from the others).
+    taken: Vec<(Entity, f32)>,
     base: Vec3,
 }
 
@@ -540,7 +542,7 @@ fn spawn_race(
             .spawn((
                 Transform::from_translation(base).with_scale(Vec3::splat(b.placement.scale.max(0.5))),
                 Visibility::default(),
-                Pickup { row, cooldown: 0.0, base },
+                Pickup { row, taken: Vec::new(), base },
                 scope.clone(),
             ))
             .id();
@@ -586,7 +588,7 @@ fn spawn_race(
                 scope.clone(),
             ));
             if let Some(row) = pickup {
-                e.insert(Pickup { row, cooldown: 0.0, base: at });
+                e.insert(Pickup { row, taken: Vec::new(), base: at });
             }
             let e = e.id();
             attach(&mut commands, e, &p);
@@ -877,6 +879,18 @@ fn spawn_race(
 }
 
 fn spawn_water(commands: &mut Commands, models: &mut Models, level: &H2Level, track: &Track, frames: Vec<Handle<Image>>, add_ribbon: bool) {
+    // RIPTIDE_H2WATER: H2Overdrive's own water shader (crate::h2water) in place of the quads below.
+    let h2 = std::env::var_os("RIPTIDE_H2WATER").is_some()
+        && !level.water_sectors.is_empty()
+        && models.content.lux.get("shad4.FX_Water2").and_then(|blob| crate::h2water::install(&mut models.shaders, blob)).is_some_and(|sh| {
+            let bump = models.lux_normal_map("wavesbump").unwrap_or_default();
+            if let Some(img) = models.images.get_mut(&bump) {
+                img.sampler = bevy::image::ImageSampler::Descriptor(crate::content::repeat_sampler());
+            }
+            let n = crate::h2water::spawn(commands, level, &sh, &mut models.meshes, &mut models.h2water, &mut models.images, bump, phy::WATER_CELL.max(1.0));
+            info!("h2water: {n} sectors with shad4.FX_Water2");
+            n > 0
+        });
     let mut positions: Vec<[f32; 3]> = Vec::new();
     let mut uvs: Vec<[f32; 2]> = Vec::new();
     let mut indices: Vec<u32> = Vec::new();
@@ -905,11 +919,15 @@ fn spawn_water(commands: &mut Commands, models: &mut Models, level: &H2Level, tr
             }
         }
     };
-    for q in &level.water {
+    for q in level.water.iter().filter(|_| !h2) {
         quad(q.corners);
     }
     // The racing line's own ribbon fills any gap between water sectors.
-    let ribbon = if track.open || !add_ribbon { 0 } else { track.edges.len() - 1 };
+    if !h2 {
+        commands.remove_resource::<crate::h2water::H2WaterOn>();
+        commands.remove_resource::<crate::h2water::H2Waves>();
+    }
+    let ribbon = if track.open || !add_ribbon || h2 { 0 } else { track.edges.len() - 1 };
     for i in 0..ribbon {
         let (a, b) = (&track.edges[i], &track.edges[i + 1]);
         let lift = |p: [f32; 3], h: f32| [p[0], h - 1.5, p[2]];
@@ -1192,12 +1210,21 @@ fn ai_drive(
         .clamp(0.0, 1.0);
         b.catchup = if b.player { 0.0 } else { ((behind - g.catchup_min_behind_distance) / span).clamp(0.0, 1.0) * near };
         b.fuel = (b.fuel + g.catchup_unit_boost_help * b.catchup * dt).min(g.boost_fuel_max_regular);
+        // No boosting into a turn: the course direction ai_boost_lookahead seconds ahead (at this
+        // speed) must stay within ai_boost_straight of the current one (with boost a real +26%,
+        // boats boosted wide through bends and kept respawning: Ship Graveyard, Revenge of the Nile).
+        let straight_ahead = {
+            let at = (tp.progress + b.speed.max(0.0) * phy::AI_BOOST_LOOKAHEAD).min(track.length() - 1.0);
+            let s = track.dist.windows(2).position(|w| at < w[1]).unwrap_or(track.last_seg());
+            let dir = (track.point(s, 1.0, 0.5) - track.point(s, 0.0, 0.5)).xz().normalize_or_zero();
+            dir.dot(tp.forward) >= phy::AI_BOOST_STRAIGHT
+        };
         let corner = 1.0 - (steer.abs() * 0.25);
         let skill = if b.player { 1.0 } else { brain.skill };
         b.control = Control {
             throttle: (skill * corner).clamp(0.3, 1.1),
             steer,
-            boost: b.fuel > 0.35 * g.boost_fuel_max_regular && steer.abs() < 0.3 && dot > 0.95,
+            boost: b.fuel > 0.35 * g.boost_fuel_max_regular && steer.abs() < 0.3 && dot > 0.95 && straight_ahead,
             ..default()
         };
         // Test hook: RIPTIDE_TEST_BOOST=secs holds boost (no steering) for three seconds from then.
@@ -1339,7 +1366,7 @@ fn boat_physics(
         if !b.airborne {
             if c.throttle > 0.0 {
                 let room = (top - b.speed).max(0.0) / top;
-                b.speed += c.throttle * thrust * phy::ACCEL_PER_THRUST * (phy::START_ROOM_BIAS + room) * dt;
+                b.speed += c.throttle * thrust * phy::ACCEL_PER_THRUST * (phy::START_ROOM_BIAS + phy::THRUST_ROOM_WEIGHT * room) * dt;
             } else if c.throttle < 0.0 {
                 b.speed += c.throttle * def.thrust_l1 * phy::SPEED_SCALE * phy::ACCEL_PER_THRUST * phy::BRAKE_MULT * dt;
             }
@@ -1631,23 +1658,26 @@ fn pickups(
     time: Res<Time>,
     tuning: Res<Tuning>,
     mut items: Query<(&mut Pickup, &mut Transform, &mut Visibility)>,
-    mut boats: Query<&mut Boat, Without<crate::net::Remote>>,
+    mut boats: Query<(Entity, &mut Boat), Without<crate::net::Remote>>,
 ) {
     let g = &tuning.0;
     let dt = time.delta_secs();
     let t = time.elapsed_secs();
+    let me = boats.iter().find(|(_, b)| b.player).map(|(e, _)| e);
     for (mut pk, mut tf, mut vis) in &mut items {
-        pk.cooldown = (pk.cooldown - dt).max(0.0);
-        *vis = if pk.cooldown > 0.0 { Visibility::Hidden } else { Visibility::Inherited };
+        for (_, left) in &mut pk.taken {
+            *left -= dt;
+        }
+        pk.taken.retain(|(_, left)| *left > 0.0);
+        // Hidden only for the racer who took it.
+        let mine = me.is_some_and(|m| pk.taken.iter().any(|(e, _)| *e == m));
+        *vis = if mine { Visibility::Hidden } else { Visibility::Inherited };
         tf.rotation = Quat::from_rotation_y(t * 2.0);
         tf.translation = pk.base + Vec3::Y * (4.0 * (t * 3.0).sin());
-        if pk.cooldown > 0.0 {
-            continue;
-        }
         let row = &PICKUPS[pk.row];
         let fuel = row.fuel_global.and_then(|i| g.get(H2_GLOBALS[i].id)).unwrap_or(0.0);
-        for mut b in &mut boats {
-            if b.pos.distance(pk.base) < phy::PICKUP_RADIUS {
+        for (e, mut b) in &mut boats {
+            if b.pos.distance(pk.base) < phy::PICKUP_RADIUS && !pk.taken.iter().any(|(t, _)| *t == e) {
                 if row.fills_super {
                     b.super_time = (b.super_time + fuel).min(g.boost_fuel_max_super);
                     b.super_pickups += 1;
@@ -1658,8 +1688,7 @@ fn pickups(
                 if b.player && std::env::var_os("RIPTIDE_PROBE").is_some() {
                     info!("PICKUP {} (boost {}, gold {}) fuel {:.1}", row.id, b.pickups, b.super_pickups, b.fuel);
                 }
-                pk.cooldown = phy::PICKUP_RESPAWN;
-                break;
+                pk.taken.push((e, phy::PICKUP_RESPAWN));
             }
         }
     }
@@ -1673,7 +1702,12 @@ pub struct Hull(pub f32);
 #[derive(Component)]
 pub struct Stern(pub Vec3);
 
-pub(crate) fn place_boats(time: Res<Time>, tuning: Res<Tuning>, mut boats: Query<(&mut Boat, &mut Transform, Option<&Hull>)>) {
+pub(crate) fn place_boats(
+    time: Res<Time>,
+    tuning: Res<Tuning>,
+    h2waves: Option<Res<crate::h2water::H2Waves>>,
+    mut boats: Query<(&mut Boat, &mut Transform, Option<&Hull>)>,
+) {
     let dt = time.delta_secs().min(1.0 / 20.0);
     let t = time.elapsed_secs();
     for (mut b, mut tf, hull) in &mut boats {
@@ -1686,7 +1720,9 @@ pub(crate) fn place_boats(time: Res<Time>, tuning: Res<Tuning>, mut boats: Query
         };
         b.roll += (target_roll - b.roll) * (dt * 5.0).min(1.0);
         b.pitch += (target_pitch - b.pitch) * (dt * 4.0).min(1.0);
-        let bob = if b.airborne { 0.0 } else {
+        // Under H2Overdrive's water shader: sit on the surface it draws (crate::h2water::H2Waves).
+        let h2 = h2waves.as_ref().filter(|_| !b.airborne).and_then(|w| w.height(b.pos.xz(), time.elapsed_secs_wrapped()));
+        let bob = if let Some(h) = h2 { (h - b.pos.y).clamp(-phy::H2WATER_BOB_MAX, phy::H2WATER_BOB_MAX) } else if b.airborne { 0.0 } else {
             // Match the rendered surface. Keeping the rig on the mean water
             // plane submerges its low exhaust nozzles whenever a crest passes.
             let k = std::f32::consts::TAU / phy::WAVE_LENGTH.max(1.0);
@@ -2641,7 +2677,7 @@ fn spawn_hackworld(commands: &mut Commands, models: &mut Models, scope: DespawnO
             let Some(row) = o.pickup else { continue };
             let Some(p) = PICKUPS[row].model.strip_prefix("lux:mesh32.").and_then(|m| models.lux(m)) else { continue };
             let e = commands
-                .spawn((Transform::from_translation(at), Visibility::default(), Pickup { row, cooldown: 0.0, base: at }, scope.clone()))
+                .spawn((Transform::from_translation(at), Visibility::default(), Pickup { row, taken: Vec::new(), base: at }, scope.clone()))
                 .id();
             attach(commands, e, &p);
             continue;

@@ -32,6 +32,13 @@ pub struct Recovery {
     /// Furthest race distance reached, and seconds since it last grew by recovery_progress.
     best: f32,
     since: f32,
+    /// Recoveries in a row with no race progress in between: each one moves the boat further on
+    /// (a boat respawned into the same bad line kept being put back at the same spot).
+    chain: u32,
+    /// Nearest nav line point last time (the search starts there).
+    nav_i: usize,
+    /// Just respawned: the next measurement re-bases `best` (not counted as progress).
+    rebase: bool,
 }
 
 fn wrap(a: f32) -> f32 {
@@ -49,6 +56,7 @@ pub fn recover(
     track: Res<Track>,
     tuning: Res<Tuning>,
     collider: Option<Res<Collider>>,
+    nav: Option<Res<crate::nav::NavLine>>,
     mut boats: Query<(&mut Boat, &mut Recovery)>,
 ) {
     let g = &tuning.0;
@@ -118,10 +126,23 @@ pub fn recover(
         }
 
         // No progress at all (circling, wedged in the air): Riptide's backstop to the original rules.
-        let here = track.race_distance(b.lap, b.tp.progress);
-        if here > r.best + phy::RECOVERY_PROGRESS {
+        // Measured along the nav line where there is one: it follows the river, where a course of
+        // a few huge cross-sections (Revenge of the Nile) reads a meander as going nowhere.
+        let here = match nav.as_deref() {
+            Some(n) => {
+                r.nav_i = n.nearest(b.pos, r.nav_i);
+                b.lap as f32 * n.length() + n.distance_at(r.nav_i)
+            }
+            None => track.race_distance(b.lap, b.tp.progress),
+        };
+        if r.rebase {
+            r.rebase = false;
             r.best = here;
             r.since = 0.0;
+        } else if here > r.best + phy::RECOVERY_PROGRESS {
+            r.best = here;
+            r.since = 0.0;
+            r.chain = 0;
         } else {
             r.since += dt;
         }
@@ -134,7 +155,9 @@ pub fn recover(
 /// Put the boat back on the course; a second recovery close to the last one moves it on.
 fn recover_boat(b: &mut Boat, r: &mut Recovery, track: &Track, col: Option<&Collider>) {
     let here = track.race_distance(b.lap, b.tp.progress);
-    let skip = if r.last_at.is_some_and(|d| (here - d).abs() < phy::RESPAWN_SKIP) { phy::RESPAWN_SKIP } else { 0.0 };
+    let near_last = r.last_at.is_some_and(|d| (here - d).abs() < phy::RESPAWN_SKIP);
+    r.chain += 1;
+    let skip = if r.chain > 1 { phy::RESPAWN_SKIP * (r.chain - 1) as f32 } else if near_last { phy::RESPAWN_SKIP } else { 0.0 };
     respawn(b, track, col, skip);
     r.last_at = Some(here);
     r.respawns += 1;
@@ -142,7 +165,7 @@ fn recover_boat(b: &mut Boat, r: &mut Recovery, track: &Track, col: Option<&Coll
     r.watch = None;
     r.meter = 0;
     r.since = 0.0;
-    r.best = track.race_distance(b.lap, b.tp.progress);
+    r.rebase = true;
 }
 
 /// Back on the course where the boat is, facing along it: the middle of the course, or the

@@ -8,6 +8,7 @@ anyhow.workspace = true
 parry3d = "0.31.1"
 bevy.workspace = true
 riptide-assets = { path = "../riptide-assets" }
+d3d9-shader = { path = "../d3d9-shader" }
 riptide-net = { path = "../riptide-net" }
 ewebsock = "0.8"
 

@@ -198,6 +198,9 @@ pub struct Models<'w> {
     pub images: ResMut<'w, Assets<Image>>,
     /// Water materials (crate::water).
     pub water: ResMut<'w, Assets<crate::water::WaterMat>>,
+    /// H2Overdrive's own water shader (crate::h2water) and the shaders it translates into.
+    pub h2water: ResMut<'w, Assets<crate::h2water::H2WaterMaterial>>,
+    pub shaders: ResMut<'w, Assets<Shader>>,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]

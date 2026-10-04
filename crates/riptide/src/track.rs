@@ -260,6 +260,19 @@ impl Track {
         Self::contains_edges(a, b, q)
     }
 
+    /// [`Self::contains`] with each cross-section stretched by `m` past both ends (water just outside
+    /// the AI corridor, where a pylon or rock fills the corridor itself).
+    pub fn contains_widened(&self, seg: usize, q: Vec2, m: f32) -> bool {
+        let widen = |e: &Edge| {
+            let d = (v2(e.end) - v2(e.start)).normalize_or_zero() * m;
+            let mut w = e.clone();
+            w.start = [e.start[0] - d.x, e.start[1], e.start[2] - d.y];
+            w.end = [e.end[0] + d.x, e.end[1], e.end[2] + d.y];
+            w
+        };
+        Self::contains_edges(&widen(&self.edges[seg]), &widen(&self.edges[seg + 1]), q)
+    }
+
     fn contains_edges(a: &Edge, b: &Edge, q: Vec2) -> bool {
         let (p0, p1, p2, p3) = (v2(a.start), v2(a.end), v2(b.end), v2(b.start));
         let tri = |a: Vec2, b: Vec2, c: Vec2| {

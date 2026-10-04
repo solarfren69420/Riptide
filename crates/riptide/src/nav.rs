@@ -29,7 +29,16 @@ pub struct NavLine {
 const NONE: u32 = u32::MAX;
 
 impl NavLine {
+    /// The nav line within the AI corridor; where that has no way through (a pylon or rock filling
+    /// the corridor), again with the grid reaching nav_widen past the corridor over open water,
+    /// then over any ground (Arctic Circle's ice). The shortcut guard applies to every attempt.
     pub fn build(track: &Track, col: &Collider) -> Option<Self> {
+        Self::build_with(track, col, 0.0, false)
+            .or_else(|| Self::build_with(track, col, phy::NAV_WIDEN, false))
+            .or_else(|| Self::build_with(track, col, phy::NAV_WIDEN, true))
+    }
+
+    fn build_with(track: &Track, col: &Collider, widen: f32, land_ok: bool) -> Option<Self> {
         let n_seg = track.edges.len().checked_sub(1)?;
         if n_seg == 0 {
             return None;
@@ -42,6 +51,7 @@ impl NavLine {
                 hi = hi.max(Vec2::new(p[0], p[2]));
             }
         }
+        let (lo, hi) = (lo - Vec2::splat(widen), hi + Vec2::splat(widen));
         let area = (hi - lo).x.max(1.0) * (hi - lo).y.max(1.0);
         let g = phy::NAV_CELL.max((area / phy::NAV_MAX_CELLS).sqrt());
         let (nx, nz) = (((hi.x - lo.x) / g) as usize + 2, ((hi.y - lo.y) / g) as usize + 2);
@@ -75,15 +85,15 @@ impl NavLine {
             let (a, b) = (&track.edges[i], &track.edges[i + 1]);
             let (mut qlo, mut qhi) = (Vec2::splat(f32::MAX), Vec2::splat(f32::MIN));
             for p in [a.start, a.end, b.start, b.end] {
-                qlo = qlo.min(Vec2::new(p[0], p[2]));
-                qhi = qhi.max(Vec2::new(p[0], p[2]));
+                qlo = qlo.min(Vec2::new(p[0], p[2]) - Vec2::splat(widen));
+                qhi = qhi.max(Vec2::new(p[0], p[2]) + Vec2::splat(widen));
             }
             let (c0, c1) = (((qlo - lo) / g).floor(), ((qhi - lo) / g).floor());
             for cz in c0.y.max(0.0) as usize..=(c1.y as usize).min(nz - 1) {
                 for cx in c0.x.max(0.0) as usize..=(c1.x as usize).min(nx - 1) {
                     let k = cz * nx + cx;
                     let q = centre(k);
-                    if seg[k] != NONE || !track.contains(i, q) {
+                    if seg[k] != NONE || !track.contains_widened(i, q, widen) {
                         continue;
                     }
                     let tp = track.locate(Vec3::new(q.x, 0.0, q.y), i);
@@ -92,7 +102,9 @@ impl NavLine {
                     water[k] = tp.water;
                     let p = Vec3::new(q.x, tp.water, q.y);
                     land[k] = col.land(p);
-                    free[k] = !col.blocked(p, g * 0.75, tp.forward);
+                    // Outside the AI corridor (nav_widen) only open water counts: never a way over land.
+                    let outside = !track.contains(i, q);
+                    free[k] = !col.blocked(p, g * 0.75, tp.forward) && !(outside && land[k] && !land_ok);
                 }
             }
         }
@@ -267,6 +279,11 @@ impl NavLine {
             if need == 0.0 { ", squeezes through a gap narrower than a boat" } else { "" }
         );
         Some(line)
+    }
+
+    /// Distance along the line to point `i`.
+    pub fn distance_at(&self, i: usize) -> f32 {
+        self.cum.get(i).copied().unwrap_or(0.0)
     }
 
     pub fn length(&self) -> f32 {

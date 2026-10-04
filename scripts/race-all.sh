@@ -11,10 +11,10 @@ tracks="$*"
 icd=$(ls /usr/share/vulkan/icd.d/lvp_icd*.json 2>/dev/null | head -1)
 for t in $tracks; do
     log="$out/$t.log"
-    RIPTIDE_DEBUG=1 VK_ICD_FILENAMES="$icd" LP_NUM_THREADS=4 XDG_CONFIG_HOME="$out/cfg" \
+    RIPTIDE_DEBUG=1 VK_ICD_FILENAMES="$icd" LP_NUM_THREADS=2 XDG_CONFIG_HOME="$out/cfg" \
     RIPTIDE_SHOT="$out/$t" RIPTIDE_SHOT_SIZE=320x180 RIPTIDE_SIM_DT=0.05 RIPTIDE_EXIT_ON_FINISH=1 \
     RIPTIDE_TRACK="$t" RIPTIDE_SHOT_FRAMES="${FRAMES:-9000}" \
-        timeout 1800 nice -n 19 "${BIN:-target/release/riptide}" > "$log" 2>&1
+        timeout 1800 scripts/light.sh "${BIN:-target/release/riptide}" > "$log" 2>&1
     if grep -q RESULT "$log"; then
         echo "$t $(grep -o 'RESULT.*' "$log" | head -1)"
     else

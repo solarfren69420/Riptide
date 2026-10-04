@@ -1,0 +1,11 @@
+[package]
+name = "d3d9-shader"
+version.workspace = true
+edition.workspace = true
+description = "Direct3D 9 shader bytecode (SM2/SM3): find programs, read constant tables, disassemble, translate to WGSL"
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+
+[dev-dependencies]
+naga = { version = "27", features = ["wgsl-in"] }

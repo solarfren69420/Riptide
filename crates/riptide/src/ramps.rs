@@ -66,6 +66,11 @@ pub fn find(col: &Collider, track: &Track) -> Vec<Ramp> {
         if hi - tp.water < phy::RAMP_FIND_MIN_RISE || lo - tp.water > phy::RAMP_FIND_MAX_BASE {
             continue;
         }
+        // Rock overhead (an arch, an overhang): not something a boat drives up.
+        let up = c + n * 2.0;
+        if col.hit(up, up + Vec3::Y * phy::RAMP_FIND_HEADROOM).is_some() {
+            continue;
+        }
         tris.push(Tri { c, n, area, lo, hi });
     }
     // Union-find: neighbours (centres close) facing the same way are one ramp.
@@ -124,6 +129,8 @@ pub struct RampTest {
     peak: f32,
     air: f32,
     reported: bool,
+    closest: f32,
+    lip_speed: f32,
 }
 
 /// List ramps (RIPTIDE_RAMPS) and run RIPTIDE_TEST_RAMP. Runs right after the AI picks controls.
@@ -143,8 +150,8 @@ pub fn ramp_test(
         if std::env::var_os("RIPTIDE_RAMPS").is_some() {
             for (i, r) in find(&col, &track).iter().enumerate() {
                 info!(
-                    "RAMP {i} at {:.0} {:.0} {:.0} rise {:.0} (base {:.0} top {:.0}) slope {:.2} uphill {:.2} {:.2} progress {:.0} tris {}",
-                    r.centre.x, r.centre.y, r.centre.z, r.top - r.base, r.base, r.top, r.slope, r.uphill.x, r.uphill.y, r.progress, r.triangles
+                    "RAMP {i} at {:.0} {:.0} {:.0} rise {:.0} (base {:.0} top {:.0} base_over_water {:.0}) slope {:.2} uphill {:.2} {:.2} progress {:.0} tris {}",
+                    r.centre.x, r.centre.y, r.centre.z, r.top - r.base, r.base, r.top, r.base - track.locate_anywhere(r.centre).water, r.slope, r.uphill.x, r.uphill.y, r.progress, r.triangles
                 );
             }
         }
@@ -174,7 +181,8 @@ pub fn ramp_test(
         let s = ((back - track.dist[seg]) / (track.dist[seg + 1] - track.dist[seg]).max(1e-3)).clamp(0.0, 1.0);
         let p = track.point(seg, s, at.u.clamp(0.15, 0.85));
         b.pos = p;
-        let to = (r.centre.xz() - p.xz()).normalize_or(r.uphill);
+        // Facing along the course: the autopilot drives the run-up.
+        let to = track.locate_anywhere(p).forward;
         b.yaw = (-to.x).atan2(-to.y);
         let water = p.y;
         b.vel = Vec2::ZERO;
@@ -183,17 +191,27 @@ pub fn ramp_test(
         b.surface = water;
         b.tp = track.locate_anywhere(b.pos);
         st.contacts0 = b.contacts;
+        st.closest = f32::MAX;
     }
-    // Straight at the ramp centre, flat out.
-    let to = (r.centre.xz() - b.pos.xz()).normalize_or(r.uphill);
-    let heading = Vec2::new(-b.yaw.sin(), -b.yaw.cos());
-    b.control.steer = (heading.perp_dot(to) * 2.2).clamp(-1.0, 1.0);
+    // The autopilot follows the course until ramp_test_takeover from the ramp, then the boat
+    // heads up its slope (at a point past its centre), flat out all the way.
+    let near = (b.pos.xz() - r.centre.xz()).length();
+    st.closest = st.closest.min(near);
+    if near < phy::RAMP_TEST_TAKEOVER {
+        // A point on the ramp's centreline 300 ahead of the boat: steering converges onto the line.
+        let along = (b.pos.xz() - r.centre.xz()).dot(r.uphill);
+        let aim = r.centre.xz() + r.uphill * (along + 300.0);
+        let to = (aim - b.pos.xz()).normalize_or(r.uphill);
+        let heading = Vec2::new(-b.yaw.sin(), -b.yaw.cos());
+        b.control.steer = (heading.perp_dot(to) * 2.2).clamp(-1.0, 1.0);
+    }
     b.control.throttle = 1.0;
     b.control.boost = true;
     b.fuel = b.fuel.max(1.0e3);
     st.t += dt;
     // Clipping: the boat below the ramp surface right under it, while not in the air.
-    if let Some(floor) = col.floor(b.pos.x, b.pos.z, b.pos.y + phy::RAMP_TEST_CLIP * 6.0) {
+    // Only surface just above the boat: an arch or bridge overhead isn't a ramp being clipped.
+    if let Some(floor) = col.floor(b.pos.x, b.pos.z, b.pos.y + phy::RAMP_TEST_CLIP * 4.0) {
         let over = (b.pos.xz() - r.centre.xz()).length() < (r.top - r.base).max(200.0) * 3.0;
         if over && floor > b.pos.y + phy::RAMP_TEST_CLIP {
             st.clipped = st.clipped.max(floor - b.pos.y);
@@ -206,15 +224,22 @@ pub fn ramp_test(
         }
         st.peak = st.peak.max(b.pos.y - r.top);
     }
-    let past = (b.pos.xz() - r.centre.xz()).dot(r.uphill) > phy::RAMP_TEST_RUNUP && !b.airborne;
+    // Past: further along the course than the ramp by ramp_test_past, back on the water.
+    let past = b.tp.progress > r.progress + phy::RAMP_TEST_PAST && b.tp.progress < r.progress + phy::RAMP_TEST_RUNUP * 2.0 && !b.airborne;
+    if !b.airborne && b.tp.progress < r.progress {
+        st.lip_speed = b.speed;
+    }
     if !st.reported && (past || st.t > phy::RAMP_TEST_TIME) {
         st.reported = true;
         info!(
-            "RAMP TEST {index}: rise {:.0} contacts {} clipped {:.0} launch_vy {:.0} peak_over_top {:.0} air {:.2}s speed {:.0} {}",
+            "RAMP TEST {index}: rise {:.0} slope {:.2} closest {:.0} contacts {} clipped {:.0} launch_vy {:.0} (slope x lip speed {:.0}) peak_over_top {:.0} air {:.2}s speed {:.0} {}",
             r.top - r.base,
+            r.slope,
+            st.closest,
             b.contacts - st.contacts0,
             st.clipped,
             st.launch_vy,
+            r.slope * st.lip_speed,
             st.peak,
             st.air,
             b.speed,

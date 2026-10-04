@@ -27,6 +27,7 @@ mod recovery;
 mod sheets;
 mod sound;
 mod track;
+mod h2water;
 mod water;
 #[cfg(target_arch = "wasm32")]
 mod web;
@@ -161,7 +162,7 @@ pub fn run(content: Content) -> AppExit {
         .init_resource::<ModelCache>()
         .init_state::<Screen>()
         .add_systems(Update, content::finish_textures)
-        .add_plugins((cheats::CheatsPlugin, net::NetPlugin, menu::MenuPlugin, race::RacePlugin, sound::SoundPlugin, effects::EffectsPlugin, hud::HudPlugin, boatrig::BoatRigPlugin, water::WaterPlugin))
+        .add_plugins((cheats::CheatsPlugin, net::NetPlugin, menu::MenuPlugin, race::RacePlugin, sound::SoundPlugin, effects::EffectsPlugin, hud::HudPlugin, boatrig::BoatRigPlugin, water::WaterPlugin, h2water::H2WaterPlugin))
         .add_systems(OnEnter(Screen::Restart), |mut next: ResMut<NextState<Screen>>| next.set(Screen::Race));
     #[cfg(target_arch = "wasm32")]
     app.add_plugins(web::WebPlugin);

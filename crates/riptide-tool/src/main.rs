@@ -201,6 +201,99 @@ fn main() -> Result<()> {
                 std::thread::sleep(std::time::Duration::from_millis(33));
             }
         }
+        Some("h2o-find") => {
+            // h2o-find <pid> <before> <after> <f32>...: find a float sequence (to within 1e-4) in the running
+            // game's writable memory (/proc/<pid>/maps + mem, read only) and dump <before> bytes before and
+            // <after> bytes after each hit as offset: hex float lines. Used to read the constant blocks
+            // H2Overdrive feeds its water shader, found by an edge's known colours.
+            use std::io::{Read, Seek, SeekFrom};
+            let pid = a(1)?;
+            let before: usize = a(2)?.parse()?;
+            let after: usize = a(3)?.parse()?;
+            let want: Vec<f32> = args[4..].iter().map(|s| s.parse()).collect::<Result<_, _>>()?;
+            let maps = std::fs::read_to_string(format!("/proc/{pid}/maps"))?;
+            let mut mem = std::fs::File::open(format!("/proc/{pid}/mem"))?;
+            let mut hits = 0;
+            for line in maps.lines() {
+                let mut f = line.split_whitespace();
+                let (Some(range), Some(perms)) = (f.next(), f.next()) else { continue };
+                if !perms.starts_with("rw") {
+                    continue;
+                }
+                let (lo, hi) = range.split_once('-').unwrap();
+                let (lo, hi) = (u64::from_str_radix(lo, 16)?, u64::from_str_radix(hi, 16)?);
+                if hi - lo > 1 << 30 {
+                    continue;
+                }
+                let mut buf = vec![0u8; (hi - lo) as usize];
+                if mem.seek(SeekFrom::Start(lo)).is_err() || mem.read_exact(&mut buf).is_err() {
+                    continue;
+                }
+                let fl = |i: usize| f32::from_le_bytes(buf[i..i + 4].try_into().unwrap());
+                let n = want.len() * 4;
+                let mut i = 0;
+                while i + n <= buf.len() {
+                    if (0..want.len()).all(|k| (fl(i + 4 * k) - want[k]).abs() < 1e-4) {
+                        hits += 1;
+                        println!("HIT at {:x}", lo + i as u64);
+                        let start = i.saturating_sub(before) & !3;
+                        let end = (i + n + after).min(buf.len());
+                        let mut o = start;
+                        while o + 4 <= end {
+                            println!("  {:+06x} {:08x} {}", o as i64 - i as i64, u32::from_le_bytes(buf[o..o + 4].try_into().unwrap()), fl(o));
+                            o += 4;
+                        }
+                        if hits >= 40 {
+                            return Ok(());
+                        }
+                    }
+                    i += 4;
+                }
+            }
+            println!("{hits} hits");
+        }
+        Some("shader") => {
+            // shader <name> [outdir]: the shader programs in shad4.<name> (H2Overdrive effects), their
+            // constant tables and disassembly; with outdir, one .asm file per program.
+            let l = open_lux()?;
+            let blob = l.get(&format!("shad4.{}", a(1)?)).context("no such shader")?;
+            for (i, p) in d3d9_shader::programs(blob).iter().enumerate() {
+                let asm = d3d9_shader::disassemble(p);
+                println!("{} #{i}: {} {}.{} at +0x{:x}, {} tokens, {} constants", a(1)?, if p.pixel { "ps" } else { "vs" }, p.major, p.minor, p.offset, p.tokens.len(), p.constants.len());
+                match args.get(2) {
+                    Some(dir) => std::fs::write(format!("{dir}/{}_{i}_{}.asm", a(1)?, if p.pixel { "ps" } else { "vs" }), &asm)?,
+                    None => print!("{}{asm}", d3d9_shader::disasm::constant_listing(p)),
+                }
+            }
+        }
+        Some("shader-wgsl") => {
+            // shader-wgsl <name> [outdir]: translate shad4.<name>'s programs to WGSL and validate them with
+            // naga (the compiler wgpu / Bevy use).
+            let l = open_lux()?;
+            let blob = l.get(&format!("shad4.{}", a(1)?)).context("no such shader")?;
+            let (mut ok, mut bad) = (0, 0);
+            for (i, p) in d3d9_shader::programs(blob).iter().enumerate() {
+                let src = d3d9_shader::wgsl::translate(p, &Default::default());
+                let kind = if p.pixel { "ps" } else { "vs" };
+                if let Some(dir) = args.get(2) {
+                    std::fs::write(format!("{dir}/{}_{i}_{kind}.wgsl", a(1)?), &src)?;
+                }
+                let checked = naga::front::wgsl::parse_str(&src).map_err(|e| e.emit_to_string(&src)).and_then(|m| {
+                    naga::valid::Validator::new(naga::valid::ValidationFlags::all(), naga::valid::Capabilities::all())
+                        .validate(&m)
+                        .map(|_| ())
+                        .map_err(|e| e.emit_to_string(&src))
+                });
+                match checked {
+                    Ok(()) => ok += 1,
+                    Err(e) => {
+                        bad += 1;
+                        println!("{} #{i} {kind}: {}", a(1)?, e.lines().take(12).collect::<Vec<_>>().join("\n"));
+                    }
+                }
+            }
+            println!("{}: {ok} valid, {bad} invalid", a(1)?);
+        }
         Some("kat") => {
             // kat <FILE.KAT> [outdir]: list a Hydro Thunder sound bank; with outdir, write each sample as WAV.
             let g = riptide_assets::gdi::GdRom::open(&riptide_assets::default_gdi_path())?;
@@ -500,6 +593,20 @@ fn main() -> Result<()> {
                 lvl.water.len(),
                 lvl.skyboxes.iter().map(|s| &s.mesh).collect::<Vec<_>>()
             );
+            if args.get(2).map(String::as_str) == Some("PATH") {
+                println!("finish buoys {:?}", lvl.finish);
+                for (i, e) in lvl.path.iter().enumerate() {
+                    println!("{i}: mid {:.0} {:.0} {:.0} width {:.0}", (e.start[0] + e.end[0]) * 0.5, e.water, (e.start[2] + e.end[2]) * 0.5, ((e.start[0] - e.end[0]).powi(2) + (e.start[2] - e.end[2]).powi(2)).sqrt());
+                }
+                return Ok(());
+            }
+            if args.get(2).map(String::as_str) == Some("WATER") {
+                println!("{} water edges, {} water sectors", lvl.water_edges.len(), lvl.water_sectors.len());
+                for e in &lvl.water_edges {
+                    println!("{e:?}");
+                }
+                return Ok(());
+            }
             let mut missing: Vec<&str> =
                 lvl.props.iter().map(|p| p.mesh.as_str()).filter(|m| !l.contains(&format!("mesh32.{m}"))).collect();
             missing.sort();

@@ -179,6 +179,52 @@ pub struct Edge {
     pub water: f32,
 }
 
+/// A `CSPropWaterEdge`: a line across the river with the water's look and waves there
+/// (H2Overdrive blends a sector's leading and trailing edge across it, shad4.FX_Water2).
+/// Positions and directions are in Riptide space (Z mirrored, like every level position).
+#[derive(Debug, Clone, Default)]
+pub struct WaterEdge {
+    pub name: String,
+    pub start: [f32; 3],
+    pub end: [f32; 3],
+    pub water: f32,
+    /// Calm, Normal, Choppy, Stormy, Rapids, Tidal or Wrappers.
+    pub wave_type: String,
+    pub wave_intensity: f32,
+    /// Degrees, as authored (original space).
+    pub wave_direction: f32,
+    pub bump_direction: f32,
+    pub bump_speed: f32,
+    pub flow_speed: f32,
+    pub opaqueness: f32,
+    /// `Real` (planar reflection) or another mode.
+    pub reflection_type: String,
+    /// RGBA motif colours.
+    pub water_color: [f32; 4],
+    pub whitewash_color: [f32; 4],
+    pub specular_color: [f32; 4],
+    pub reflection_tint: [f32; 4],
+    pub light: Option<WaterLight>,
+}
+
+/// A `CSPropLightEdgeInfo` (an edge's `Light Info Ob`): one directional light plus ambient.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct WaterLight {
+    /// Direction the light shines, Riptide space.
+    pub direction: [f32; 3],
+    pub color: [f32; 4],
+    pub intensity: f32,
+    pub ambient: [f32; 4],
+    pub ambient_intensity: f32,
+}
+
+/// A `CSPropWaterSector`: indices into `H2Level::water_edges`.
+#[derive(Debug, Clone, Copy)]
+pub struct WaterSector {
+    pub leading: usize,
+    pub trailing: usize,
+}
+
 #[derive(Debug, Clone)]
 pub struct Quad {
     pub corners: [[f32; 3]; 4],
@@ -209,6 +255,9 @@ pub struct H2Level {
     /// Racing line: AI sector cross-sections in driving order (first lap).
     pub path: Vec<Edge>,
     pub water: Vec<Quad>,
+    /// Water edges and the sectors between them (the original's water shader inputs).
+    pub water_edges: Vec<WaterEdge>,
+    pub water_sectors: Vec<WaterSector>,
     /// Vertical curtains at river drops (generated for Hydro Thunder sector portals).
     pub waterfalls: Vec<Quad>,
     pub skyboxes: Vec<Placement>,
@@ -345,6 +394,8 @@ pub fn load_level(lux: &LuxArchive, code: &str) -> Result<H2Level> {
             });
         }
     }
+
+    water_sectors(lux, code, &mut lvl);
 
     let ai = load_list(lux, &format!("{code}_ai")).unwrap_or_default();
     lvl.path = racing_line(&ai, lvl.starts.first().map(|s| s.0), "CSPropAISector");
@@ -502,4 +553,66 @@ fn slide_controllers(objs: &[XmlObject]) -> HashMap<String, Slide> {
 /// The first of `o`'s `Controllers` found in `by_name`.
 fn controlled<T: Clone>(o: &XmlObject, by_name: &HashMap<String, T>) -> Option<T> {
     o.props.get("Controllers").and_then(|cs| cs.iter().find_map(|c| by_name.get(c.as_str()))).cloned()
+}
+
+/// Water edges with every property (engine defaults filled in), their lights, and the sectors.
+fn water_sectors(lux: &LuxArchive, code: &str, lvl: &mut H2Level) {
+    let Ok(objs) = load_list_with_defaults(lux, &format!("{code}_sectors")) else {
+        return;
+    };
+    let lights: HashMap<String, WaterLight> = load_list_with_defaults(lux, &format!("{code}_lights"))
+        .unwrap_or_default()
+        .iter()
+        .filter(|o| o.class == "CSPropLightEdgeInfo")
+        .map(|o| {
+            let d = o.floats("Directional Direction").unwrap_or_default();
+            let c4 = |k: &str| {
+                let v = o.floats(k).unwrap_or_default();
+                [0, 1, 2, 3].map(|i| v.get(i).copied().unwrap_or(if i == 3 { 1.0 } else { 0.0 }))
+            };
+            let light = WaterLight {
+                direction: [d.first().copied().unwrap_or(0.0), d.get(1).copied().unwrap_or(-1.0), -d.get(2).copied().unwrap_or(0.0)],
+                color: c4("Directional motif color"),
+                intensity: o.f32("Directional Intensity").unwrap_or(1.0),
+                ambient: c4("Ambient motif color"),
+                ambient_intensity: o.f32("Ambient Intensity").unwrap_or(0.0),
+            };
+            (o.name.clone(), light)
+        })
+        .collect();
+    let mut index = HashMap::new();
+    for o in objs.iter().filter(|o| o.class == "CSPropWaterEdge") {
+        let (Some(start), Some(end)) = (o.vec3("Edge start"), o.vec3("Edge end")) else { continue };
+        let c4 = |k: &str| {
+            let v = o.floats(k).unwrap_or_default();
+            [0, 1, 2, 3].map(|i| v.get(i).copied().unwrap_or(1.0))
+        };
+        index.insert(o.name.clone(), lvl.water_edges.len());
+        lvl.water_edges.push(WaterEdge {
+            name: o.name.clone(),
+            start,
+            end,
+            water: o.f32("Water height").unwrap_or((start[1] + end[1]) * 0.5),
+            wave_type: o.get("Wave Type").unwrap_or("Normal").trim().to_string(),
+            wave_intensity: o.f32("Wave Intensity").unwrap_or(0.0),
+            wave_direction: o.f32("Wave Direction").unwrap_or(0.0),
+            bump_direction: o.f32("Bump Direction").unwrap_or(0.0),
+            bump_speed: o.f32("Bump Speed").unwrap_or(0.0),
+            flow_speed: o.f32("Flow Speed").unwrap_or(0.0),
+            opaqueness: o.f32("Opaqueness").unwrap_or(1.0),
+            reflection_type: o.get("Reflection Type").unwrap_or("Real").trim().to_string(),
+            water_color: c4("Water Color motif color"),
+            whitewash_color: c4("Whitewash Color motif color"),
+            specular_color: c4("Specular Color motif color"),
+            reflection_tint: c4("Reflection Tint motif color"),
+            light: o.get("Light Info Ob").and_then(|n| lights.get(n.trim())).copied(),
+        });
+    }
+    for s in objs.iter().filter(|o| o.class == "CSPropWaterSector") {
+        if let (Some(&leading), Some(&trailing)) =
+            (s.get("Leading edge").and_then(|n| index.get(n)), s.get("Trailing edge").and_then(|n| index.get(n)))
+        {
+            lvl.water_sectors.push(WaterSector { leading, trailing });
+        }
+    }
 }

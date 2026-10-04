@@ -123,6 +123,7 @@ fn emit(
     time: Res<Time>,
     art: Option<Res<FxArt>>,
     live: Query<(), With<Particle>>,
+    h2water: Option<Res<crate::h2water::H2WaterOn>>,
     mut boats: Query<(Entity, &Boat, Option<&mut Emitter>)>,
 ) {
     let Some(art) = art else { return };
@@ -152,17 +153,24 @@ fn emit(
                 return;
             }
             budget -= 1;
-            commands.spawn((
-                Mesh3d(art.quad.clone()),
-                MeshMaterial3d(match kind {
-                    Kind::Foam => art.foam[0][0].clone(),
-                    Kind::Spray => art.spray[0][0].clone(),
-                }),
-                Transform::from_translation(pos).with_scale(Vec3::splat(size.0)),
-                Particle { kind, vel, age: 0.0, life, size, art: (rnd * art_n as f32) as usize % art_n },
-                NotShadowCaster,
-                scope.clone(),
-            ));
+            let id = commands
+                .spawn((
+                    Mesh3d(art.quad.clone()),
+                    MeshMaterial3d(match kind {
+                        Kind::Foam => art.foam[0][0].clone(),
+                        Kind::Spray => art.spray[0][0].clone(),
+                    }),
+                    Transform::from_translation(pos).with_scale(Vec3::splat(size.0)),
+                    Particle { kind, vel, age: 0.0, life, size, art: (rnd * art_n as f32) as usize % art_n },
+                    NotShadowCaster,
+                    scope.clone(),
+                ))
+                .id();
+            // Under H2Overdrive's water shader foam goes into its whitewash buffer instead
+            // (crate::h2water::WhitewashCam), lit and tinted by the water.
+            if h2water.is_some() && matches!(kind, Kind::Foam) {
+                commands.entity(id).insert(bevy::camera::visibility::RenderLayers::layer(crate::h2water::WHITEWASH_LAYER));
+            }
         };
         let on_water = !b.airborne;
         // Foam wake: patches left at the stern and both flanks, more the faster the boat goes.

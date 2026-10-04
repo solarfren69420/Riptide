@@ -2224,6 +2224,13 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f27ae1dd37df86211c42e150270f82743308803d90a6f6e6651cd730d5e1732f"
 
 [[package]]
+name = "d3d9-shader"
+version = "0.1.0"
+dependencies = [
+ "naga",
+]
+
+[[package]]
 name = "dasp_sample"
 version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4465,6 +4472,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "bevy",
+ "d3d9-shader",
  "ewebsock",
  "js-sys",
  "parry3d",
@@ -4518,6 +4526,8 @@ name = "riptide-tool"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "d3d9-shader",
+ "naga",
  "png",
  "riptide-assets",
  "roxmltree",
