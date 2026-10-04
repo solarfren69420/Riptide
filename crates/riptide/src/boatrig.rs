@@ -19,7 +19,7 @@ pub struct BoatRigPlugin;
 
 impl Plugin for BoatRigPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Update, (animate.run_if(in_state(Screen::Race)), pose_menu.run_if(in_state(Screen::Menu))));
+        app.add_systems(Update, (animate.run_if(in_state(Screen::Race)), pose_menu.run_if(in_state(Screen::Menu)), animate_props.run_if(in_state(Screen::Race))));
     }
 }
 
@@ -324,5 +324,51 @@ fn pose_menu(time: Res<Time>, mut rigs: Query<&mut BoatRig, Without<Boat>>, mut 
             None => step(&mut rig, on, airborne, time.delta_secs().min(0.1)),
         }
         apply(&rig, on, &mut bones);
+    }
+}
+
+/// An animated level prop (`CSMeshInst` with an `Animation`: sawblades, spike blocks, cranes,
+/// wildlife): its clip loops on its own skeleton.
+#[derive(Component)]
+pub struct PropRig {
+    clip: Bound,
+    speed: f32,
+}
+
+/// Build `mesh`'s skeleton under `node` and bind `anim.clip` to it, starting at `anim.start` of
+/// the clip. `None` when the mesh has no skeleton or the clip moves none of its bones (then draw
+/// the prop whole, as before).
+pub fn spawn_prop(commands: &mut Commands, models: &mut Models, mesh: &str, anim: &riptide_assets::h2level::PropAnim, node: Entity) -> Option<PropRig> {
+    let rig = models.lux_rig(mesh)?;
+    let clip = models.lux_clip(&anim.clip)?;
+    if rig.bones.is_empty() || !clip.tracks.iter().any(|t| rig.bones.iter().any(|b| b.name.eq_ignore_ascii_case(&t.name))) {
+        return None;
+    }
+    let bones = spawn_bones(commands, &rig, node, Mat4::IDENTITY, &vec![false; rig.bones.len()]);
+    let mut rests: HashMap<Entity, Transform> = HashMap::new();
+    for b in &rig.bones {
+        if let Some(&e) = bones.get(&b.name.to_ascii_lowercase()) {
+            let local = match b.parent {
+                Some(p) => mat(&rig.bones[p].rest).inverse() * mat(&b.rest),
+                None => mat(&b.rest),
+            };
+            rests.insert(e, Transform::from_matrix(local));
+        }
+    }
+    let mut bound = bind(clip, &bones, &rests);
+    bound.t = anim.start.rem_euclid(1.0) * bound.clip.duration;
+    Some(PropRig { clip: bound, speed: anim.speed })
+}
+
+fn animate_props(time: Res<Time>, mut rigs: Query<&mut PropRig>, mut bones: Query<&mut Transform, Without<PropRig>>) {
+    let dt = time.delta_secs();
+    for mut rig in &mut rigs {
+        let len = rig.clip.clip.duration.max(1e-3);
+        rig.clip.t = (rig.clip.t + dt * rig.speed).rem_euclid(len);
+        for &(ti, e, rest) in &rig.clip.nodes {
+            if let Ok(mut tf) = bones.get_mut(e) {
+                *tf = sample(&rig.clip, ti, rest);
+            }
+        }
     }
 }

@@ -445,6 +445,7 @@ fn spawn_race(
         }
     }
     // Props.
+    let mut animated = 0;
     for prop in &level.props {
         let Some(p) = models.lux(&prop.mesh) else { continue };
         let mover = prop.path.as_ref().map(|path| PathMover::new(path, Vec3::from(prop.position), prop.scale));
@@ -460,7 +461,18 @@ fn spawn_race(
         if let Some(m) = mover {
             commands.entity(e).insert(m);
         }
-        attach(&mut commands, e, &p);
+        // Animated props (sawblades, spike blocks, cranes, wildlife) play their clip on their own
+        // skeleton; the rest are drawn whole.
+        match prop.anim.as_ref().and_then(|a| crate::boatrig::spawn_prop(&mut commands, &mut models, &prop.mesh, a, e)) {
+            Some(rig) => {
+                commands.entity(e).insert(rig);
+                animated += 1;
+            }
+            None => attach(&mut commands, e, &p),
+        }
+    }
+    if animated > 0 {
+        info!("{code}: {animated} animated props");
     }
     if matches!(choice.source, CourseSource::Sandbox { .. }) {
         spawn_hackworld(&mut commands, &mut models, scope.clone());

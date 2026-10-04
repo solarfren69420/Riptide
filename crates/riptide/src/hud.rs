@@ -147,7 +147,8 @@ fn spawn(mut commands: Commands, mut models: Models, sel: Res<Selection>) {
                 e.insert(Node { flex_direction: FlexDirection::Row, align_items: AlignItems::FlexEnd, ..e_node(card) });
             }
             HudRole::RadarMap => {
-                if let (Some(l), Some(t)) = (level, models.lux_texture(&format!("ht_radar_map_{}", H2_LEVELS[level.unwrap_or(0)].id))) {
+                let name = format!("ht_radar_map_{}", H2_LEVELS[level.unwrap_or(0)].id);
+                if let (Some(l), Some(t)) = (level, models.lux_texture(&name)) {
                     // The square inscribed in the round frame, so no corners stick out.
                     let side = w * std::f32::consts::FRAC_1_SQRT_2;
                     let inset = (w - side) / 2.0;
@@ -159,7 +160,10 @@ fn spawn(mut commands: Commands, mut models: Models, sel: Res<Selection>) {
                 // Blips live inside the radar card: one per rival, placed each frame.
                 let radar = HUD.iter().find(|r| r.role == HudRole::RadarMap).and_then(|r| r.card).map(|c| &H2_HUD[c]);
                 if let Some(rc) = radar {
-                    e.insert(Node { position_type: PositionType::Absolute, right: v(rc.x_position), top: v(rc.y_position), width: v(rc.x_size), height: v(rc.y_size), ..default() });
+                    // The same inscribed square as the map: blips are placed in its coordinates.
+                    let side = rc.x_size.max(1.0) * std::f32::consts::FRAC_1_SQRT_2;
+                    let inset = (rc.x_size.max(1.0) - side) / 2.0;
+                    e.insert(Node { position_type: PositionType::Absolute, right: v(rc.x_position + inset), top: v(rc.y_position + inset), width: v(side), height: v(side), ..default() });
                     e.with_children(|c| {
                         for i in 0..phy::RACERS as usize {
                             c.spawn((
@@ -169,6 +173,12 @@ fn spawn(mut commands: Commands, mut models: Models, sel: Res<Selection>) {
                                 Blip(i),
                             ));
                         }
+                        // The player: white, in the middle (the map scrolls under it).
+                        c.spawn((
+                            Node { position_type: PositionType::Absolute, left: percent(50), top: percent(50), margin: UiRect::all(v(-5.5)), width: v(11.0), height: v(11.0), border_radius: BorderRadius::MAX, ..default() },
+                            BackgroundColor(Color::WHITE),
+                            BorderColor::all(Color::BLACK),
+                        ));
                     });
                 }
             }
@@ -299,7 +309,8 @@ fn texts(
 }
 
 /// World XZ (game coordinates, Z un-mirrored) to radar map texels via the level's two
-/// calibration points (CLevelInfo Map Texel/World 0 and 1).
+/// calibration points (CLevelInfo Map Texel/World 0 and 1). The texels are in a 1024-px
+/// map's space for every level (all under 1024), which is how the 2048-px maps load.
 fn texel(level: usize, p: Vec3) -> Vec2 {
     let l = &H2_LEVELS[level];
     let g = |v: &[f32]| Vec2::new(v.first().copied().unwrap_or(0.0), v.get(1).copied().unwrap_or(0.0));

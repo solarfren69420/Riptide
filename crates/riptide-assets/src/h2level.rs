@@ -114,6 +114,19 @@ pub struct Placement {
     pub scale: f32,
     /// Set when a path controller drives the object (traffic, trains, gondolas).
     pub path: Option<MotionPath>,
+    /// A looping clip on the object's own skeleton (`Animation`: sawblades, spike blocks,
+    /// cranes, wildlife).
+    pub anim: Option<PropAnim>,
+}
+
+#[derive(Debug, Clone)]
+pub struct PropAnim {
+    /// `anim4` entry name.
+    pub clip: String,
+    /// `Anim Speed x`: playback rate (1 = the clip's own).
+    pub speed: f32,
+    /// `Anim Start`: phase to start at, as a fraction of the clip.
+    pub start: f32,
 }
 
 #[derive(Debug, Clone)]
@@ -232,7 +245,12 @@ pub fn load_level(lux: &LuxArchive, code: &str) -> Result<H2Level> {
                 .get("Controllers")
                 .and_then(|cs| cs.iter().find_map(|c| paths.get(c.as_str())))
                 .cloned();
-            let placement = Placement { mesh, position, rotation, scale, path };
+            let anim = o.get("Animation").filter(|a| !a.is_empty()).map(|clip| PropAnim {
+                clip: clip.to_string(),
+                speed: o.f32("Anim Speed x").unwrap_or(1.0),
+                start: o.f32("Anim Start").unwrap_or(0.0),
+            });
+            let placement = Placement { mesh, position, rotation, scale, path, anim };
             if o.class == "CBooster" {
                 let kind = match o.f32("Type").map(|t| t as i32).unwrap_or(0) {
                     1 => BoostKind::Red,
@@ -265,6 +283,7 @@ pub fn load_level(lux: &LuxArchive, code: &str) -> Result<H2Level> {
                         rotation: [0.0, s, 0.0, c],
                         scale: info.f32(&format!("Skybox {i} Scale")).unwrap_or(1.0),
                         path: None,
+                        anim: None,
                     });
                 }
             }
