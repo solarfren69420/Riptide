@@ -500,6 +500,7 @@ fn material_alpha(source: Source, texture: &str, shader: &str, blend: Blend, alp
         (Blend::Add, _) => AlphaMode::Add,
         (Blend::Blend, _) => AlphaMode::Blend,
         (Blend::Cutout, _) => AlphaMode::Mask(0.5),
+        (Blend::Solid, _) => AlphaMode::Opaque,
         // Boat and world texture alpha stores gloss. Prop art and shaders ending
         // in A use it for cutout coverage instead.
         (_, Some(TexAlpha::Binary)) if source == Source::Ht || shader.ends_with('A') || is_prop_tex => AlphaMode::Mask(0.5),

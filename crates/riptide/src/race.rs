@@ -407,6 +407,10 @@ fn spawn_race(
         }
         _ => {}
     }
+    let turned = track.orient();
+    if turned > 0 {
+        info!("{code}: turned {turned} reversed cross-sections");
+    }
     info!(
         "{code}: {} sectors, {} props, {} boosters, track {:.0} units",
         level.sector_meshes.len(),
@@ -1965,7 +1969,7 @@ impl Collider {
     }
 
     /// First hit along `a -> b` as a fraction of the segment.
-    fn hit(&self, a: Vec3, b: Vec3) -> Option<f32> {
+    pub(crate) fn hit(&self, a: Vec3, b: Vec3) -> Option<f32> {
         if let Some(p) = &self.parry {
             return p.sight.along(a, b);
         }

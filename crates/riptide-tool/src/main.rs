@@ -347,7 +347,14 @@ fn main() -> Result<()> {
         }
         Some("ht-tex") => {
             let h = ht::HydroThunder::open(&riptide_assets::default_gdi_path())?;
-            write_png(Path::new(a(2)?), &h.texture(a(1)?)?)?;
+            let img = h.texture(a(1)?)?;
+            let n = (img.rgba.len() / 4).max(1);
+            let zero = img.rgba.chunks_exact(4).filter(|p| p[3] == 0).count();
+            let full = img.rgba.chunks_exact(4).filter(|p| p[3] == 255).count();
+            println!("{}: {}x{} alpha 0 in {:.0}%, 255 in {:.0}%", a(1)?, img.width, img.height, zero as f32 * 100.0 / n as f32, full as f32 * 100.0 / n as f32);
+            if let Ok(out) = a(2) {
+                write_png(Path::new(out), &img)?;
+            }
         }
         Some("ht-geom") => {
             let h = ht::HydroThunder::open(&riptide_assets::default_gdi_path())?;

@@ -12,6 +12,9 @@ pub enum Blend {
     Blend,
     /// Additive (glows, flares).
     Add,
+    /// Opaque whatever the texture's alpha holds (Hydro Thunder materials that ignore it: the
+    /// alpha marks lit windows and the like, not holes).
+    Solid,
 }
 
 #[derive(Debug, Clone, Default)]

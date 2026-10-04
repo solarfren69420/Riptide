@@ -83,6 +83,10 @@ pub fn decode_geometry_at(obj: &R2Object, base: usize, all_groups: bool) -> Resu
         let Some(polys) = obj.ptr(rb + 4) else { continue };
         let mat = obj.ptr(rb + 8);
         let texture = mat.and_then(|m| obj.external_at(m + 0x14)).map(str::to_string);
+        // Material +0x00 low half: render flags. 0x10 ignores the texture's alpha (Tinytanic's hull
+        // and windows, ramp tops: their alpha marks lights, mostly zero); 0x01 alone uses it as
+        // cut-out coverage (flags, parrots, signs); 0x08 marks effects (fire, glows, gulls).
+        let solid = mat.and_then(|m| obj.u32(m)).is_some_and(|w| w & 0x10 != 0);
         let mut part = MeshPart { texture, ..Default::default() };
         for p in 0..npoly.min(65_536) {
             let pb = polys + p * 48;
@@ -127,7 +131,7 @@ pub fn decode_geometry_at(obj: &R2Object, base: usize, all_groups: bool) -> Resu
             part.indices.extend([base, base + 1, base + 2]);
         }
         if !part.indices.is_empty() {
-            part.blend = Blend::Opaque;
+            part.blend = if solid { Blend::Solid } else { Blend::Opaque };
             part.double_sided = true;
             model.parts.push(part);
         }
@@ -139,7 +143,7 @@ pub fn decode_geometry_at(obj: &R2Object, base: usize, all_groups: bool) -> Resu
         // Thousands of records: one part per texture keeps the draw count sane.
         let mut merged: Vec<MeshPart> = Vec::new();
         for p in model.parts.drain(..) {
-            match merged.iter_mut().find(|m| m.texture == p.texture) {
+            match merged.iter_mut().find(|m| m.texture == p.texture && m.blend == p.blend) {
                 Some(m) => {
                     let base = m.positions.len() as u32;
                     m.positions.extend(p.positions);

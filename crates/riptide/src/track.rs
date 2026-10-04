@@ -65,6 +65,25 @@ mod tests {
         assert_eq!(track.point_at(outside,1.0).x,22.0);
         assert!(track.locate(Vec3::new(5.0,0.0,5.0),0).branch.is_none());
     }
+
+    #[test]
+    fn reversed_cross_sections_are_turned_by_majority() {
+        let e = |z: f32, flip: bool| {
+            let (a, b) = ([0.0, 0.0, z], [10.0, 0.0, z]);
+            let (start, end) = if flip { (b, a) } else { (a, b) };
+            Edge { start, end, water: 0.0 }
+        };
+        // A reversed edge in the middle.
+        let mut t = Track::new(vec![e(0.0, false), e(10.0, false), e(20.0, true), e(30.0, false)]);
+        t.lanes = vec![[0.1, 0.4]; 4];
+        assert_eq!(t.orient(), 1);
+        assert_eq!(t.edges[2].start, [0.0, 0.0, 20.0]);
+        assert_eq!(t.lanes[2], [0.6, 0.9]);
+        // The first edge is the odd one out: it turns, not the rest.
+        let mut t = Track::new(vec![e(0.0, true), e(10.0, false), e(20.0, false), e(30.0, false)]);
+        assert_eq!(t.orient(), 1);
+        assert_eq!(t.edges[0].start, [0.0, 0.0, 0.0]);
+    }
 }
 
 impl Track {
@@ -76,6 +95,31 @@ impl Track {
         }
         let looped = edges.len() > 3 && Self::mid_of(&edges[0]).distance(Self::mid_of(&edges[edges.len() - 1])) < 2500.0;
         Self { edges, dist, looped, laps: if looped { 3 } else { 1 }, starts: Vec::new(), lanes: Vec::new(), finish: None, open: false, branches: Vec::new() }
+    }
+
+    /// Make every cross-section run the same way across the course as the one before it (a
+    /// reversed one twists both neighbouring quads into bow-ties and flips the lanes there:
+    /// Ship Graveyard's edge 94). The AI lane band flips with it. Returns how many were turned.
+    pub fn orient(&mut self) -> usize {
+        let across = |e: &Edge| Vec2::new(e.end[0] - e.start[0], e.end[2] - e.start[2]);
+        // Which edges disagree with the first, following the chain; the majority way wins (New
+        // York's first edge is the reversed one).
+        let mut flip = vec![false; self.edges.len()];
+        for i in 1..self.edges.len() {
+            let agree = across(&self.edges[i]).dot(across(&self.edges[i - 1])) >= 0.0;
+            flip[i] = if agree { flip[i - 1] } else { !flip[i - 1] };
+        }
+        if flip.iter().filter(|f| **f).count() * 2 > flip.len() {
+            flip.iter_mut().for_each(|f| *f = !*f);
+        }
+        for (i, _) in flip.iter().enumerate().filter(|(_, f)| **f) {
+            let e = &mut self.edges[i];
+            std::mem::swap(&mut e.start, &mut e.end);
+            if let Some(l) = self.lanes.get_mut(i) {
+                *l = [1.0 - l[1], 1.0 - l[0]];
+            }
+        }
+        flip.iter().filter(|f| **f).count()
     }
 
     /// Total race distance covered by a boat on `lap` at `progress`.

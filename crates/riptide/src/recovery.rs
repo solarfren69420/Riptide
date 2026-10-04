@@ -123,11 +123,21 @@ pub fn recover(
 fn respawn(b: &mut Boat, track: &Track, col: Option<&Collider>) {
     let tp = b.tp;
     let r = phy::BOAT_RADIUS * b.info.scale.min(1.3);
-    let spot = [0.5, 0.35, 0.65, 0.2, 0.8]
-        .into_iter()
-        .map(|u| track.point_at(tp, u))
-        .find(|p| col.is_none_or(|c| !c.blocked(*p, r, tp.forward)))
-        .unwrap_or_else(|| track.point_at(tp, 0.5));
+    let lanes: Vec<Vec3> = [0.5, 0.35, 0.65, 0.2, 0.8].into_iter().map(|u| track.point_at(tp, u)).collect();
+    let free = |p: &Vec3| col.is_none_or(|c| !c.blocked(*p, r, tp.forward));
+    // Prefer a lane with open water ahead: one that is free but faces a wall repeats the crash.
+    let open = |p: &Vec3| {
+        col.is_none_or(|c| {
+            let eye = *p + Vec3::Y * c.cuts()[0];
+            c.hit(eye, eye + Vec3::new(tp.forward.x, 0.0, tp.forward.y) * phy::RESPAWN_CLEAR_AHEAD).is_none()
+        })
+    };
+    let spot = lanes
+        .iter()
+        .find(|p| free(p) && open(p))
+        .or_else(|| lanes.iter().find(|p| free(p)))
+        .copied()
+        .unwrap_or(lanes[0]);
     if std::env::var_os("RIPTIDE_PROBE").is_some() && b.player {
         info!("RECOVER respawn from {:.0} {:.0} {:.0} to {:.0} {:.0} {:.0} (seg {})", b.pos.x, b.pos.y, b.pos.z, spot.x, spot.y, spot.z, tp.seg);
     }
