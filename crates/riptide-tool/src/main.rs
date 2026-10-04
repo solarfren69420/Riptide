@@ -274,6 +274,13 @@ fn main() -> Result<()> {
             }
             // NEAR="x,z" (Riptide world units): the instances (placed scenery) within 400 of it.
             if let Some((px, pz)) = std::env::var("NEAR").ok().and_then(|s| { let (a, b) = s.split_once(',')?; Some((a.parse::<f32>().ok()? / 1.6, b.parse::<f32>().ok()? / 1.6)) }) {
+                for (i, [a, b]) in t.river.iter().enumerate() {
+                    let mid = |e: &riptide_assets::h2level::Edge| [(e.start[0] + e.end[0]) / 2.0, (e.start[2] + e.end[2]) / 2.0];
+                    let d = |m: [f32; 2]| ((m[0] - px).powi(2) + (m[1] - pz).powi(2)).sqrt();
+                    if d(mid(a)).min(d(mid(b))) < 1500.0 / 1.6 {
+                        println!("  river {i}: water {:.1} -> {:.1} (world {:.0} -> {:.0}), y at banks {:.1} {:.1}", a.water, b.water, a.water * 1.6, b.water * 1.6, a.start[1], a.end[1]);
+                    }
+                }
                 for inst in &t.instances {
                     let d = ((inst.position[0] - px).powi(2) + (inst.position[2] - pz).powi(2)).sqrt();
                     if d < 400.0 / 1.6 {

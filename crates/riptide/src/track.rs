@@ -154,7 +154,9 @@ impl Track {
         let l = v2(a.start).lerp(v2(b.start), s);
         let r = v2(a.end).lerp(v2(b.end), s);
         let p = l.lerp(r, u);
-        Vec3::new(p.x, a.water + (b.water - a.water) * s, p.y)
+        // Same waterfall rule as `locate`: the upper level holds to the edge.
+        let water = if a.water - b.water > crate::sheets::physics::WATERFALL_DROP { a.water } else { a.water + (b.water - a.water) * s };
+        Vec3::new(p.x, water, p.y)
     }
 
     pub fn point_at(&self, at: TrackPos, u: f32) -> Vec3 {

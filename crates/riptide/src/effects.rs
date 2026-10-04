@@ -332,7 +332,7 @@ fn emit_flames(
     mut flames: ResMut<FlameArt>,
     mut models: Models,
     live: Query<&Flame>,
-    mut boats: Query<(&Boat, &mut Emitter, Option<&crate::boatrig::BoatRig>)>,
+    mut boats: Query<(&Boat, &mut Emitter, Option<&crate::boatrig::BoatRig>, Option<&crate::race::Stern>)>,
     places: bevy::transform::helper::TransformHelper,
 ) {
     let Some(art) = art else { return };
@@ -346,8 +346,8 @@ fn emit_flames(
         (seed % 10_000) as f32 / 10_000.0 * 2.0 - 1.0
     };
     let mut emitters: Vec<_> = boats.iter_mut().collect();
-    emitters.sort_by_key(|(b, _, _)| !b.player);
-    for (b, mut em, rig) in emitters {
+    emitters.sort_by_key(|(b, _, _, _)| !b.player);
+    for (b, mut em, rig, stern) in emitters {
         let def = b.info.def;
         let flame = if b.super_time > 0.0 {
             def.flamedef_super.or(def.flamedef_boost)
@@ -366,7 +366,10 @@ fn emit_flames(
         let back = rot * Vec3::Z;
         // The boat's own rocket nozzle bones (RKBOOST_*, RKSUPERBOOST for gold boost); boats
         // without a rig use the stern estimate (physics.rocket_nozzle_height).
-        let fallback = b.pos + rot * Vec3::new(0.0, phy::ROCKET_NOZZLE_HEIGHT, -def.rooster_offset_z) * s;
+        let fallback = match stern {
+            Some(st) => b.pos + rot * st.0,
+            None => b.pos + rot * Vec3::new(0.0, phy::ROCKET_NOZZLE_HEIGHT, -def.rooster_offset_z) * s,
+        };
         let nozzles: Vec<(Vec3, Vec3)> = match rig {
             Some(r) => {
                 let ids: Vec<Entity> = match (b.super_time > 0.0, r.super_nozzle) {

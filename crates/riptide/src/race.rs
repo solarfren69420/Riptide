@@ -233,7 +233,31 @@ impl PathMover {
     }
 }
 
-fn move_props(time: Res<Time>, mut q: Query<(&mut PathMover, &mut Transform)>) {
+/// A level prop turned and/or slid by its controllers (`Spin`, `Slide`) about where it was placed.
+#[derive(Component)]
+struct Motion {
+    base: Transform,
+    spin: Option<riptide_assets::h2level::Spin>,
+    slide: Option<riptide_assets::h2level::Slide>,
+}
+
+fn move_props(time: Res<Time>, mut q: Query<(&mut PathMover, &mut Transform)>, mut motions: Query<(&Motion, &mut Transform), Without<PathMover>>) {
+    let t = time.elapsed_secs();
+    for (m, mut tf) in &mut motions {
+        let mut out = m.base;
+        if let Some(s) = m.slide {
+            // 0 -> distance -> 0 once per round trip; eased (cosine) or at constant speed.
+            let f = (s.phase + t * s.round_trips_per_second).rem_euclid(1.0);
+            let k = if s.eased { 0.5 - 0.5 * (f * std::f32::consts::TAU).cos() } else { 1.0 - (2.0 * f - 1.0).abs() };
+            out.translation += m.base.rotation * (Vec3::from(s.axis) * s.distance * k);
+        }
+        if let Some(s) = m.spin {
+            let a = (s.phase + t * s.revs_per_second) * std::f32::consts::TAU;
+            out.rotation = m.base.rotation * Quat::from_axis_angle(Vec3::from(s.axis), a);
+        }
+        *tf = out;
+    }
+
     let dt = time.delta_secs().min(1.0 / 20.0);
     for (mut m, mut tf) in &mut q {
         m.d += m.speed * dt;
@@ -344,7 +368,7 @@ fn spawn_race(
                     for [a, b] in &t.river {
                         let drop = (a.water - b.water) * s > phy::WATERFALL_DROP;
                         let lift = |p: [f32; 3], y: f32| [p[0] * s, y * s, p[2] * s];
-                        level.water.push(Quad { corners: [sc(a.start), sc(a.end), lift(b.end, if drop { a.water } else { b.water }), lift(b.start, if drop { a.water } else { b.water })] });
+                        level.water.push(Quad { corners: [lift(a.start, a.water), lift(a.end, a.water), lift(b.end, if drop { a.water } else { b.water }), lift(b.start, if drop { a.water } else { b.water })] });
                         if drop {
                             level.waterfalls.push(Quad { corners: [lift(b.start, a.water), lift(b.end, a.water), sc(b.end), sc(b.start)] });
                         }
@@ -446,6 +470,7 @@ fn spawn_race(
     }
     // Props.
     let mut animated = 0;
+    let mut moving = 0;
     for prop in &level.props {
         let Some(p) = models.lux(&prop.mesh) else { continue };
         let mover = prop.path.as_ref().map(|path| PathMover::new(path, Vec3::from(prop.position), prop.scale));
@@ -460,6 +485,12 @@ fn spawn_race(
             .id();
         if let Some(m) = mover {
             commands.entity(e).insert(m);
+        } else if prop.spin.is_some() || prop.slide.is_some() {
+            let base = Transform::from_translation(Vec3::from(prop.position))
+                .with_rotation(Quat::from_array(prop.rotation).normalize())
+                .with_scale(Vec3::splat(prop.scale.max(0.01)));
+            commands.entity(e).insert(Motion { base, spin: prop.spin, slide: prop.slide });
+            moving += 1;
         }
         // Animated props (sawblades, spike blocks, cranes, wildlife) play their clip on their own
         // skeleton; the rest are drawn whole.
@@ -471,8 +502,8 @@ fn spawn_race(
             None => attach(&mut commands, e, &p),
         }
     }
-    if animated > 0 {
-        info!("{code}: {animated} animated props");
+    if animated + moving > 0 {
+        info!("{code}: {animated} animated props, {moving} spinning or sliding");
     }
     if matches!(choice.source, CourseSource::Sandbox { .. }) {
         spawn_hackworld(&mut commands, &mut models, scope.clone());
@@ -718,6 +749,14 @@ fn spawn_race(
             }
             None => {
                 if let Some(p) = pieces {
+                    // No rocket nozzle bones: boost flames come out of the hull's stern, half-way up.
+                    let bounds = p.iter().filter_map(|pc| bevy::camera::primitives::MeshAabb::compute_aabb(models.meshes.get(&pc.mesh)?)).fold(None, |acc: Option<(Vec3, Vec3)>, a| {
+                        let (lo, hi) = (Vec3::from(a.min()), Vec3::from(a.max()));
+                        Some(acc.map_or((lo, hi), |(l, h)| (l.min(lo), h.max(hi))))
+                    });
+                    if let Some((lo, hi)) = bounds {
+                        commands.entity(e).insert(Stern(Vec3::new((lo.x + hi.x) * 0.5, (lo.y + hi.y) * 0.5, hi.z) * info.scale));
+                    }
                     attach(&mut commands, model, &p);
                 }
             }
@@ -806,9 +845,13 @@ fn spawn_water(commands: &mut Commands, models: &mut Models, level: &H2Level, tr
     let mut positions: Vec<[f32; 3]> = Vec::new();
     let mut uvs: Vec<[f32; 2]> = Vec::new();
     let mut indices: Vec<u32> = Vec::new();
-    // Each quad is split into a grid so the surface can carry waves.
-    let sub = (phy::WATER_SUBDIV as u32).max(1);
+    // Each quad is split into a grid fine enough to carry the waves the boats bob on: cells no
+    // bigger than water_cell (a fixed count left Hydro Thunder's huge river quads with cells
+    // longer than a wave, so the drawn surface missed the waves and boats sank into it).
     let mut quad = |c: [[f32; 3]; 4]| {
+        let side = |a: [f32; 3], b: [f32; 3]| Vec2::new(a[0] - b[0], a[2] - b[2]).length();
+        let longest = side(c[0], c[1]).max(side(c[1], c[2])).max(side(c[2], c[3])).max(side(c[3], c[0]));
+        let sub = ((longest / phy::WATER_CELL.max(1.0)).ceil() as u32).clamp((phy::WATER_SUBDIV as u32).max(1), 96);
         let base = positions.len() as u32;
         let lerp = |a: [f32; 3], b: [f32; 3], t: f32| [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
         for j in 0..=sub {
@@ -1588,6 +1631,10 @@ fn pickups(
 /// How far a boat's hull reaches below its model origin (world units).
 #[derive(Component)]
 pub struct Hull(pub f32);
+
+/// Where a boat without a rig's boost flames start: its hull's stern (boat-local, scaled).
+#[derive(Component)]
+pub struct Stern(pub Vec3);
 
 pub(crate) fn place_boats(time: Res<Time>, tuning: Res<Tuning>, mut boats: Query<(&mut Boat, &mut Transform, Option<&Hull>)>) {
     let dt = time.delta_secs().min(1.0 / 20.0);
@@ -2510,7 +2557,7 @@ fn sky_cubemap(sun: Vec3, sun_color: Color) -> Image {
 
 impl Collider {
     /// Highest floor under (x, z) that is no higher than `max_y`.
-    fn floor(&self, x: f32, z: f32, max_y: f32) -> Option<f32> {
+    pub(crate) fn floor(&self, x: f32, z: f32, max_y: f32) -> Option<f32> {
         if let Some(p) = &self.parry {
             return p.floors.down(Vec3::new(x, max_y, z), 1.0e6).map(|d| max_y - d);
         }
@@ -2846,14 +2893,19 @@ fn probe(time: Res<Time>, clock: Res<RaceClock>, track: Res<Track>, collider: Op
     st.frame += 1;
     if st.frame % 20 == 0 {
         info!(
-            "PROBE done {:.0}% finished {} contacts {} stall {:.1}s launches {} max_air {:.0} crossings {}",
+            "PROBE done {:.0}% finished {} contacts {} stall {:.1}s launches {} max_air {:.0} crossings {} at {:.0} {:.1} {:.0} water {:.1} ground {:?}",
             st.best.min(100.0),
             b.finished.is_some(),
             b.contacts,
             st.stall,
             st.launches,
             st.max_air,
-            st.crossings
+            st.crossings,
+            b.pos.x,
+            b.pos.y,
+            b.pos.z,
+            b.tp.water,
+            collider.as_ref().and_then(|c| c.floor(b.pos.x, b.pos.z, b.pos.y + 300.0))
         );
     }
 }

@@ -106,6 +106,13 @@ pub fn load_list(lux: &LuxArchive, name: &str) -> Result<Vec<XmlObject>> {
     parse_object_list(&String::from_utf8_lossy(blob))
 }
 
+/// [`load_list`] with every declared property present (its `DEFAULT` comment when unset): the
+/// game's own values, not ours.
+pub fn load_list_with_defaults(lux: &LuxArchive, name: &str) -> Result<Vec<XmlObject>> {
+    let blob = lux.get(&format!("data.{name}")).with_context(|| format!("data.{name} missing"))?;
+    parse_object_list_with_defaults(&String::from_utf8_lossy(blob))
+}
+
 #[derive(Debug, Clone)]
 pub struct Placement {
     pub mesh: String,
@@ -117,6 +124,30 @@ pub struct Placement {
     /// A looping clip on the object's own skeleton (`Animation`: sawblades, spike blocks,
     /// cranes, wildlife).
     pub anim: Option<PropAnim>,
+    /// `CSEntityController_Rotate`: turning about a local axis (signs, wheels, fans).
+    pub spin: Option<Spin>,
+    /// `CSEntityController_Slide`: sliding back and forth along a local axis.
+    pub slide: Option<Slide>,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct Spin {
+    /// Local axis, Z mirrored like everything else.
+    pub axis: [f32; 3],
+    pub revs_per_second: f32,
+    /// Starting turn, a fraction of a revolution.
+    pub phase: f32,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct Slide {
+    pub axis: [f32; 3],
+    /// How far it travels from its placed position (units).
+    pub distance: f32,
+    pub round_trips_per_second: f32,
+    pub phase: f32,
+    /// Interpolation Type 1: eased at the ends; 0: constant speed.
+    pub eased: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -219,8 +250,10 @@ pub fn load_level(lux: &LuxArchive, code: &str) -> Result<H2Level> {
         .filter_map(|o| Some((o.name.clone(), o.get("Mesh Name 1")?.to_string())))
         .collect();
 
-    if let Ok(objs) = load_list(lux, &format!("{code}_worldobs")) {
+    if let Ok(objs) = load_list_with_defaults(lux, &format!("{code}_worldobs")) {
         let paths = motion_paths(&objs);
+        let spins = spin_controllers(&objs);
+        let slides = slide_controllers(&objs);
         let buoys: Vec<[f32; 3]> = objs
             .iter()
             .filter(|o| o.name.to_ascii_lowercase().contains("finish"))
@@ -245,12 +278,13 @@ pub fn load_level(lux: &LuxArchive, code: &str) -> Result<H2Level> {
                 .get("Controllers")
                 .and_then(|cs| cs.iter().find_map(|c| paths.get(c.as_str())))
                 .cloned();
+            let (spin, slide) = (controlled(o, &spins), controlled(o, &slides));
             let anim = o.get("Animation").filter(|a| !a.is_empty()).map(|clip| PropAnim {
                 clip: clip.to_string(),
                 speed: o.f32("Anim Speed x").unwrap_or(1.0),
                 start: o.f32("Anim Start").unwrap_or(0.0),
             });
-            let placement = Placement { mesh, position, rotation, scale, path, anim };
+            let placement = Placement { mesh, position, rotation, scale, path, anim, spin, slide };
             if o.class == "CBooster" {
                 let kind = match o.f32("Type").map(|t| t as i32).unwrap_or(0) {
                     1 => BoostKind::Red,
@@ -284,6 +318,8 @@ pub fn load_level(lux: &LuxArchive, code: &str) -> Result<H2Level> {
                         scale: info.f32(&format!("Skybox {i} Scale")).unwrap_or(1.0),
                         path: None,
                         anim: None,
+                        spin: None,
+                        slide: None,
                     });
                 }
             }
@@ -320,7 +356,8 @@ fn motion_paths(objs: &[XmlObject]) -> HashMap<String, MotionPath> {
     let points: HashMap<&str, &XmlObject> =
         objs.iter().filter(|o| o.class == "CSPathPoint").map(|o| (o.name.as_str(), o)).collect();
     let mut out = HashMap::new();
-    for c in objs.iter().filter(|o| o.class == "CSEntityController_Path") {
+    // Entity paths and game-mesh paths (London's paddleboats, Hong Kong's traffic) share the fields.
+    for c in objs.iter().filter(|o| o.class == "CSEntityController_Path" || o.class == "CGMController_Path") {
         let Some(start) = c.get("Path Object") else { continue };
         let mut chain = Vec::new();
         let mut seen = std::collections::HashSet::new();
@@ -415,4 +452,48 @@ fn racing_line(ai: &[XmlObject], start: Option<[f32; 3]>, sector_class: &str) ->
         }
     }
     line
+}
+
+/// Controller axis `0` / `1` / `2` (X / Y / Z) in output space (Z mirrored).
+fn axis(i: i32) -> [f32; 3] {
+    match i {
+        0 => [1.0, 0.0, 0.0],
+        1 => [0.0, 1.0, 0.0],
+        _ => [0.0, 0.0, -1.0],
+    }
+}
+
+fn spin_controllers(objs: &[XmlObject]) -> HashMap<String, Spin> {
+    objs.iter()
+        .filter(|o| o.class == "CSEntityController_Rotate")
+        .map(|c| {
+            let spin = Spin {
+                axis: axis(c.f32("Rotation Axis").unwrap_or(2.0) as i32),
+                revs_per_second: c.f32("Revolutions per Second").unwrap_or(0.0),
+                phase: c.f32("Phase").unwrap_or(0.0),
+            };
+            (c.name.clone(), spin)
+        })
+        .collect()
+}
+
+fn slide_controllers(objs: &[XmlObject]) -> HashMap<String, Slide> {
+    objs.iter()
+        .filter(|o| o.class == "CSEntityController_Slide")
+        .map(|c| {
+            let slide = Slide {
+                axis: axis(c.f32("Slide Axis").unwrap_or(0.0) as i32),
+                distance: c.f32("Slide Distance").unwrap_or(0.0),
+                round_trips_per_second: c.f32("Round Trips Per Second").unwrap_or(0.0),
+                phase: c.f32("Phase").unwrap_or(0.0),
+                eased: c.f32("Interpolation Type").unwrap_or(0.0) as i32 == 1,
+            };
+            (c.name.clone(), slide)
+        })
+        .collect()
+}
+
+/// The first of `o`'s `Controllers` found in `by_name`.
+fn controlled<T: Clone>(o: &XmlObject, by_name: &HashMap<String, T>) -> Option<T> {
+    o.props.get("Controllers").and_then(|cs| cs.iter().find_map(|c| by_name.get(c.as_str()))).cloned()
 }

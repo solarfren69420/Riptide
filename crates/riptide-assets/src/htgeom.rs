@@ -86,7 +86,15 @@ pub fn decode_geometry_at(obj: &R2Object, base: usize, all_groups: bool) -> Resu
         // Material +0x00 low half: render flags. 0x10 ignores the texture's alpha (Tinytanic's hull
         // and windows, ramp tops: their alpha marks lights, mostly zero); 0x01 alone uses it as
         // cut-out coverage (flags, parrots, signs); 0x08 marks effects (fire, glows, gulls).
-        let solid = mat.and_then(|m| obj.u32(m)).is_some_and(|w| w & 0x10 != 0);
+        let flags = mat.and_then(|m| obj.u32(m)).unwrap_or(0) & 0xffff;
+        let blend = if flags & 0x10 != 0 {
+            Blend::Solid
+        } else if flags & 0x08 != 0 {
+            // Translucent: waterfalls, spray, fire, glows. As a cut-out most of it vanished.
+            Blend::Blend
+        } else {
+            Blend::Opaque
+        };
         let mut part = MeshPart { texture, ..Default::default() };
         for p in 0..npoly.min(65_536) {
             let pb = polys + p * 48;
@@ -131,7 +139,7 @@ pub fn decode_geometry_at(obj: &R2Object, base: usize, all_groups: bool) -> Resu
             part.indices.extend([base, base + 1, base + 2]);
         }
         if !part.indices.is_empty() {
-            part.blend = if solid { Blend::Solid } else { Blend::Opaque };
+            part.blend = blend;
             part.double_sided = true;
             model.parts.push(part);
         }

@@ -27,6 +27,8 @@ pub struct Recovery {
     /// Turning to face the course: target yaw and seconds left.
     turn: Option<(f32, f32)>,
     pub respawns: u32,
+    /// Race distance of the last recovery (a second one close by moves the boat on).
+    last_at: Option<f32>,
 }
 
 fn wrap(a: f32) -> f32 {
@@ -103,7 +105,11 @@ pub fn recover(
                 r.watch = Some((b.pos, 0.0));
                 let geiger = r.meter.count_ones() as f32 / 64.0;
                 if geiger > g.antistuck_coll_geiger {
-                    respawn(&mut b, &track, collider.as_deref());
+                    // Recovered here before: that spot traps it, so put it further along.
+                    let here = track.race_distance(b.lap, b.tp.progress);
+                    let skip = if r.last_at.is_some_and(|d| (here - d).abs() < phy::RESPAWN_SKIP) { phy::RESPAWN_SKIP } else { 0.0 };
+                    respawn(&mut b, &track, collider.as_deref(), skip);
+                    r.last_at = Some(here);
                     r.respawns += 1;
                     r.turn = None;
                     r.watch = None;
@@ -120,8 +126,16 @@ pub fn recover(
 /// clearest lane nearby when something stands there. (The original uses the boat's last path
 /// node, FUN_004bf3e0; the start of Riptide's much longer segments threw boats back too far:
 /// 13 finishes instead of 18.)
-fn respawn(b: &mut Boat, track: &Track, col: Option<&Collider>) {
-    let tp = b.tp;
+fn respawn(b: &mut Boat, track: &Track, col: Option<&Collider>, skip: f32) {
+    let tp = if skip > 0.0 {
+        // `skip` further along the course (not past its end).
+        let at = (b.tp.progress + skip).min(track.length() - 1.0);
+        let seg = track.dist.windows(2).position(|w| at < w[1]).unwrap_or(track.last_seg());
+        let s = (at - track.dist[seg]) / (track.dist[seg + 1] - track.dist[seg]).max(1e-3);
+        track.locate(track.point(seg, s.clamp(0.0, 1.0), 0.5), seg)
+    } else {
+        b.tp
+    };
     let r = phy::BOAT_RADIUS * b.info.scale.min(1.3);
     let lanes: Vec<Vec3> = [0.5, 0.35, 0.65, 0.2, 0.8].into_iter().map(|u| track.point_at(tp, u)).collect();
     let free = |p: &Vec3| col.is_none_or(|c| !c.blocked(*p, r, tp.forward));
