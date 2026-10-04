@@ -128,6 +128,8 @@ pub struct Placement {
     pub spin: Option<Spin>,
     /// `CSEntityController_Slide`: sliding back and forth along a local axis.
     pub slide: Option<Slide>,
+    /// A physics object (mesh def Physics Type 1 or 2): boats collide with it and ride over it.
+    pub solid: bool,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -244,11 +246,13 @@ pub fn load_level(lux: &LuxArchive, code: &str) -> Result<H2Level> {
     let prefix = format!("sg_{code}_");
     lvl.sector_meshes = lux.names_of_kind("mesh32").filter(|n| n.starts_with(&prefix)).map(str::to_string).collect();
 
-    let mesh_defs: HashMap<String, String> = load_list(lux, "global_GameMeshDef")
-        .unwrap_or_default()
-        .into_iter()
-        .filter_map(|o| Some((o.name.clone(), o.get("Mesh Name 1")?.to_string())))
-        .collect();
+    let defs = load_list_with_defaults(lux, "global_GameMeshDef").unwrap_or_default();
+    let mesh_defs: HashMap<String, String> =
+        defs.iter().filter_map(|o| Some((o.name.clone(), o.get("Mesh Name 1").filter(|m| !m.is_empty())?.to_string()))).collect();
+    // Physics Type 1 (moored boats) and 2 (floating logs, rafts, crates, houseboats) are things
+    // boats hit and ride over; 0 is scenery.
+    let solid_defs: std::collections::HashSet<String> =
+        defs.iter().filter(|o| matches!(o.f32("Physics Type").map(|t| t as i32), Some(1 | 2))).map(|o| o.name.clone()).collect();
 
     if let Ok(objs) = load_list_with_defaults(lux, &format!("{code}_worldobs")) {
         let paths = motion_paths(&objs);
@@ -284,7 +288,8 @@ pub fn load_level(lux: &LuxArchive, code: &str) -> Result<H2Level> {
                 speed: o.f32("Anim Speed x").unwrap_or(1.0),
                 start: o.f32("Anim Start").unwrap_or(0.0),
             });
-            let placement = Placement { mesh, position, rotation, scale, path, anim, spin, slide };
+            let solid = o.get("Game Mesh Def").is_some_and(|d| solid_defs.contains(d));
+            let placement = Placement { mesh, position, rotation, scale, path, anim, spin, slide, solid };
             if o.class == "CBooster" {
                 let kind = match o.f32("Type").map(|t| t as i32).unwrap_or(0) {
                     1 => BoostKind::Red,
@@ -320,6 +325,7 @@ pub fn load_level(lux: &LuxArchive, code: &str) -> Result<H2Level> {
                         anim: None,
                         spin: None,
                         slide: None,
+                        solid: false,
                     });
                 }
             }

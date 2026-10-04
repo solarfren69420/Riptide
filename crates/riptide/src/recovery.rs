@@ -29,6 +29,9 @@ pub struct Recovery {
     pub respawns: u32,
     /// Race distance of the last recovery (a second one close by moves the boat on).
     last_at: Option<f32>,
+    /// Furthest race distance reached, and seconds since it last grew by recovery_progress.
+    best: f32,
+    since: f32,
 }
 
 fn wrap(a: f32) -> f32 {
@@ -58,7 +61,9 @@ pub fn recover(
         r.contacts = b.contacts;
         r.meter = (r.meter << 1) | touched as u64;
         let racing = clock.t >= 0.0 && b.finished.is_none() && !b.timed_out;
-        if !racing || (b.player && phy::RECOVERY_PLAYER < 0.5) {
+        // A ramp test (RIPTIDE_TEST_RAMP) aims the player itself.
+        let testing = b.player && std::env::var_os("RIPTIDE_TEST_RAMP").is_some();
+        if !racing || testing || (b.player && phy::RECOVERY_PLAYER < 0.5) {
             *r = Recovery { contacts: r.contacts, meter: r.meter, respawns: r.respawns, ..default() };
             continue;
         }
@@ -105,21 +110,39 @@ pub fn recover(
                 r.watch = Some((b.pos, 0.0));
                 let geiger = r.meter.count_ones() as f32 / 64.0;
                 if geiger > g.antistuck_coll_geiger {
-                    // Recovered here before: that spot traps it, so put it further along.
-                    let here = track.race_distance(b.lap, b.tp.progress);
-                    let skip = if r.last_at.is_some_and(|d| (here - d).abs() < phy::RESPAWN_SKIP) { phy::RESPAWN_SKIP } else { 0.0 };
-                    respawn(&mut b, &track, collider.as_deref(), skip);
-                    r.last_at = Some(here);
-                    r.respawns += 1;
-                    r.turn = None;
-                    r.watch = None;
-                    r.meter = 0;
+                    recover_boat(&mut b, &mut r, &track, collider.as_deref());
                 }
             } else {
                 r.watch = Some((anchor, t + dt));
             }
         }
+
+        // No progress at all (circling, wedged in the air): Riptide's backstop to the original rules.
+        let here = track.race_distance(b.lap, b.tp.progress);
+        if here > r.best + phy::RECOVERY_PROGRESS {
+            r.best = here;
+            r.since = 0.0;
+        } else {
+            r.since += dt;
+        }
+        if r.since > phy::RECOVERY_NO_PROGRESS_TIME {
+            recover_boat(&mut b, &mut r, &track, collider.as_deref());
+        }
     }
+}
+
+/// Put the boat back on the course; a second recovery close to the last one moves it on.
+fn recover_boat(b: &mut Boat, r: &mut Recovery, track: &Track, col: Option<&Collider>) {
+    let here = track.race_distance(b.lap, b.tp.progress);
+    let skip = if r.last_at.is_some_and(|d| (here - d).abs() < phy::RESPAWN_SKIP) { phy::RESPAWN_SKIP } else { 0.0 };
+    respawn(b, track, col, skip);
+    r.last_at = Some(here);
+    r.respawns += 1;
+    r.turn = None;
+    r.watch = None;
+    r.meter = 0;
+    r.since = 0.0;
+    r.best = track.race_distance(b.lap, b.tp.progress);
 }
 
 /// Back on the course where the boat is, facing along it: the middle of the course, or the

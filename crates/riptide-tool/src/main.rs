@@ -176,6 +176,31 @@ fn main() -> Result<()> {
             let yaw: f32 = args.get(3).and_then(|s| s.parse().ok()).unwrap_or(35.0);
             write_png(Path::new(a(2)?), &render(&m, &tex, yaw, 25.0, 768))?;
         }
+        Some("h2o-track") => {
+            // h2o-track <pid> [seconds]: log the running H2Overdrive player boat 30 times a second
+            // (reads /proc/<pid>/mem, never pauses the game): time, x y z (game space), speed, state.
+            // Player boat [0x793EB0]; position +0xA0..A8, speed +0x1394, state +0x588.
+            use std::io::{Read, Seek, SeekFrom};
+            let mut mem = std::fs::File::open(format!("/proc/{}/mem", a(1)?))?;
+            let secs: f32 = args.get(2).and_then(|s| s.parse().ok()).unwrap_or(600.0);
+            let mut read = |addr: u64, n: usize| -> Option<Vec<u8>> {
+                let mut b = vec![0u8; n];
+                mem.seek(SeekFrom::Start(addr)).ok()?;
+                mem.read_exact(&mut b).ok()?;
+                Some(b)
+            };
+            let t0 = std::time::Instant::now();
+            while t0.elapsed().as_secs_f32() < secs {
+                let boat = read(0x793EB0, 4).map(|b| u32::from_le_bytes(b.try_into().unwrap()) as u64).unwrap_or(0);
+                if boat != 0 {
+                    if let (Some(p), Some(s), Some(st)) = (read(boat + 0xa0, 12), read(boat + 0x1394, 4), read(boat + 0x588, 4)) {
+                        let f = |b: &[u8], i: usize| f32::from_le_bytes(b[i * 4..i * 4 + 4].try_into().unwrap());
+                        println!("{:.3} {:.1} {:.1} {:.1} {:.1} {:x}", t0.elapsed().as_secs_f32(), f(&p, 0), f(&p, 1), f(&p, 2), f(&s, 0), u32::from_le_bytes(st.try_into().unwrap()));
+                    }
+                }
+                std::thread::sleep(std::time::Duration::from_millis(33));
+            }
+        }
         Some("kat") => {
             // kat <FILE.KAT> [outdir]: list a Hydro Thunder sound bank; with outdir, write each sample as WAV.
             let g = riptide_assets::gdi::GdRom::open(&riptide_assets::default_gdi_path())?;
@@ -480,6 +505,15 @@ fn main() -> Result<()> {
             missing.sort();
             missing.dedup();
             println!("props with no mesh32: {missing:?}");
+            // NEAR=x,z (Riptide world units): placed props within 800 of it.
+            if let Some((px, pz)) = std::env::var("NEAR").ok().and_then(|s| { let (a, b) = s.split_once(',')?; Some((a.parse::<f32>().ok()?, b.parse::<f32>().ok()?)) }) {
+                for p in lvl.props.iter().chain(lvl.boosters.iter().map(|b| &b.placement)) {
+                    let d = ((p.position[0] - px).powi(2) + (p.position[2] - pz).powi(2)).sqrt();
+                    if d < 800.0 {
+                        println!("  prop {} at {:.0} {:.0} {:.0} scale {:.2} dist {d:.0} anim {:?}", p.mesh, p.position[0], p.position[1], p.position[2], p.scale, p.anim.as_ref().map(|a| &a.clip));
+                    }
+                }
+            }
             if std::env::var_os("EDGES").is_some() {
                 // EDGES=1: every racing-line cross-section: index, mid point, water level.
                 for (i, e) in lvl.path.iter().enumerate() {

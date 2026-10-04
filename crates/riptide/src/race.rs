@@ -35,6 +35,7 @@ impl Plugin for RacePlugin {
                 (
                     player_input,
                     ai_drive,
+                    crate::ramps::ramp_test,
                     boat_physics,
                     boat_contacts,
                     crate::recovery::recover,
@@ -129,6 +130,8 @@ pub struct Boat {
     /// Jumps since leaving the water, and seconds since the last one.
     pub jumps: u32,
     pub jump_t: f32,
+    /// Smoothed rate the surface under the boat rises (ramp launches).
+    pub climb_rate: f32,
 }
 
 #[derive(Default, Clone, Copy)]
@@ -422,6 +425,7 @@ fn spawn_race(
         }
         (_, Some((t, laps))) => {
             track.looped = t.looped;
+            track.gravity = Some(phy::HT_GRAVITY);
             track.laps = (*laps).max(1);
             let s = phy::HT_WORLD_SCALE;
             track.starts = t.starts.iter().map(|(p, yaw)| (Vec3::from(*p) * s, *yaw)).collect();
@@ -455,7 +459,25 @@ fn spawn_race(
                 indices: (0..tris.len() as u32 * 3).collect(),
                 ..Default::default()
             };
-            let model = riptide_assets::model::Model { name: format!("wc_{lvl}"), parts: vec![part], ..Default::default() };
+            let mut model = riptide_assets::model::Model { name: format!("wc_{lvl}"), parts: vec![part], ..Default::default() };
+            // Physics objects (floating logs, rafts, crates, moored boats) are solid: boats hit them
+            // and ride over them, which is where many of the original's jumps come from. They
+            // stay where they were placed (the original floats and pushes them).
+            let mut solid = 0;
+            for prop in level.props.iter().filter(|p| p.solid) {
+                let Some(m) = models.content.lux.get(&format!("mesh32.{}", prop.mesh)).and_then(|b| riptide_assets::h2mesh::decode_mesh(&prop.mesh, b).ok()) else { continue };
+                let place = Transform::from_translation(Vec3::from(prop.position)).with_rotation(Quat::from_array(prop.rotation).normalize()).with_scale(Vec3::splat(prop.scale.max(0.01)));
+                for mut part in m.parts {
+                    for p in &mut part.positions {
+                        *p = place.transform_point(Vec3::from(*p)).to_array();
+                    }
+                    model.parts.push(part);
+                }
+                solid += 1;
+            }
+            if solid > 0 {
+                info!("{lvl}: {solid} solid physics objects");
+            }
             commands.insert_resource(Collider { trusted: true, ..Collider::build(std::slice::from_ref(&model), 1.0, phy::WALL_STEEPNESS, true) });
         }
     }
@@ -733,6 +755,7 @@ fn spawn_race(
                     contacts: 0,
                     jumps: 0,
                     jump_t: 0.0,
+                    climb_rate: 0.0,
                 },
                 scope.clone(),
                 Name::new(info.name.clone()),
@@ -1236,6 +1259,10 @@ fn boat_physics(
     let racing = clock.t >= 0.0;
     for mut b in &mut boats {
         let def = b.info.def;
+        // The boat def's own Gravity (-200 on every boat; measured 198-205 units/s² on the original
+        // Wild America, evidence EVD_GRAVITY), Wipeout Gravity while wiping out.
+        let own = track.gravity.unwrap_or(-def.gravity);
+        let fall = if b.wipeout > 0.0 { own * def.wipeout_gravity / def.gravity.min(-1.0) } else { own };
         let mut c = b.control;
         if !racing || b.finished.is_some() || b.timed_out {
             c = Control { throttle: if b.finished.is_some() { 0.3 } else { 0.0 }, steer: c.steer * 0.3, boost: false, ..default() };
@@ -1278,7 +1305,7 @@ fn boat_physics(
         // Button Hold Time`) trimmed by `Low Jump Upward Vel Atten`.
         b.jump_t += dt;
         if c.jump && b.boosting && racing && b.wipeout <= 0.0 {
-            let lift = |h: f32| (2.0 * phy::GRAVITY * h).sqrt();
+            let lift = |h: f32| (2.0 * fall * h).sqrt();
             if !b.airborne {
                 b.vy = lift(g.target_single_jump_height_sp);
                 b.airborne = true;
@@ -1470,7 +1497,7 @@ fn boat_physics(
             .filter(|_| inside || track.open)
             .and_then(|c| c.floor(b.pos.x, b.pos.z, reach.min(tp.water + phy::FLOOR_MAX_ABOVE_WATER)));
         let water = floor.map_or(tp.water, |f| f.max(tp.water));
-        b.vy -= phy::GRAVITY * dt;
+        b.vy -= fall * dt;
         b.pos.y += b.vy * dt;
         if b.pos.y <= water {
             let was_air = b.airborne;
@@ -1484,13 +1511,6 @@ fn boat_physics(
             }
             b.airborne = false;
         } else if b.pos.y > water + 6.0 {
-            if !b.airborne && b.vy > 0.0 && b.surface > tp.water + 1.0 {
-                // Off a ramp lip (still climbing, leaving a raised floor): TritonGame `Player / AI
-                // Vel Y Min..Max`, by speed (evidence EVD_RAMP_LAUNCH).
-                let (lo, hi) = if b.player { (g.player_vel_y_min, g.player_vel_y_max) } else { (g.ai_vel_y_min, g.ai_vel_y_max) };
-                let unit = (b.speed / top.max(1.0)).clamp(0.0, 1.0);
-                b.vy = b.vy.max(lo + (hi - lo) * unit);
-            }
             b.airborne = true;
         }
         // Test hook: RIPTIDE_TEST_LAUNCH=secs throws the player high once (checking the view from
@@ -1510,11 +1530,16 @@ fn boat_physics(
             // Only a slope launches: a ledge climbed in one frame (rocks, collision-mesh steps,
             // prop edges) is steeper than physics.ramp_max_slope over the distance travelled.
             let run = b.vel.length() * dt;
-            if climb > 0.0 && climb <= run * phy::RAMP_MAX_SLOPE {
-                // Riding up a ramp carries the climb rate into the air at its lip, never faster
-                // than the game's own launch ceiling (TritonGame Player / AI Vel Y Max).
+            // Riding up a ramp carries the climb rate into the air at its lip, never faster than
+            // the game's own launch ceiling (TritonGame Player / AI Vel Y Max). The rate is smoothed
+            // over ramp_climb_smooth: frame to frame the surface steps between triangles, and those
+            // spikes launched boats at the ceiling off gentle ramps (Wild America's first ramp,
+            // slope 0.25: 350 here, 181 in the original at the same speed).
+            let rate = if climb > 0.0 && climb <= run * phy::RAMP_MAX_SLOPE { climb / dt } else { 0.0 };
+            b.climb_rate += (rate - b.climb_rate) * (dt / phy::RAMP_CLIMB_SMOOTH.max(dt)).min(1.0);
+            if rate > 0.0 {
                 let cap = if b.player { g.player_vel_y_max } else { g.ai_vel_y_max };
-                b.vy = b.vy.max((climb / dt).min(cap));
+                b.vy = b.vy.max(b.climb_rate.min(cap));
             }
         }
         b.surface = water;
@@ -1951,7 +1976,7 @@ fn sky_follow(cam: Query<&Transform, With<ChaseCam>>, mut sky: Query<&mut Transf
 pub struct Collider {
     cell: f32,
     grid: std::collections::HashMap<(i32, i32), Vec<u32>>,
-    tris: Vec<[Vec3; 3]>,
+    pub(crate) tris: Vec<[Vec3; 3]>,
     /// Height above the waterline the walls are cut at.
     probe: f32,
     /// A second, lower cut (fraction of `probe`; 0 = none), so low walls and slopes catch too.
@@ -1966,7 +1991,7 @@ pub struct Collider {
     floors: std::collections::HashMap<(i32, i32), Vec<u32>>,
     /// Per triangle: a wall / a floor (as classified for the grids above).
     steep_tri: Vec<bool>,
-    floor_tri: Vec<bool>,
+    pub(crate) floor_tri: Vec<bool>,
     /// Parry collision (crate::collide), switched on per course by `tracks.collision`.
     parry: Option<ParrySets>,
 }

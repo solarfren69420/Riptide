@@ -145,3 +145,18 @@ wall_hit_gap,f32,0.4,s,riptide design: at most one wall impact sound this often 
 ground_apron_size,f32,200000,units,riptide design: half-width of the ground plane laid under H2Overdrive levels (seen from big launches)
 ground_apron_tile,f32,1500,units,riptide design: one tile of the ground apron texture
 ground_apron_drop,f32,30,units,riptide design: the ground apron sits this far below the level lowest point
+ramp_find_min_ny,f32,0.15,normal y,riptide design: (ramp audit) floor triangles steeper than this are walls not ramps
+ramp_find_max_ny,f32,0.97,normal y,riptide design: (ramp audit) flatter than this is water or flat ground not a ramp
+ramp_find_min_rise,f32,25,units,riptide design: (ramp audit) a ramp rises at least this far above the water
+ramp_find_max_base,f32,80,units,riptide design: (ramp audit) and starts no higher than this above the water
+ramp_find_join,f32,160,units,riptide design: (ramp audit) triangle centres this close facing the same way are one ramp
+ramp_find_min_tris,f32,2,triangles,riptide design: (ramp audit) smallest ramp
+ramp_test_runup,f32,1200,units,riptide design: (ramp test) the boat starts this far before the ramp
+ramp_test_clip,f32,15,units,riptide design: (ramp test) the boat this far below the ramp surface counts as clipping through it
+ramp_test_time,f32,10,s,riptide design: (ramp test) give up after this long
+ramp_find_edge,f32,0.1,track width fraction,riptide design: (ramp audit) slopes this close to the corridor edge are banks not ramps
+ramp_find_along,f32,0.6,cos of angle,riptide design: (ramp audit) a ramp faces within about 50 degrees of the course direction
+recovery_progress,f32,300,units,riptide design: race progress a boat must make within recovery_no_progress_time
+recovery_no_progress_time,f32,6,s,riptide design: a boat making no progress this long (circling or wedged) is put back on the course
+ht_gravity,f32,260,units/s^2,riptide engine: gravity on Hydro Thunder courses until its own (HT GRAVITY_MIN / GRAVITY_MAX) is decoded; H2Overdrive courses use the boat def Gravity (-200 measured)
+ramp_climb_smooth,f32,0.12,s,riptide design: ramp climb rate averaged over this long before it launches a boat (per-frame triangle steps spiked launches to the ceiling)
