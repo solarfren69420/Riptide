@@ -25,6 +25,8 @@ impl Plugin for SoundPlugin {
 pub struct SoundBanks {
     banks: HashMap<String, Arc<Vec<FsbSample>>>,
     sources: HashMap<usize, Option<Handle<AudioSource>>>,
+    /// Hydro Thunder `.KAT` clips by (file, index), decoded to WAV once.
+    kat: HashMap<(String, usize), Option<Handle<AudioSource>>>,
     seed: u32,
 }
 
@@ -123,15 +125,20 @@ impl Sfx<'_, '_> {
 
     /// Play the sound a `sound_events` row names (see `crate::sheets::sound_events_ids`).
     pub fn event(&mut self, ev: usize) {
+        self.event_gain(ev, 1.0);
+    }
+
+    /// [`Self::event`] at `gain` times its own volume.
+    pub fn event_gain(&mut self, ev: usize, gain: f32) {
         let row = &SOUND_EVENTS[ev];
         if !row.status.is_ok() {
             return;
         }
         if let Some(def) = row.global.and_then(|g| H2_GLOBALSOUNDS[g].sounddef) {
-            self.def(def, 1.0);
+            self.def(def, gain);
         }
         if let Some(def) = row.sounddef {
-            self.def(def, 1.0);
+            self.def(def, gain);
         }
     }
 
@@ -151,6 +158,28 @@ impl Sfx<'_, '_> {
         }
         let settings = PlaybackSettings::DESPAWN.with_volume(Volume::Linear(d.volume_2d * v.volume));
         Some(self.commands.spawn((AudioPlayer(src), settings, scope)).id())
+    }
+
+    /// Play clip `index` of a Hydro Thunder `.KAT` bank on the disc (announcer, boat names).
+    pub fn kat(&mut self, file: &str, index: usize, volume: f32) {
+        let key = (file.to_string(), index);
+        if !self.banks.kat.contains_key(&key) {
+            let Some(ht) = self.content.ht.clone() else { return };
+            // In the browser the disc is fetched on demand: not there yet, try again next time.
+            let Ok(bank) = ht.disc.read(file) else { return };
+            let src = riptide_assets::kat::parse(&bank).ok().and_then(|s| s.get(index).cloned()).and_then(|s| {
+                let pcm = riptide_assets::kat::decode(&bank, &s)?;
+                Some(self.sources.add(AudioSource { bytes: riptide_assets::kat::wav(&pcm, s.rate).into() }))
+            });
+            self.banks.kat.insert(key.clone(), src);
+        }
+        let Some(Some(src)) = self.banks.kat.get(&key).cloned() else { return };
+        if std::env::var_os("RIPTIDE_DEBUG").is_some() {
+            info!("sound: kat {file} #{index}");
+        }
+        if !muted() {
+            self.commands.spawn((AudioPlayer(src), PlaybackSettings::DESPAWN.with_volume(Volume::Linear(volume))));
+        }
     }
 
     /// Stop a sound started by [`Self::event_loop`] or [`Self::event_once`].

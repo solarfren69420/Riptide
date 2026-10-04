@@ -9,6 +9,7 @@ pub mod h2mesh;
 pub mod ht;
 pub mod htgeom;
 pub mod httrack;
+pub mod kat;
 pub mod image;
 pub mod lux;
 pub mod model;

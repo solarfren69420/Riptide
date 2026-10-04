@@ -3,7 +3,7 @@
 use crate::cheats::Cheats;
 use crate::content::{attach, BoatInfo, CourseSource, Models, Piece, TrackChoice};
 use crate::controls::Input;
-use crate::sheets::{controls_ids as ctl, BoatsUnlock, CheatsEffect};
+use crate::sheets::{controls_ids as ctl, physics as phy, BoatsUnlock, CheatsEffect};
 use crate::{Screen, Selection};
 use bevy::prelude::*;
 use bevy::camera::{visibility::RenderLayers, ImageRenderTarget, RenderTarget};
@@ -290,9 +290,12 @@ pub(crate) fn menu_input(
     // Selection sounds: the announcer names a newly picked boat; other moves tick.
     if sel.boat != *last_boat {
         *last_boat = sel.boat;
-        match boats[sel.boat].row.voice.and_then(|g| crate::sheets::H2_GLOBALSOUNDS[g].sounddef) {
-            Some(def) => sfx.def(def, 1.0),
-            None => sfx.event(crate::sheets::sound_events_ids::MENU_TICK),
+        // H2Overdrive boats: their voice global; Hydro Thunder boats: their name clip in COMM.KAT.
+        let ht_clip = boats[sel.boat].row.ht_boat.map(|h| crate::sheets::HT_BOATS[h].name_clip).filter(|c| *c >= 0);
+        match (boats[sel.boat].row.voice.and_then(|g| crate::sheets::H2_GLOBALSOUNDS[g].sounddef), ht_clip) {
+            (Some(def), _) => sfx.def(def, 1.0),
+            (None, Some(clip)) => sfx.kat("COMM.KAT", clip as usize, phy::HT_VOICE_VOLUME),
+            (None, None) => sfx.event(crate::sheets::sound_events_ids::MENU_TICK),
         }
         // A hard boat: warning beeps while it stays highlighted (the announcer is busy naming it).
         if let Some(e) = warnings.1.take() {

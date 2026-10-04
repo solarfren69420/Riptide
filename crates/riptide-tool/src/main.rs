@@ -176,6 +176,17 @@ fn main() -> Result<()> {
             let yaw: f32 = args.get(3).and_then(|s| s.parse().ok()).unwrap_or(35.0);
             write_png(Path::new(a(2)?), &render(&m, &tex, yaw, 25.0, 768))?;
         }
+        Some("kat") => {
+            // kat <FILE.KAT> [outdir]: list a Hydro Thunder sound bank; with outdir, write each sample as WAV.
+            let g = riptide_assets::gdi::GdRom::open(&riptide_assets::default_gdi_path())?;
+            let bank = g.read(a(1)?)?;
+            for (i, s) in riptide_assets::kat::parse(&bank)?.iter().enumerate() {
+                println!("{} #{i}: {:.2} s {} Hz {}-bit{}", a(1)?, s.seconds(), s.rate, s.bits, if s.looped { " loop" } else { "" });
+                if let (Ok(dir), Some(pcm)) = (a(2), riptide_assets::kat::decode(&bank, s)) {
+                    std::fs::write(format!("{dir}/{}_{i}.wav", a(1)?.trim_end_matches(".KAT")), riptide_assets::kat::wav(&pcm, s.rate))?;
+                }
+            }
+        }
         Some("ht-file") => {
             let g = riptide_assets::gdi::GdRom::open(&riptide_assets::default_gdi_path())?;
             if args.len() < 2 { for (n, f) in g.files() { eprintln!("{n} {f:?}"); } } else { use std::io::Write; std::io::stdout().write_all(&g.read(a(1)?)?)?; }
@@ -270,6 +281,12 @@ fn main() -> Result<()> {
                             println!("  under start {:?}: y {:.1} {:.1} {:.1} tex {:?}", [q[0] as i32, q[2] as i32], p[0][1], p[1][1], p[2][1], part.texture);
                         }
                     }
+                }
+            }
+            // FX=1: every effect instance (`G?F*`: waterfalls, glows, birds) with its world position.
+            if std::env::var_os("FX").is_some() {
+                for inst in t.instances.iter().filter(|i| i.geometry.as_bytes().get(2) == Some(&b'F')) {
+                    println!("  fx {} at world {:.0}, {:.0}, {:.0} yaw {:.2} scale {:.2}", inst.geometry, inst.position[0] * 1.6, inst.position[1] * 1.6, inst.position[2] * 1.6, inst.yaw, inst.scale);
                 }
             }
             // NEAR="x,z" (Riptide world units): the instances (placed scenery) within 400 of it.

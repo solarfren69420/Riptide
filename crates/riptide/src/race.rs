@@ -582,6 +582,9 @@ fn spawn_race(
     if let CourseSource::Ht { sky: Some(first), .. } = &choice.source {
         spawn_ht_sky(&mut commands, &mut models, first, scope.clone());
     }
+    // Seen from high up (big launches), H2Overdrive levels end where the camera normally can't
+    // see: lay their most common ground texture out underneath, so the gaps read as distant land.
+    let apron = if matches!(choice.source, CourseSource::H2(_)) { ground_apron(&mut models, &level) } else { None };
     // Sky.
     if let Some(sky) = level.skyboxes.first() {
         if let Some(p) = models.lux_unlit(&sky.mesh) {
@@ -599,16 +602,25 @@ fn spawn_race(
                 }
             });
             // The dome is a half sphere: from high up, past the terrain's edge, nothing is drawn
-            // below its rim. Close it with a skirt in its own horizon colour.
+            // below its rim. Close it with a skirt in its own horizon colour, unless a ground apron
+            // fills that (the skirt, hanging from the dome around the camera, hid the apron).
             if let Some((mesh, color)) = sky_skirt(&models, &sky.mesh) {
                 // Gaps in the dome (cut-out art) show the clear colour: make it the horizon too.
                 commands.insert_resource(ClearColor(color));
-                let material = models.materials.add(StandardMaterial { base_color: color, unlit: true, fog_enabled: false, cull_mode: None, ..default() });
-                let mesh = models.meshes.add(mesh);
-                commands.entity(e).with_children(|c| {
-                    c.spawn((Mesh3d(mesh), MeshMaterial3d(material), NoFrustumCulling, NotShadowCaster));
-                });
+                if apron.is_none() {
+                    let material = models.materials.add(StandardMaterial { base_color: color, unlit: true, fog_enabled: false, cull_mode: None, ..default() });
+                    let mesh = models.meshes.add(mesh);
+                    commands.entity(e).with_children(|c| {
+                        c.spawn((Mesh3d(mesh), MeshMaterial3d(material), NoFrustumCulling, NotShadowCaster));
+                    });
+                }
             }
+        }
+    }
+
+    if let Some((mesh, material)) = apron.clone() {
+        {
+            commands.spawn((Mesh3d(mesh), MeshMaterial3d(material), NotShadowCaster, scope.clone(), Name::new("ground apron")));
         }
     }
 
@@ -2265,6 +2277,8 @@ fn engine_audio(boats: Query<&Boat>, mut layers: Query<(&crate::sound::EngineLay
 /// What the player's boat did last frame, to turn state changes into sound events.
 #[derive(Default)]
 struct HeardState {
+    /// Race clock at the last wall-impact sound.
+    wall_sound: f32,
     /// Race clock last frame.
     t: f32,
     /// The 3-2-1 countdown voice has played (when the clock reaches the countdown).
@@ -2352,8 +2366,10 @@ fn race_audio(
     if p.smashes > last.smashes {
         sfx.event(ev::HULLCRUSH_ATTACK);
     }
-    if p.wall_hits > last.wall_hits {
-        sfx.event(ev::WALL_HIT);
+    // Scraping along a wall counts many hits: one impact sound per wall_hit_gap, turned down.
+    if p.wall_hits > last.wall_hits && clock.t - last.wall_sound >= phy::WALL_HIT_GAP {
+        last.wall_sound = clock.t;
+        sfx.event_gain(ev::WALL_HIT, phy::WALL_HIT_VOLUME);
     }
     last.boosting = boost_on;
     last.super_on = super_on;
@@ -2908,4 +2924,43 @@ fn probe(time: Res<Time>, clock: Res<RaceClock>, track: Res<Track>, collider: Op
             collider.as_ref().and_then(|c| c.floor(b.pos.x, b.pos.z, b.pos.y + 300.0))
         );
     }
+}
+
+/// A wide plane just under an H2Overdrive level, tiled with the texture that covers most of
+/// its upward-facing terrain.
+fn ground_apron(models: &mut Models, level: &H2Level) -> Option<(Handle<Mesh>, Handle<StandardMaterial>)> {
+    let mut area: std::collections::HashMap<String, f32> = Default::default();
+    let (mut lo, mut hi, mut low_y) = (Vec2::splat(f32::MAX), Vec2::splat(f32::MIN), f32::MAX);
+    for name in &level.sector_meshes {
+        let Some(blob) = models.content.lux.get(&format!("mesh32.{name}")) else { continue };
+        let Ok(model) = riptide_assets::h2mesh::decode_mesh(name, blob) else { continue };
+        for part in &model.parts {
+            for p in &part.positions {
+                lo = lo.min(Vec2::new(p[0], p[2]));
+                hi = hi.max(Vec2::new(p[0], p[2]));
+                low_y = low_y.min(p[1]);
+            }
+            let Some(tex) = &part.texture else { continue };
+            for t in part.indices.chunks_exact(3) {
+                let v = |i: u32| Vec3::from(part.positions[i as usize]);
+                let n = (v(t[1]) - v(t[0])).cross(v(t[2]) - v(t[0]));
+                if n.length() > 0.0 && n.y.abs() > 0.7 * n.length() {
+                    *area.entry(tex.clone()).or_default() += n.length() * 0.5;
+                }
+            }
+        }
+    }
+    let tex = area.into_iter().max_by(|a, b| a.1.total_cmp(&b.1))?.0;
+    let texture = models.lux_texture(&tex)?;
+    let (centre, half, tile) = ((lo + hi) * 0.5, phy::GROUND_APRON_SIZE, phy::GROUND_APRON_TILE.max(1.0));
+    let y = low_y - phy::GROUND_APRON_DROP;
+    let corners = [[-half, -half], [half, -half], [half, half], [-half, half]].map(|[x, z]| [centre.x + x, y, centre.y + z]);
+    let mut mesh = Mesh::new(PrimitiveTopology::TriangleList, RenderAssetUsages::RENDER_WORLD);
+    mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, corners.to_vec());
+    mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, vec![[0.0, 1.0, 0.0]; 4]);
+    mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, corners.iter().map(|c| [c[0] / tile, c[2] / tile]).collect::<Vec<_>>());
+    mesh.insert_indices(Indices::U32(vec![0, 2, 1, 0, 3, 2]));
+    // No fog: fogged, the far apron turned back into the fog colour (sunset orange on Temple of Flume).
+    let material = StandardMaterial { base_color_texture: Some(texture), perceptual_roughness: 1.0, cull_mode: None, fog_enabled: false, ..default() };
+    Some((models.meshes.add(mesh), models.materials.add(material)))
 }
