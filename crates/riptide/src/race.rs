@@ -879,8 +879,8 @@ fn spawn_race(
 }
 
 fn spawn_water(commands: &mut Commands, models: &mut Models, level: &H2Level, track: &Track, frames: Vec<Handle<Image>>, add_ribbon: bool) {
-    // RIPTIDE_H2WATER: H2Overdrive's own water shader (crate::h2water) in place of the quads below.
-    let h2 = std::env::var_os("RIPTIDE_H2WATER").is_some()
+    // On by default (desktop and browser); RIPTIDE_H2WATER=0 keeps Riptide's own water.
+    let h2 = std::env::var("RIPTIDE_H2WATER").map_or(true, |v| v != "0")
         && !level.water_sectors.is_empty()
         && models.content.lux.get("shad4.FX_Water2").and_then(|blob| crate::h2water::install(&mut models.shaders, blob)).is_some_and(|sh| {
             let bump = models.lux_normal_map("wavesbump").unwrap_or_default();

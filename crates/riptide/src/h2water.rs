@@ -12,7 +12,8 @@
 //! the screen-space whitewash buffer (none), and the wave / bump / flow numbers derived from an
 //! edge's Wave Type and speeds (being decoded from sdaemon.exe).
 //!
-//! `RIPTIDE_H2WATER=1` uses it in place of Riptide's own water (crate::water).
+//! The default water on H2Overdrive courses; `RIPTIDE_H2WATER=0` uses Riptide's own water
+//! (crate::water) instead.
 
 use bevy::asset::uuid_handle;
 use bevy::mesh::{Indices, MeshVertexBufferLayoutRef, PrimitiveTopology};

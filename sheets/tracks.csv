@@ -23,10 +23,10 @@ thunder_park,ht,Thunder Park,20,-,loo1,ok,ok,ht_tracks.loo1,n/a: HT checkpoint t
 lost_island,ht,Lost Island,21,-,amaz,ok,ok,ht_tracks.amaz,n/a: HT checkpoint times not decoded,com_music_theme,classic,racing,easy
 lake_powell,ht,Lake Powell,22,-,pwel,ok,ok,ht_tracks.pwel,n/a: HT checkpoint times not decoded,com_music_theme,classic,nav,medium
 arctic_circle,ht,Arctic Circle,23,-,arct,ok,ok,ht_tracks.arct,n/a: HT checkpoint times not decoded,com_music_theme,parry,racing,easy
-greek_isles,ht,Greek Isles,24,-,gree,ok,ok,ht_tracks.gree,n/a: HT checkpoint times not decoded,com_music_theme,classic,racing,medium
+greek_isles,ht,Greek Isles,24,-,gree,ok,ok,ht_tracks.gree,n/a: HT checkpoint times not decoded,com_music_theme,classic,nav,medium
 ship_graveyard,ht,Ship Graveyard,25,-,grav,ok,ok,ht_tracks.grav,n/a: HT checkpoint times not decoded,com_music_theme,classic,nav,hard
 venice_canals,ht,Venice Canals,26,-,veni,ok,ok,ht_tracks.veni,n/a: HT checkpoint times not decoded,com_music_theme,classic,racing,hard
-far_east,ht,Far East,27,-,chin,ok,ok,ht_tracks.chin,n/a: HT checkpoint times not decoded,com_music_theme,classic,racing,medium
+far_east,ht,Far East,27,-,chin,ok,ok,ht_tracks.chin,n/a: HT checkpoint times not decoded,com_music_theme,classic,nav,medium
 new_york_disaster,ht,New York Disaster,28,-,newy,ok,ok,ht_tracks.newy,n/a: HT checkpoint times not decoded,com_music_theme,classic,racing,hard
 nile_adventure,ht,Nile Adventure,29,-,nile,ok,ok,ht_tracks.nile,n/a: HT checkpoint times not decoded,com_music_theme,parry,racing,expert
 hydro_speedway,ht,Hydro Speedway,30,-,loo2,ok,ok,ht_tracks.loo2,n/a: HT checkpoint times not decoded,com_music_theme,classic,racing,expert
