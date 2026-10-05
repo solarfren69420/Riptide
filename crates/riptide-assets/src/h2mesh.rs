@@ -153,6 +153,10 @@ fn decode(name: &str, blob: &[u8], rigged: bool) -> Result<Model> {
             .collect(),
         _ => Vec::new(),
     };
+    let vec3s = |usage: u32| -> Option<Vec<[f32; 3]>> {
+        find(usage, 12).map(|s| (0..vcount).map(|i| { let o = s.0 + i * s.2; [f32_at(o), f32_at(o + 4), f32_at(o + 8)] }).collect())
+    };
+    let (binormals, tangents) = (vec3s(2), vec3s(3));
     let uvs: Option<Vec<[f32; 2]>> = find(5, 8).map(|s| {
         (0..vcount)
             .map(|i| {
@@ -184,6 +188,15 @@ fn decode(name: &str, blob: &[u8], rigged: bool) -> Result<Model> {
         textures.sort_by_key(|t| t.0);
         if std::env::var_os("RIPTIDE_MESH_DEBUG").is_some() {
             eprintln!("  material {m}: shader {shader:?} textures {:?}", textures.iter().map(|t| (t.0 - mb, t.1)).collect::<Vec<_>>());
+            let mut floats = String::new();
+            for o in (0x2c..0x2b4).step_by(4) {
+                if let Some(v) = body.get(mb + o..mb + o + 4).map(|b| f32::from_le_bytes(b.try_into().unwrap())) {
+                    if v != 0.0 && v.is_finite() && v.abs() < 1e6 && v.abs() > 1e-6 {
+                        floats += &format!(" {o:#x}={v}");
+                    }
+                }
+            }
+            eprintln!("    floats:{floats}");
         }
         // Slot 0 is the diffuse map; normal maps (`_N`) and lightmaps (`_LM`) follow.
         let texture = textures
@@ -235,6 +248,7 @@ fn decode(name: &str, blob: &[u8], rigged: bool) -> Result<Model> {
         // one per bone, each with its own vertex remap.
         let blank = MeshPart {
             texture: texture.map(|t| t.trim_start_matches("txtr1.").to_string()),
+            textures: textures.iter().map(|t| t.1.trim_start_matches("txtr1.").to_string()).collect(),
             shader: shader.as_ref().map(|s| s.trim_start_matches("shad4.").to_string()),
             ..Default::default()
         };
@@ -290,6 +304,21 @@ fn decode(name: &str, blob: &[u8], rigged: bool) -> Result<Model> {
                     }
                     if let Some(t) = &uvs {
                         part.uvs.push(t[vi]);
+                    }
+                    if let (Some(n), Some(t), Some(bn)) = (&normals, &tangents, &binormals) {
+                        let dir = |v: [f32; 3]| -> [f32; 3] {
+                            let v = match b {
+                                Some(m) => [v[0] * m[0] + v[1] * m[4] + v[2] * m[8], v[0] * m[1] + v[1] * m[5] + v[2] * m[9], v[0] * m[2] + v[1] * m[6] + v[2] * m[10]],
+                                None => v,
+                            };
+                            [v[0], v[1], -v[2]]
+                        };
+                        let (nn, tt, bb) = (dir(n[vi]), dir(t[vi]), dir(bn[vi]));
+                        let len = (tt[0] * tt[0] + tt[1] * tt[1] + tt[2] * tt[2]).sqrt().max(1e-9);
+                        let tt = tt.map(|c| c / len);
+                        let cross = [nn[1] * tt[2] - nn[2] * tt[1], nn[2] * tt[0] - nn[0] * tt[2], nn[0] * tt[1] - nn[1] * tt[0]];
+                        let w = if cross[0] * bb[0] + cross[1] * bb[1] + cross[2] * bb[2] < 0.0 { -1.0 } else { 1.0 };
+                        part.tangents.push([tt[0], tt[1], tt[2], w]);
                     }
                     if let Some(c) = &colors {
                         part.colors.push(c[vi]);

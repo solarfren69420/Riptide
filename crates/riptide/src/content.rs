@@ -140,6 +140,8 @@ pub struct Rig {
 pub struct Piece {
     pub mesh: Handle<Mesh>,
     pub material: Handle<StandardMaterial>,
+    /// H2Overdrive boat parts: the original boat shader (crate::boatshader), drawn instead of `material`.
+    pub boat: Option<Handle<crate::boatshader::BoatMaterial>>,
     /// Rigged models: the bone the piece rides (its vertices are in that bone's space).
     pub bone: Option<u16>,
 }
@@ -151,6 +153,8 @@ pub struct ModelCache {
     clips: HashMap<String, Option<Arc<riptide_assets::h2anim::Clip>>>,
     textures: HashMap<String, Option<(Handle<Image>, TexAlpha)>>,
     deferred: Vec<DeferredMaterial>,
+    /// Stand-in textures for the boat shader: white, black, a flat normal map, a grey cube.
+    boat_defaults: Option<[Handle<Image>; 4]>,
 }
 
 struct DeferredMaterial {
@@ -200,6 +204,7 @@ pub struct Models<'w> {
     pub water: ResMut<'w, Assets<crate::water::WaterMat>>,
     /// H2Overdrive's own water shader (crate::h2water) and the shaders it translates into.
     pub h2water: ResMut<'w, Assets<crate::h2water::H2WaterMaterial>>,
+    pub boats: ResMut<'w, Assets<crate::boatshader::BoatMaterial>>,
     pub shaders: ResMut<'w, Assets<Shader>>,
 }
 
@@ -429,6 +434,64 @@ impl Models<'_> {
         out
     }
 
+    /// The original boat shader for an H2Overdrive boat part (`FX_Boat*`), with its paint, light
+    /// masks (`_LM`) and normal map (`_N`) from the material's texture slots; adds tangents.
+    fn boat_material(&mut self, source: Source, part: &riptide_assets::model::MeshPart, mesh: &mut Mesh) -> Option<Handle<crate::boatshader::BoatMaterial>> {
+        if source != Source::Lux || !part.shader.as_deref().is_some_and(|s| s.starts_with("FX_Boat")) || std::env::var("RIPTIDE_BOATSHADER").is_ok_and(|v| v == "0") {
+            return None;
+        }
+        let blob = self.content.lux.get("shad4.FX_BoatLocal")?;
+        let sh = crate::boatshader::install(&mut self.shaders, blob)?;
+        let paint = self.texture(source, part.texture.as_deref()?)?.0;
+        let [white, black, flat, cube] = self.boat_defaults();
+        let masks: Vec<Handle<Image>> = part.textures.iter().filter(|t| t.contains("_LM")).filter_map(|t| self.texture(source, t).map(|x| x.0)).collect();
+        let normal = part.textures.iter().find(|t| t.ends_with("_N")).and_then(|t| self.lux_normal_map(t)).unwrap_or(flat);
+        let n = part.positions.len();
+        if part.tangents.len() == n {
+            mesh.insert_attribute(Mesh::ATTRIBUTE_TANGENT, part.tangents.clone());
+        } else if mesh.generate_tangents().is_err() {
+            mesh.insert_attribute(Mesh::ATTRIBUTE_TANGENT, vec![[1.0f32, 0.0, 0.0, 1.0]; n]);
+        }
+        let _ = (white, &black);
+        Some(self.boats.add(crate::boatshader::BoatMaterial {
+            ps: crate::boatshader::constants(&sh, crate::sheets::physics::BOATSHADER_SPECULAR_EXPONENT),
+            paint,
+            mask1: masks.first().cloned().unwrap_or(black.clone()),
+            mask2: masks.get(1).cloned().unwrap_or(black.clone()),
+            mask3: masks.get(2).cloned().unwrap_or(black),
+            normal,
+            sky: cube,
+        }))
+    }
+
+    fn boat_defaults(&mut self) -> [Handle<Image>; 4] {
+        if let Some(d) = &self.cache.boat_defaults {
+            return d.clone();
+        }
+        use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat, TextureViewDescriptor, TextureViewDimension};
+        let one = Extent3d { width: 1, height: 1, depth_or_array_layers: 1 };
+        let px = |c: [u8; 4], f: TextureFormat| Image::new_fill(one, TextureDimension::D2, &c, f, RenderAssetUsages::RENDER_WORLD);
+        // The original binds `pt_tst_skytest_08` (a 256x256 lake-and-mountains picture) as the boats'
+        // reflection cube: the same picture on every face.
+        let mut cube = match self.content.lux.get("txtr1.pt_tst_skytest_08").and_then(|b| riptide_assets::image::decode_txtr(b).ok()) {
+            Some(img) => {
+                let (w, h) = (img.width, img.height);
+                let data: Vec<u8> = (0..6).flat_map(|_| img.rgba.iter().copied()).collect();
+                Image::new(Extent3d { width: w, height: h, depth_or_array_layers: 6 }, TextureDimension::D2, data, TextureFormat::Rgba8UnormSrgb, RenderAssetUsages::RENDER_WORLD)
+            }
+            None => Image::new_fill(Extent3d { depth_or_array_layers: 6, ..one }, TextureDimension::D2, &[150, 160, 175, 255], TextureFormat::Rgba8UnormSrgb, RenderAssetUsages::RENDER_WORLD),
+        };
+        cube.texture_view_descriptor = Some(TextureViewDescriptor { dimension: Some(TextureViewDimension::Cube), ..default() });
+        let d = [
+            self.images.add(px([255, 255, 255, 255], TextureFormat::Rgba8UnormSrgb)),
+            self.images.add(px([0, 0, 0, 255], TextureFormat::Rgba8UnormSrgb)),
+            self.images.add(px([128, 128, 255, 128], TextureFormat::Rgba8Unorm)),
+            self.images.add(cube),
+        ];
+        self.cache.boat_defaults = Some(d.clone());
+        d
+    }
+
     fn build(&mut self, model: &Model, source: Source, unlit: bool) -> Vec<Piece> {
         let mut out = Vec::new();
         for part in &model.parts {
@@ -469,12 +532,13 @@ impl Models<'_> {
                 ..default()
             };
             let handle = self.materials.add(material);
+            let boat = self.boat_material(source, part, &mut mesh);
             if deferred {
                 self.cache.deferred.push(DeferredMaterial {
                     handle: handle.clone(), source, texture: part.texture.clone().unwrap(), shader: shader.to_string(), blend: part.blend,
                 });
             }
-            out.push(Piece { mesh: self.meshes.add(mesh), material: handle, bone: part.bone });
+            out.push(Piece { mesh: self.meshes.add(mesh), material: handle, bone: part.bone, boat });
         }
         out
     }
@@ -576,7 +640,11 @@ fn half(img: &RgbaImage) -> RgbaImage {
 pub fn attach(commands: &mut Commands, parent: Entity, pieces: &[Piece]) {
     commands.entity(parent).with_children(|c| {
         for p in pieces {
-            c.spawn((Mesh3d(p.mesh.clone()), MeshMaterial3d(p.material.clone()), Transform::IDENTITY));
+            let mut e = c.spawn((Mesh3d(p.mesh.clone()), Transform::IDENTITY));
+            match &p.boat {
+                Some(b) => e.insert(MeshMaterial3d(b.clone())),
+                None => e.insert(MeshMaterial3d(p.material.clone())),
+            };
         }
     });
 }

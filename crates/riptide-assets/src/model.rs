@@ -24,12 +24,18 @@ pub struct MeshPart {
     pub positions: Vec<[f32; 3]>,
     pub normals: Vec<[f32; 3]>,
     pub uvs: Vec<[f32; 2]>,
+    /// Tangent (xyz) and handedness (w: the binormal is cross(normal, tangent) * w), when the
+    /// source has tangent and binormal streams (H2Overdrive boats: their normal maps).
+    pub tangents: Vec<[f32; 4]>,
     /// Linear RGBA vertex colour (pre-lit lighting on both games' geometry).
     pub colors: Vec<[f32; 4]>,
     /// Triangle list, counter-clockwise front faces.
     pub indices: Vec<u32>,
     /// Texture key in the owning archive, if any.
     pub texture: Option<String>,
+    /// Every texture the source material binds, in slot order (H2Overdrive: diffuse, normal map,
+    /// light masks, cube map), without the `txtr1.` prefix.
+    pub textures: Vec<String>,
     /// Source shader/material name, for blend heuristics.
     pub shader: Option<String>,
     pub blend: Blend,

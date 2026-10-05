@@ -174,3 +174,5 @@ ht_water_flow_speed,f32,0.25,-,riptide design: Hydro Thunder generated water edg
 ht_water_opaqueness,f32,0.85,-,riptide design: Hydro Thunder generated water edges: mostly the course own water colour with a little of the riverbed showing
 ht_water_reflection,f32,0.55,-,riptide design: Hydro Thunder generated water edges: reflection tint
 h2water_clip_lift,f32,2,units,riptide design: the reflection camera clips everything this little above the water surface and below (no seam where geometry meets the water)
+boatshader_specular_exponent,f32,20,-,observed: H2Overdrive boat materials (mesh32 material record +0x2b0) carry specular exponent 20
+boatshader_ambient,f32,0.6,-,riptide design: the scene ambient colour scaled for the boat shader (the original fed its own ambient)

@@ -103,7 +103,11 @@ fn spawn_bones(commands: &mut Commands, rig: &Rig, parent: Entity, base: Mat4, s
             None => (parent, Transform::IDENTITY),
         };
         commands.entity(owner).with_children(|c| {
-            c.spawn((Mesh3d(p.mesh.clone()), MeshMaterial3d(p.material.clone()), place));
+            let mut e = c.spawn((Mesh3d(p.mesh.clone()), place));
+            match &p.boat {
+                Some(b) => e.insert(MeshMaterial3d(b.clone())),
+                None => e.insert(MeshMaterial3d(p.material.clone())),
+            };
         });
     }
     rig.bones.iter().zip(ent).filter_map(|(b, e)| Some((b.name.to_ascii_lowercase(), e?))).collect()

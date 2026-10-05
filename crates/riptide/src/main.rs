@@ -12,6 +12,7 @@
 //! `RIPTIDE_SHOT_AT=x,y,z,yaw-degrees` places the capture boat/camera at a particular feature.
 
 mod boatrig;
+mod boatshader;
 mod cheats;
 mod collide;
 mod content;
@@ -162,7 +163,7 @@ pub fn run(content: Content) -> AppExit {
         .init_resource::<ModelCache>()
         .init_state::<Screen>()
         .add_systems(Update, content::finish_textures)
-        .add_plugins((cheats::CheatsPlugin, net::NetPlugin, menu::MenuPlugin, race::RacePlugin, sound::SoundPlugin, effects::EffectsPlugin, hud::HudPlugin, boatrig::BoatRigPlugin, water::WaterPlugin, h2water::H2WaterPlugin))
+        .add_plugins((cheats::CheatsPlugin, net::NetPlugin, menu::MenuPlugin, race::RacePlugin, sound::SoundPlugin, effects::EffectsPlugin, hud::HudPlugin, boatrig::BoatRigPlugin, water::WaterPlugin, h2water::H2WaterPlugin, boatshader::BoatShaderPlugin))
         .add_systems(OnEnter(Screen::Restart), |mut next: ResMut<NextState<Screen>>| next.set(Screen::Race));
     #[cfg(target_arch = "wasm32")]
     app.add_plugins(web::WebPlugin);
