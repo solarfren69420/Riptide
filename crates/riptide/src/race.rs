@@ -123,6 +123,8 @@ pub struct Boat {
     pub catchup: f32,
     /// Running counts for sound cues: boats blasted by this one's Hull Crusher, hard wall hits.
     pub smashes: u32,
+    /// Boats this one has rammed while boosting (crate::race::boat_contacts).
+    pub rams: u32,
     pub wall_hits: u32,
     /// Boost / gold boost pickups collected (sound cues: heard even with a full tank).
     pub pickups: u32,
@@ -857,6 +859,7 @@ fn spawn_race(
                     surface: pos.y,
                     catchup: 0.0,
                     smashes: 0,
+                    rams: 0,
                     wall_hits: 0,
                     pickups: 0,
                     super_pickups: 0,
@@ -1812,6 +1815,27 @@ fn boat_contacts(cheats: Res<Cheats>, tuning: Res<Tuning>, mut boats: Query<&mut
             let imp = normal * rel * 0.5;
             p.vel += imp;
             q.vel -= imp;
+            // A boosting boat ramming another: its closing speed counts `Impact Speed Mult` times (the
+            // original's multiplier, kept off ordinary bumps where it wiped out starting packs); past the
+            // victim's Impact Speed Max the victim wipes out and is thrown up and away.
+            let (pb, qb) = (p.boosting || p.super_time > 0.0, q.boosting || q.super_time > 0.0);
+            // Only where the player is in it (ramming or rammed): AI-on-AI rams wiped out so many
+            // boats that whole fields missed the arcade time limit (24 courses: 155 -> 143 finishers).
+            if pb != qb && (p.player || q.player) {
+                let (rammer, victim, dir) = if pb { (&mut **p, &mut **q, normal) } else { (&mut **q, &mut **p, -normal) };
+                let max = if victim.player { g.player_impact_speed_max } else { g.ai_impact_speed_max };
+                if -rel / phy::SPEED_SCALE * g.impact_speed_mult >= max && !(victim.player && no_wipeout) {
+                    rammer.rams += 1;
+                    victim.vel += dir * -rel * phy::BOOST_RAM_PUSH;
+                    victim.vy = victim.vy.max(phy::BOOST_RAM_HOP);
+                    victim.airborne = true;
+                    victim.wipeout = phy::WIPEOUT_TIME;
+                    if std::env::var_os("RIPTIDE_PROBE").is_some() {
+                        info!("BOOST RAM closing {:.0} victim player {}", -rel, victim.player);
+                    }
+                    continue;
+                }
+            }
             // Closing speed as-is: scaling it by `Impact Speed Mult` wiped out whole starting packs.
             let impact = -rel / phy::SPEED_SCALE;
             for boat in [&mut **p, &mut **q] {
@@ -2500,8 +2524,6 @@ fn start_race_audio(
     boats: Query<(Entity, &Boat)>,
     sel: Res<Selection>,
     content: Res<crate::content::Content>,
-    clock: Res<RaceClock>,
-    mut intro: ResMut<Intro>,
 ) {
     // The track's music (tracks sheet).
     let music = content.tracks.get(sel.level).and_then(|c| TRACKS.iter().find(|t| t.id == c.id)).and_then(|t| t.music);
@@ -2512,12 +2534,6 @@ fn start_race_audio(
         if let Some(engine) = b.info.def.engine_def {
             crate::sound::start_engine(&mut sfx, e, engine, DespawnOnExit(Screen::Race));
         }
-    }
-    // The pre-race checklist: the original picks it by the boat's engine (boat def Hydro Engine).
-    if clock.t < -phy::COUNTDOWN {
-        let hydro = boats.iter().find(|(_, b)| b.player).is_some_and(|(_, b)| b.info.def.hydro_engine);
-        let ev = if hydro { crate::sheets::sound_events_ids::RACE_CHECKLIST_HYDRO } else { crate::sheets::sound_events_ids::RACE_CHECKLIST_GAS };
-        intro.0 = sfx.event_once(ev, DespawnOnExit(Screen::Race));
     }
 }
 
@@ -2552,6 +2568,9 @@ struct HeardState {
     gates: usize,
     low_time: bool,
     started: bool,
+    /// The Go / No Go systems checklist has played (just after GO).
+    checklist: bool,
+    rams: u32,
 }
 
 fn race_audio(
@@ -2573,6 +2592,9 @@ fn race_audio(
         if let Some(old) = last.riff.take() {
             sfx.stop(old);
         }
+        if let Some(old) = intro.0.take() {
+            sfx.stop(old);
+        }
         *last = HeardState { fuel: p.fuel, started: true, ..default() };
     }
     last.t = clock.t;
@@ -2580,12 +2602,17 @@ fn race_audio(
         last.counted = true;
         sfx.event(ev::COUNTDOWN);
     }
-    // The checklist file runs on past the countdown: it ends at GO.
-    if clock.t >= 0.0 {
-        if let Some(e) = intro.0.take() {
-            sfx.stop(e);
-        }
+    // The Go / No Go systems checklist (picked by the boat's engine, boat def Hydro Engine) plays
+    // once the race is under way, not over the countdown (user, 2026-10-05).
+    if !last.checklist && clock.t >= phy::CHECKLIST_AFTER_GO {
+        last.checklist = true;
+        let ev = if p.info.def.hydro_engine { ev::RACE_CHECKLIST_HYDRO } else { ev::RACE_CHECKLIST_GAS };
+        intro.0 = sfx.event_once(ev, DespawnOnExit(Screen::Race));
     }
+    if p.rams > last.rams {
+        sfx.event(ev::HULL_IMPACT);
+    }
+    last.rams = p.rams;
     // Pickups by count, not by the tank rising: a full tank (or the infinite boost cheat) still
     // hears them.
     if p.pickups > last.pickups {

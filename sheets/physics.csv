@@ -135,7 +135,7 @@ water_shallow_alpha,f32,0.3,0-1,riptide design: opacity at the very edge of the 
 water_sky_reflect,f32,0.55,0-1,riptide design: how much of the sky the water reflects (the generated sky washed it out at 1)
 ai_scrape_time,f32,1,s,riptide design: for this long after touching a wall the AI checks that its aim point is not behind one
 recovery_player,f32,1,0/1,riptide design: H2Overdrive recovery (Slow Driver / Wrong Way / AntiStuck) also applies to the player (which boats the original flags is not decoded)
-race_intro,f32,15.6,s,riptide calibration: the 3-2-1 countdown starts this long into the pre-race checklist (user recording of the original: evidence EVD_GONOGO); skipped by accelerate / boost / start
+race_intro,f32,0,s,riptide design (was 15.6 to fit the checklist before the countdown; the checklist now plays after GO): the 3-2-1 countdown starts this long into the pre-race checklist (user recording of the original: evidence EVD_GONOGO); skipped by accelerate / boost / start
 respawn_clear_ahead,f32,400,units,riptide design: a recovered boat goes back on the lane with this much open water ahead when there is one
 water_cell,f32,60,units,riptide design: largest water mesh cell (a quarter of wave_length) so the drawn waves match the ones boats bob on
 respawn_skip,f32,400,units,riptide design: a boat recovered again within this distance of its last recovery goes back on the course this much further along (the spot traps it)
@@ -203,3 +203,6 @@ level_fire_max_particles,f32,600,particles,riptide design: live particle budget 
 level_fire_range,f32,9000,units,riptide design: level fire emitters farther than this from the camera are idle
 level_fire_max_rate,f32,60,per second,riptide design: cap on one level fire layer's puff rate
 sound_gate_radius,f32,2500,units,riptide design: a level sound gate (CSMusicTripwire) fires when the player crosses its plane within this distance of its position
+boost_ram_push,f32,0.8,x closing speed,riptide design: a boosted ram pushes the victim away at this fraction of the closing speed
+boost_ram_hop,f32,300,units/s,riptide design: a boosted ram throws the victim up at this vertical speed (user: hitting boats while boosting should send them flying)
+checklist_after_go,f32,1.5,s,riptide design: the Go / No Go systems checklist plays this long after GO (user 2026-10-05: after the race begins so it does not overlap the countdown)
