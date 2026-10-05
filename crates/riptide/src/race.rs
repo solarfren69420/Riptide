@@ -28,6 +28,7 @@ pub struct RacePlugin;
 
 impl Plugin for RacePlugin {
     fn build(&self, app: &mut App) {
+        app.init_resource::<CamView>();
         app.add_systems(Update, probe.run_if(in_state(Screen::Race)))
             .add_systems(OnEnter(Screen::Race), (spawn_race, choose_collision, start_race_audio, crate::net::race_ready).chain())
             .add_systems(
@@ -1955,6 +1956,7 @@ pub(crate) fn place_boats(
 
 fn chase_camera(
     time: Res<Time>,
+    view: Res<CamView>,
     track: Res<Track>,
     cheats: Res<Cheats>,
     occluder: Option<Res<Collider>>,
@@ -1966,7 +1968,7 @@ fn chase_camera(
     let Ok(mut tf) = cam.single_mut() else { return };
     let dt = time.delta_secs().min(1.0 / 20.0);
     let size = b.info.scale.max(1.0);
-    let zoom = cheats.zoom();
+    let zoom = cheats.zoom() * view.scale();
     let heading = Vec3::new(-b.yaw.sin(), 0.0, -b.yaw.cos());
     let speed_pull = (b.speed / phy::SPEED_NORM).clamp(0.0, 1.6);
     let want = b.pos - heading * (phy::CAM_BACK + phy::CAM_BACK_SPEED * speed_pull) * size.sqrt() * zoom
@@ -1974,8 +1976,11 @@ fn chase_camera(
     let k = (dt * phy::CAM_FOLLOW_RATE).min(1.0);
     tf.translation = tf.translation.lerp(want, k);
     // Stay inside the river corridor so cliffs never swallow the view (open water has none).
+    // Not on H2Overdrive courses: their collision mesh keeps the camera off the terrain below, and
+    // in wide water (Wild America's lake) the clamp left the camera far behind a boat off the line.
+    let trusted = occluder.as_ref().is_some_and(|c| c.trusted);
     let at = track.locate(tf.translation, b.tp.seg);
-    if !track.open && (at.u < 0.02 || at.u > 0.98) {
+    if !track.open && !trusted && (at.u < 0.02 || at.u > 0.98) {
         let on = track.point_at(at, at.u.clamp(0.02, 0.98));
         tf.translation.x = on.x;
         tf.translation.z = on.z;
@@ -2122,6 +2127,7 @@ fn hud(
 
 fn race_keys(
     input: Input,
+    mut view: ResMut<CamView>,
     cheats: Res<Cheats>,
     mut online: ResMut<crate::net::Online>,
     mut next: ResMut<NextState<Screen>>,
@@ -2160,6 +2166,9 @@ fn race_keys(
     }
     if input.just_pressed(ctl::RESTART) && !online.racing() {
         next.set(Screen::Restart);
+    }
+    if input.just_pressed(ctl::CAMERA) {
+        view.0 = (view.0 + 1) % 3;
     }
 }
 
@@ -2510,6 +2519,20 @@ fn arcade_timer(
         info!("RESULT time up at {pct:.0}% after {:.2}s", clock.t);
         if autopilot.is_some() && std::env::var_os("RIPTIDE_EXIT_ON_FINISH").is_some() {
             exit.write(AppExit::Success);
+        }
+    }
+}
+
+/// Chase camera view, cycled with the camera key (0 normal, 1 near, 2 far); kept between races.
+#[derive(Resource, Default)]
+pub struct CamView(pub u8);
+
+impl CamView {
+    fn scale(&self) -> f32 {
+        match self.0 {
+            1 => phy::CAM_VIEW_NEAR,
+            2 => phy::CAM_VIEW_FAR,
+            _ => 1.0,
         }
     }
 }

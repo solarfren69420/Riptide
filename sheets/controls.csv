@@ -6,6 +6,7 @@ steer_left,race,ArrowLeft KeyA,DPadLeft,Steer left
 steer_right,race,ArrowRight KeyD,DPadRight,Steer right
 boost,race,Space ShiftLeft ShiftRight,East RightTrigger,Boost (starts Hull Crusher with that cheat on)
 restart,race,KeyR,Select,Restart race
+camera,race,KeyC,North,Cycle the chase camera: normal / near / far
 leave_race,race,Escape,-,Back to menu
 menu_prev_boat,menu,ArrowUp,DPadUp,Previous boat
 menu_next_boat,menu,ArrowDown,DPadDown,Next boat

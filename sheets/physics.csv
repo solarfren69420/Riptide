@@ -206,3 +206,5 @@ sound_gate_radius,f32,2500,units,riptide design: a level sound gate (CSMusicTrip
 boost_ram_push,f32,0.8,x closing speed,riptide design: a boosted ram pushes the victim away at this fraction of the closing speed
 boost_ram_hop,f32,300,units/s,riptide design: a boosted ram throws the victim up at this vertical speed (user: hitting boats while boosting should send them flying)
 checklist_after_go,f32,1.5,s,riptide design: the Go / No Go systems checklist plays this long after GO (user 2026-10-05: after the race begins so it does not overlap the countdown)
+cam_view_near,f32,0.6,x distance,riptide design: chase camera distance and height in the near view (C cycles normal / near / far)
+cam_view_far,f32,1.6,x distance,riptide design: chase camera distance and height in the far view
