@@ -174,6 +174,8 @@ pub struct ModelCache {
     deferred: Vec<DeferredMaterial>,
     /// Stand-in textures for the boat shader: white, black, a flat normal map, a grey cube.
     boat_defaults: Option<[Handle<Image>; 4]>,
+    /// Hydro Thunder effect materials whose texture is a flip-book (`T3WLAVAWA10..13`): material, frames.
+    pub animated: Vec<(Handle<StandardMaterial>, Vec<Handle<Image>>)>,
 }
 
 struct DeferredMaterial {
@@ -190,6 +192,7 @@ impl ModelCache {
         self.models.retain(|k, _| !k.starts_with("ht:"));
         self.textures.retain(|k, _| !k.starts_with("ht:"));
         self.deferred.retain(|m| m.source != Source::Ht);
+        self.animated.clear();
     }
 }
 
@@ -298,7 +301,24 @@ impl Models<'_> {
             }
         }
         keep_bright_colors(&mut model);
+        model.parts.retain(|p| !p.indices.is_empty());
         let pieces = (!model.parts.is_empty()).then(|| Arc::new(self.build(&model, Source::Ht, false)));
+        // Effects (`G?F*`: lava falls, fire, glows) animate their texture through numbered frames
+        // (`T3WLAVAWA10`, `11`, `12`, `13`): the frame digit is the last one.
+        let fx = names.split(',').all(|n| n.as_bytes().get(2) == Some(&b'F'));
+        if let (true, Some(ps)) = (fx, &pieces) {
+            for (part, piece) in model.parts.iter().zip(ps.iter()) {
+                let Some(tex) = part.texture.as_deref().filter(|t| t.len() > 2 && t.as_bytes()[t.len() - 1].is_ascii_digit()) else { continue };
+                let stem = &tex[..tex.len() - 1];
+                // Frame digits are hex (`T3WLAVAWA10` .. `1F`).
+                let frames: Vec<Handle<Image>> = "0123456789ABCDEF".chars().map_while(|d| self.ht_texture(&format!("{stem}{d}"))).collect();
+                // At least 3: pairs are colour variants (the two parrots), not animation.
+                if frames.len() >= 3 {
+                    debug!("flip-book {stem}0..: {} frames", frames.len());
+                    self.cache.animated.push((piece.material.clone(), frames));
+                }
+            }
+        }
         if pieces.is_some() || !self.pending() {
             self.cache.models.insert(key, pieces.clone());
         }
@@ -724,4 +744,21 @@ pub fn attach(commands: &mut Commands, parent: Entity, pieces: &[Piece]) {
             p.apply(&mut e);
         }
     });
+}
+
+/// Step Hydro Thunder effect flip-books (`ModelCache::animated`) at the water's frame rate.
+pub fn animate_ht_textures(time: Res<Time>, cache: Res<ModelCache>, mut materials: ResMut<Assets<StandardMaterial>>, mut shown: Local<usize>) {
+    if cache.animated.is_empty() {
+        return;
+    }
+    let f = (time.elapsed_secs() * crate::sheets::physics::HT_WATER_FPS) as usize;
+    if f == *shown {
+        return;
+    }
+    *shown = f;
+    for (m, frames) in &cache.animated {
+        if let Some(mat) = materials.get_mut(m) {
+            mat.base_color_texture = Some(frames[f % frames.len()].clone());
+        }
+    }
 }

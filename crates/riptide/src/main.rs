@@ -163,7 +163,7 @@ pub fn run(content: Content) -> AppExit {
         .insert_resource(content)
         .init_resource::<ModelCache>()
         .init_state::<Screen>()
-        .add_systems(Update, content::finish_textures)
+        .add_systems(Update, (content::finish_textures, content::animate_ht_textures))
         .add_plugins((cheats::CheatsPlugin, net::NetPlugin, menu::MenuPlugin, race::RacePlugin, sound::SoundPlugin, effects::EffectsPlugin, hud::HudPlugin, boatrig::BoatRigPlugin, water::WaterPlugin, h2water::H2WaterPlugin, boatshader::BoatShaderPlugin, terrain::TerrainPlugin))
         .add_systems(OnEnter(Screen::Restart), |mut next: ResMut<NextState<Screen>>| next.set(Screen::Race));
     #[cfg(target_arch = "wasm32")]

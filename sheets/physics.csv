@@ -148,7 +148,7 @@ ground_apron_drop,f32,30,units,riptide design: the ground apron sits this far be
 ramp_find_min_ny,f32,0.8,normal y,riptide design: (ramp audit) floor triangles steeper than this (about 37 degrees) are rock faces not ramps
 ramp_find_max_ny,f32,0.97,normal y,riptide design: (ramp audit) flatter than this is water or flat ground not a ramp
 ramp_find_min_rise,f32,25,units,riptide design: (ramp audit) a ramp rises at least this far above the water
-ramp_find_max_base,f32,80,units,riptide design: (ramp audit) and starts no higher than this above the water
+ramp_find_max_base,f32,50,units,riptide design: (ramp audit) and starts no higher than this above the water (logs sit 21-49 up; bridge decks and planks the course passes under sit 58+)
 ramp_find_join,f32,160,units,riptide design: (ramp audit) triangle centres this close facing the same way are one ramp
 ramp_find_min_tris,f32,2,triangles,riptide design: (ramp audit) smallest ramp
 ramp_test_runup,f32,1200,units,riptide design: (ramp test) the boat starts this far before the ramp
@@ -183,3 +183,4 @@ waterfall_columns,f32,24,vertices,riptide design: waterfall sheet grid across
 waterfall_rows,f32,24,vertices,riptide design: waterfall sheet grid down
 waterfall_white_bias,f32,2,-,riptide design (CSWaterfall White Bias default unknown): the waterfall program clamps light x bias to 0..1; 2 saturates sunlit falls to white
 lightmap_strength,f32,1,-,riptide calibration: H2Overdrive lightmaps (OP_*L*) add surface x lightmap x this as light (the original adds lightmap x emissive)
+nav_narrow_clearance,f32,0.3,cells,riptide design: last-resort nav attempt with this blocked-test radius (a narrow opening a boat fits through: Venice Canals tunnel arch)

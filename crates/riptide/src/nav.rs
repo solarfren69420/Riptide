@@ -36,9 +36,16 @@ impl NavLine {
         Self::build_with(track, col, 0.0, false)
             .or_else(|| Self::build_with(track, col, phy::NAV_WIDEN, false))
             .or_else(|| Self::build_with(track, col, phy::NAV_WIDEN, true))
+            .or_else(|| Self::build_with_clearance(track, col, 0.0, false, phy::NAV_NARROW_CLEARANCE))
     }
 
     fn build_with(track: &Track, col: &Collider, widen: f32, land_ok: bool) -> Option<Self> {
+        Self::build_with_clearance(track, col, widen, land_ok, 0.75)
+    }
+
+    /// `clearance`: the blocked test's radius in cells (0.75 normally; less for a narrow opening a boat
+    /// still fits through, Venice Canals' low tunnel arch).
+    fn build_with_clearance(track: &Track, col: &Collider, widen: f32, land_ok: bool, clearance: f32) -> Option<Self> {
         let n_seg = track.edges.len().checked_sub(1)?;
         if n_seg == 0 {
             return None;
@@ -104,7 +111,7 @@ impl NavLine {
                     land[k] = col.land(p);
                     // Outside the AI corridor (nav_widen) only open water counts: never a way over land.
                     let outside = !track.contains(i, q);
-                    free[k] = !col.blocked(p, g * 0.75, tp.forward) && !(outside && land[k] && !land_ok);
+                    free[k] = !col.blocked(p, g * clearance, tp.forward) && !(outside && land[k] && !land_ok);
                 }
             }
         }
