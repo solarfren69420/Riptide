@@ -265,6 +265,11 @@ struct Flame {
     age: f32,
     life: f32,
     size: f32,
+    /// FX_RocketFlame's spin: a random start angle, and the rotation speed blended from birth to
+    /// death (radians per unit of life, signed at random), applied as 0.5 x life x speed.
+    spin0: f32,
+    spin_birth: f32,
+    spin_death: f32,
 }
 
 /// 0 -> 1 across a transition centred on `centre`, `width` wide (life fractions).
@@ -300,11 +305,12 @@ fn layer_color(l: &H2RocketLayersRow, t: f32) -> (Vec3, f32) {
     (c, (a * fade).clamp(0.0, 1.0))
 }
 
-/// Scale0 at birth -> Scale1 at `ScaleTrans0 Life` -> Scale2 at death.
+/// Scale0 at birth -> Scale1 at `ScaleTrans0 Life` -> Scale2 at death. FX_RocketFlame eases the first
+/// stretch by the square root of its progress (fast growth, then settling), the second linearly.
 fn layer_scale(l: &H2RocketLayersRow, t: f32) -> f32 {
     let m = l.high_scaletrans0_life.clamp(1e-3, 0.999);
     if t < m {
-        l.high_scale0_val + (l.high_scale1_val - l.high_scale0_val) * t / m
+        l.high_scale0_val + (l.high_scale1_val - l.high_scale0_val) * (t / m).sqrt()
     } else {
         l.high_scale1_val + (l.high_scale2_val - l.high_scale1_val) * (t - m) / (1.0 - m)
     }
@@ -428,7 +434,16 @@ fn emit_flames(
                     MeshMaterial3d(mat.clone()),
                     // Interpolate the nozzle's birth position within this frame.
                     Transform::from_translation(nozzle - carry * age + jitter).with_scale(Vec3::splat(l.high_scale0_val.max(0.01) * size)),
-                    Flame { layer, vel: carry + direction * speed, age: -born_at, life, size },
+                    Flame {
+                        layer,
+                        vel: carry + direction * speed,
+                        age: -born_at,
+                        life,
+                        size,
+                        spin0: rand() * std::f32::consts::PI,
+                        spin_birth: (l.high_rot_speed_birth * (1.0 + l.high_rot_speed_birth_spread * rand()).max(0.0)) * rand().signum(),
+                        spin_death: l.high_rot_speed_death * (1.0 + l.high_rot_speed_death_spread * rand()).max(0.0),
+                    },
                     NotShadowCaster,
                     DespawnOnExit(Screen::Race),
                 ));
@@ -468,6 +483,8 @@ fn animate_flames(
         if let Some(eye) = eye {
             tf.look_at(eye, Vec3::Y);
         }
+        let speed = p.spin_birth + (p.spin_death * p.spin_birth.signum() - p.spin_birth) * t;
+        tf.rotate_local_z(p.spin0 + 0.5 * t * speed);
         let near = eye.map_or(1.0, |e| (tf.translation.distance(e) / phy::ROCKET_NEAR_FADE).clamp(0.0, 1.0));
         if near < 1.0 {
             tf.scale *= near;
