@@ -24,6 +24,10 @@ pub struct TerrainExt {
     #[texture(100)]
     #[sampler(101)]
     pub second: Handle<Image>,
+    /// x: 0 = two-texture blend (OP_2V*), 1 = lightmap (OP_*L*: `second` is the `_LM` texture on the
+    /// second UV set, adding its light); y: lightmap strength.
+    #[uniform(102)]
+    pub params: Vec4,
 }
 
 impl MaterialExtension for TerrainExt {

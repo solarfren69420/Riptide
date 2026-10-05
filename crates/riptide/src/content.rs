@@ -144,6 +144,8 @@ pub struct Piece {
     pub boat: Option<Handle<crate::boatshader::BoatMaterial>>,
     /// H2Overdrive two-texture terrain (crate::terrain), drawn instead of `material`.
     pub terrain: Option<Handle<crate::terrain::TerrainMat>>,
+    /// H2Overdrive lightmapped parts (`OP_*L*`): the `_LM` texture, read on the mesh's UV_1.
+    pub lightmap: Option<Handle<Image>>,
     /// Rigged models: the bone the piece rides (its vertices are in that bone's space).
     pub bone: Option<u16>,
 }
@@ -152,6 +154,9 @@ impl Piece {
     /// Give `e` this piece's material: the original boat shader or two-texture terrain where the
     /// piece has one, else its standard material.
     pub fn apply(&self, e: &mut bevy::ecs::system::EntityCommands) {
+        if let Some(lm) = &self.lightmap {
+            e.insert(bevy::pbr::Lightmap { image: lm.clone(), uv_rect: Rect::new(0.0, 0.0, 1.0, 1.0), bicubic_sampling: false });
+        }
         match (&self.boat, &self.terrain) {
             (Some(b), _) => e.insert(MeshMaterial3d(b.clone())),
             (None, Some(t)) => e.insert(MeshMaterial3d(t.clone())),
@@ -499,7 +504,7 @@ impl Models<'_> {
         }
         let second = self.texture(source, part.textures.get(1)?)?.0;
         mesh.insert_attribute(Mesh::ATTRIBUTE_COLOR, part.colors.clone());
-        Some(self.terrains.add(crate::terrain::TerrainMat { base: base.clone(), extension: crate::terrain::TerrainExt { second } }))
+        Some(self.terrains.add(crate::terrain::TerrainMat { base: base.clone(), extension: crate::terrain::TerrainExt { second, params: Vec4::ZERO } }))
     }
 
     fn boat_defaults(&mut self) -> [Handle<Image>; 4] {
@@ -532,8 +537,17 @@ impl Models<'_> {
 
     fn build(&mut self, model: &Model, source: Source, unlit: bool) -> Vec<Piece> {
         let mut out = Vec::new();
+        // H2Overdrive props are drawn in passes over the same triangles: D_Opaque (depth only), L_VV
+        // (vertex-colour light), then the textured pass. Drawn as separate opaque surfaces they
+        // z-fought (grey and black speckle); keep only the textured pass where one matches.
+        let textured: std::collections::HashSet<(usize, usize)> =
+            model.parts.iter().filter(|p| p.texture.is_some()).map(|p| (p.positions.len(), p.indices.len())).collect();
         for part in &model.parts {
             if part.indices.is_empty() {
+                continue;
+            }
+            let pass_only = matches!(part.shader.as_deref(), Some("D_Opaque") | Some("L_VV"));
+            if source == Source::Lux && pass_only && part.texture.is_none() && textured.contains(&(part.positions.len(), part.indices.len())) {
                 continue;
             }
             let n = part.positions.len();
@@ -557,6 +571,22 @@ impl Models<'_> {
             // Sky effect layers (London's lightning flashes: FX_Textured, white on black) add light.
             let alpha_mode = if unlit && shader.starts_with("FX_") { AlphaMode::Add } else { alpha_mode };
             let deferred = tex.is_none() && part.texture.is_some() && self.pending();
+            // Lightmapped H2Overdrive parts (OP_OLP, OP_2LP, OP_CLP ...), opt-in (RIPTIDE_LIGHTMAPS=1): on the software
+            // renderer meshes with UV_1 drew nothing through the terrain extension (CHECKLIST.md). The
+            // `_LM` texture on the second
+            // UV set (a 0..1 atlas) adds its baked light, as the original pixel program does.
+            let lightmap = (source == Source::Lux
+                && !unlit
+                && part.uvs1.len() == n
+                && part.shader.as_deref().is_some_and(|s| s.len() >= 5 && s.starts_with("OP_") && s.as_bytes()[4] == b'L')
+                && std::env::var("RIPTIDE_LIGHTMAPS").is_ok_and(|v| v == "1"))
+                .then(|| part.textures.iter().find(|t| t.contains("_LM")).cloned())
+                .flatten()
+                .and_then(|t| self.texture(source, &t).map(|x| x.0));
+            if lightmap.is_some() {
+                mesh.insert_attribute(Mesh::ATTRIBUTE_UV_1, part.uvs1.clone());
+                debug!("lightmap {:?} on {:?}", part.textures.iter().find(|t| t.contains("_LM")), part.shader);
+            }
             let material = StandardMaterial {
                 base_color: if tex.is_some() { Color::WHITE } else { Color::srgb(0.55, 0.55, 0.58) },
                 base_color_texture: tex.map(|t| t.0),
@@ -572,13 +602,23 @@ impl Models<'_> {
             let handle = self.materials.add(material.clone());
             let boat = self.boat_material(source, part, &mut mesh);
             // Not on sky domes (unlit): their materials stay as they are.
-            let terrain = if unlit { None } else { self.terrain_material(source, part, &mut mesh, &material) };
+            let terrain = match &lightmap {
+                // Through the terrain extension (crate::terrain, lightmap mode): Bevy's own Lightmap
+                // component showed no effect.
+                Some(lm) => Some(self.terrains.add(crate::terrain::TerrainMat {
+                    base: material.clone(),
+                    extension: crate::terrain::TerrainExt { second: lm.clone(), params: Vec4::new(1.0, crate::sheets::physics::LIGHTMAP_STRENGTH, 0.0, 0.0) },
+                })),
+                None if unlit => None,
+                None => self.terrain_material(source, part, &mut mesh, &material),
+            };
+            let lightmap: Option<Handle<Image>> = None;
             if deferred {
                 self.cache.deferred.push(DeferredMaterial {
                     handle: handle.clone(), source, texture: part.texture.clone().unwrap(), shader: shader.to_string(), blend: part.blend,
                 });
             }
-            out.push(Piece { mesh: self.meshes.add(mesh), material: handle, bone: part.bone, boat, terrain });
+            out.push(Piece { mesh: self.meshes.add(mesh), material: handle, bone: part.bone, boat, terrain, lightmap });
         }
         out
     }

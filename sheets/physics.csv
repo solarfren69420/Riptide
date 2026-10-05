@@ -182,3 +182,4 @@ waterfall_gravity,f32,2000,units/s^2,riptide design: the waterfall sheet falls u
 waterfall_columns,f32,24,vertices,riptide design: waterfall sheet grid across
 waterfall_rows,f32,24,vertices,riptide design: waterfall sheet grid down
 waterfall_white_bias,f32,2,-,riptide design (CSWaterfall White Bias default unknown): the waterfall program clamps light x bias to 0..1; 2 saturates sunlit falls to white
+lightmap_strength,f32,1,-,riptide calibration: H2Overdrive lightmaps (OP_*L*) add surface x lightmap x this as light (the original adds lightmap x emissive)

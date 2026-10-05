@@ -12,6 +12,7 @@
 
 @group(#{MATERIAL_BIND_GROUP}) @binding(100) var second_texture: texture_2d<f32>;
 @group(#{MATERIAL_BIND_GROUP}) @binding(101) var second_sampler: sampler;
+@group(#{MATERIAL_BIND_GROUP}) @binding(102) var<uniform> terrain: vec4<f32>;
 
 @fragment
 fn fragment(
@@ -22,6 +23,20 @@ fn fragment(
     // The surface textures tile on the first UV set; the mesh's second set is a 0..1 atlas (mostly
     // zero on these parts), where both textures came out as a transparent black corner.
     let uv1 = in.uv;
+    if terrain.x > 0.5 {
+        // Lightmap (OP_*L*): the baked light on the second UV set (a 0..1 atlas) adds to the lit
+        // surface, as the original pixel program adds lightmap x emissive to its light.
+#ifdef VERTEX_UVS_B
+        let lm = textureSample(second_texture, second_sampler, in.uv_b).rgb;
+#else
+        let lm = vec3<f32>(0.0);
+#endif
+        pbr_input.material.emissive = vec4<f32>(pbr_input.material.base_color.rgb * lm * terrain.y, 1.0);
+        var lit: FragmentOutput;
+        lit.color = apply_pbr_lighting(pbr_input);
+        lit.color = main_pass_post_lighting_processing(pbr_input, lit.color);
+        return lit;
+    }
     let second = textureSample(second_texture, second_sampler, uv1);
 #ifdef VERTEX_COLORS
     let blend = clamp(second.a * in.color.a, 0.0, 1.0);
