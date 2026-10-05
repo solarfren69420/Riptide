@@ -376,6 +376,11 @@ fn main() -> Result<()> {
             }).sum();
             println!("{}: {} tris, {} parts, path {} edges ({len:.0} units, looped {}), {} instances, {} starts", a(2)?, t.terrain.triangle_count(), t.terrain.parts.len(), t.path.len(), t.looped, t.instances.len(), t.starts.len());
             println!("  river: {} sectors (including side routes), {} drops over 40 Riptide units", t.river.len(), t.river.iter().filter(|[a,b]| (a.water-b.water)*1.6 > 40.0).count());
+            for (i, [a, b]) in t.river.iter().enumerate() {
+                if (b.water - a.water) * 1.6 > 20.0 {
+                    println!("  RISE river {i}: {:.0} -> {:.0} at [{:.0}, {:.0}] (Riptide {:.0}, {:.0})", a.water, b.water, (b.start[0] + b.end[0]) * 0.5, (b.start[2] + b.end[2]) * 0.5, (b.start[0] + b.end[0]) * 0.8, -(b.start[2] + b.end[2]) * 0.8);
+                }
+            }
             if let Some((lo, hi)) = t.terrain.bounds() { println!("  bounds {lo:?} .. {hi:?}"); }
             if let (Some(f), Some(l)) = (t.path.first(), t.path.last()) { println!("  path first {:?}..{:?} last {:?}", f.start, f.end, l.start); }
             if let Some(s) = t.starts.first() { println!("  start {:?}", s); }
@@ -612,6 +617,7 @@ fn main() -> Result<()> {
                 return Ok(());
             }
             if args.get(2).map(String::as_str) == Some("WATER") {
+println!("{} fires: {:?}", lvl.fires.len(), lvl.fires.iter().take(3).map(|f| (&f.def, f.position, f.scale)).collect::<Vec<_>>());
                 println!("{} water edges, {} water sectors", lvl.water_edges.len(), lvl.water_sectors.len());
                 for s in &lvl.water_sectors {
                     let (a, b) = (&lvl.water_edges[s.leading], &lvl.water_edges[s.trailing]);

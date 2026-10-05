@@ -259,9 +259,20 @@ pub struct Booster {
     pub placement: Placement,
 }
 
+/// A level fire, smoke or torch (`<code>_Fire`, CRocketFlameEntity): a rocket flame def run at a
+/// fixed spot, emitting along its local +Z (Riptide -Z after the mirror).
+#[derive(Clone, Debug)]
+pub struct LevelFire {
+    pub def: String,
+    pub position: [f32; 3],
+    pub rotation: [f32; 4],
+    pub scale: f32,
+}
+
 #[derive(Debug, Clone, Default)]
 pub struct H2Level {
     pub code: String,
+    pub fires: Vec<LevelFire>,
     pub title: String,
     /// Terrain meshes (`sg_<code>_PropSectorN`), placed at the origin.
     pub sector_meshes: Vec<String>,
@@ -376,6 +387,16 @@ pub fn load_level(lux: &LuxArchive, code: &str) -> Result<H2Level> {
                 lvl.props.push(placement);
             }
         }
+    }
+
+    for o in load_list_with_defaults(lux, &format!("{code}_Fire")).unwrap_or_default() {
+        let (Some(def), Some(position)) = (o.get("FlameDef").filter(|d| !d.is_empty()), o.vec3("Position")) else { continue };
+        lvl.fires.push(LevelFire {
+            def: def.to_string(),
+            position,
+            rotation: o.quat("Orientation").unwrap_or([0.0, 0.0, 0.0, 1.0]),
+            scale: o.f32("Scale").unwrap_or(1.0),
+        });
     }
 
     for o in load_list(lux, &format!("{code}_startpoints")).unwrap_or_default() {

@@ -177,6 +177,10 @@ pub fn decode_track(obj: &R2Object) -> Result<HtTrack> {
         // Records whose `+0x10` high half is 0x1002 use `+0x0c` for something else: no yaw.
         let special = obj.u32(b + 0x10).is_some_and(|v| v >> 16 == 0x1002);
         let yaw = if special { 0.0 } else { -(obj.u16(b + 0x0e).unwrap_or(0) as f32 / 65536.0 * std::f32::consts::TAU) };
+        if std::env::var_os("RIPTIDE_HT_INST_DEBUG").is_some() {
+            let w: Vec<String> = (0x0c..0x24).step_by(2).map(|o| format!("{:04x}", obj.u16(b + o).unwrap_or(0))).collect();
+            eprintln!("inst {geometry} {name:?} at {x:.0} {y:.0} {z:.0} raw0c.. {}", w.join(" "));
+        }
         inst.push(HtInstance { geometry: geometry.to_string(), name, position: [x, y, -z], yaw, scale });
     }
 

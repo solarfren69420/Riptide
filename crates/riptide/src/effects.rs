@@ -19,7 +19,7 @@ impl Plugin for EffectsPlugin {
         app.init_resource::<FlameArt>()
             .add_systems(OnEnter(Screen::Race), (load_art, load_bolt_art))
             .add_systems(Update, (emit, animate, hull_bolts).chain().run_if(in_state(Screen::Race)))
-            .add_systems(Update, (emit_flames, animate_flames).chain()
+            .add_systems(Update, (emit_flames, emit_level_fires, animate_flames).chain()
                 .after(emit)
                 .after(crate::race::place_boats)
                 .after(crate::boatrig::animate)
@@ -260,6 +260,8 @@ struct FlameArt(HashMap<usize, Vec<Handle<StandardMaterial>>>);
 
 #[derive(Component)]
 struct Flame {
+    /// From a level fire (`LevelFire`), not a boat: counted against its own particle budget.
+    level: bool,
     layer: usize,
     vel: Vec3,
     age: f32,
@@ -351,7 +353,7 @@ fn emit_flames(
 ) {
     let Some(art) = art else { return };
     let dt = time.delta_secs().min(1.0 / 20.0);
-    let mut budget = (phy::ROCKET_MAX_PARTICLES as usize).saturating_sub(live.iter().filter(|p| p.age + dt < p.life).count());
+    let mut budget = (phy::ROCKET_MAX_PARTICLES as usize).saturating_sub(live.iter().filter(|p| !p.level && p.age + dt < p.life).count());
     let mut seed = (time.elapsed_secs() * 7919.0) as u32 | 1;
     let mut rand = move || {
         seed ^= seed << 13;
@@ -435,6 +437,7 @@ fn emit_flames(
                     // Interpolate the nozzle's birth position within this frame.
                     Transform::from_translation(nozzle - carry * age + jitter).with_scale(Vec3::splat(l.high_scale0_val.max(0.01) * size)),
                     Flame {
+                        level: false,
                         layer,
                         vel: carry + direction * speed,
                         age: -born_at,
@@ -664,6 +667,94 @@ fn hull_bolts(
                         mat.0 = mats[step].clone();
                     }
                 }
+            }
+        }
+    }
+}
+
+// ---- Level fires, smoke, torches, leaks and splashes: `<code>_Fire` (CRocketFlameEntity) ------
+
+/// A rocket flame def running at a fixed spot of the level, emitting along its local +Z (-Z in
+/// Riptide space after the mirror), like a boat nozzle that never stops.
+#[derive(Component)]
+pub struct LevelFire {
+    flame: usize,
+    scale: f32,
+    due: HashMap<usize, f32>,
+}
+
+impl LevelFire {
+    pub fn new(def: &str, scale: f32) -> Option<Self> {
+        let flame = H2_ROCKET_FLAMES.iter().position(|f| f.id.eq_ignore_ascii_case(def))?;
+        Some(Self { flame, scale: scale.max(0.01), due: HashMap::new() })
+    }
+}
+
+fn emit_level_fires(
+    mut commands: Commands,
+    time: Res<Time>,
+    art: Option<Res<FxArt>>,
+    mut flames: ResMut<FlameArt>,
+    mut models: Models,
+    live: Query<&Flame>,
+    cam: Query<&Transform, With<ChaseCam>>,
+    mut fires: Query<(&Transform, &mut LevelFire)>,
+) {
+    let Some(art) = art else { return };
+    let Ok(eye) = cam.single().map(|c| c.translation) else { return };
+    let dt = time.delta_secs().min(1.0 / 20.0);
+    let mut budget = (phy::LEVEL_FIRE_MAX_PARTICLES as usize).saturating_sub(live.iter().filter(|p| p.level && p.age + dt < p.life).count());
+    let mut seed = (time.elapsed_secs() * 6271.0) as u32 | 1;
+    let mut rand = move || {
+        seed ^= seed << 13;
+        seed ^= seed >> 17;
+        seed ^= seed << 5;
+        (seed % 10_000) as f32 / 10_000.0 * 2.0 - 1.0
+    };
+    // Nearest first, so the budget goes to what the player can see.
+    let mut near: Vec<_> = fires.iter_mut().filter(|(tf, _)| tf.translation.distance(eye) < phy::LEVEL_FIRE_RANGE).collect();
+    near.sort_by(|a, b| a.0.translation.distance(eye).total_cmp(&b.0.translation.distance(eye)));
+    for (tf, mut fire) in near {
+        let f = &H2_ROCKET_FLAMES[fire.flame];
+        let direction = tf.rotation * Vec3::NEG_Z;
+        let s = fire.scale;
+        for layer in [f.layer0_def, f.layer1_def, f.layer2_def, f.layer3_def].into_iter().flatten() {
+            let mat = flames.0.entry(layer).or_insert_with(|| flame_materials(&mut models, layer))[0].clone();
+            let l = &H2_ROCKET_LAYERS[layer];
+            // A puff each time the last one has travelled Puff Dist (the emitter stands still).
+            let rate = (l.high_motion_speed.abs() / l.high_motion_puff_dist.max(0.01)).min(phy::LEVEL_FIRE_MAX_RATE);
+            let due = fire.due.entry(layer).or_default();
+            *due += rate * dt;
+            let n = *due as usize;
+            *due -= n as f32;
+            for k in 0..n {
+                if budget == 0 {
+                    return;
+                }
+                budget -= 1;
+                let born_at = (k as f32 + rand().abs()) / rate;
+                let life = (l.high_motion_life_secs + l.high_motion_life_secs_spread * rand()).max(0.02).max(2.5 * dt);
+                let speed = l.high_motion_speed + l.high_motion_speed_spread * rand();
+                let jitter = tf.rotation * Vec3::new(rand() * l.high_motion_pos_delta_x, rand() * l.high_motion_pos_delta_y, 0.0) * s;
+                let size = phy::ROCKET_SIZE * s;
+                commands.spawn((
+                    Mesh3d(art.quad.clone()),
+                    MeshMaterial3d(mat.clone()),
+                    Transform::from_translation(tf.translation + jitter).with_scale(Vec3::splat(l.high_scale0_val.max(0.01) * size)),
+                    Flame {
+                        level: true,
+                        layer,
+                        vel: direction * speed,
+                        age: -born_at,
+                        life,
+                        size,
+                        spin0: rand() * std::f32::consts::PI,
+                        spin_birth: (l.high_rot_speed_birth * (1.0 + l.high_rot_speed_birth_spread * rand()).max(0.0)) * rand().signum(),
+                        spin_death: l.high_rot_speed_death * (1.0 + l.high_rot_speed_death_spread * rand()).max(0.0),
+                    },
+                    NotShadowCaster,
+                    DespawnOnExit(Screen::Race),
+                ));
             }
         }
     }

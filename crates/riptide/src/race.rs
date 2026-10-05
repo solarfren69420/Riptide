@@ -567,6 +567,16 @@ fn spawn_race(
             });
         }
     }
+    // Level fires, smoke, torches, leaks and splashes (`<code>_Fire`): rocket flame defs at fixed spots.
+    let mut fires = 0;
+    for f in &level.fires {
+        let Some(fire) = crate::effects::LevelFire::new(&f.def, f.scale) else { continue };
+        commands.spawn((Transform::from_translation(Vec3::from(f.position)).with_rotation(Quat::from_array(f.rotation).normalize()), fire, scope.clone()));
+        fires += 1;
+    }
+    if fires > 0 {
+        info!("{code}: {fires} level fires / smoke / splashes");
+    }
     // Props.
     let mut animated = 0;
     let mut moving = 0;

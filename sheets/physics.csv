@@ -199,3 +199,6 @@ floater_max_radius,f32,400,units,riptide design: footprint radius cap for a floa
 h2water_surface_max,f32,400,units,riptide design: boats ride the H2Overdrive water sector under them when it is within this of the racing-line water height (else the racing line)
 chute_half_way_fraction,f32,0.25,-,riptide design: a racing-line drop is a sloped chute when the level's drawn water halfway along it is already down by this fraction of the drop (else the water steps and boats fly off)
 finish_line_reach,f32,0.25,fraction of the course width,riptide design: the finish line (through the finish buoys) spans the course and this far past either bank (the original tripwire spans the course)
+level_fire_max_particles,f32,600,particles,riptide design: live particle budget for level fires / smoke / torches / leaks (separate from the boats' rocket flames)
+level_fire_range,f32,9000,units,riptide design: level fire emitters farther than this from the camera are idle
+level_fire_max_rate,f32,60,per second,riptide design: cap on one level fire layer's puff rate
