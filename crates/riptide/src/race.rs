@@ -901,7 +901,13 @@ fn spawn_water(commands: &mut Commands, models: &mut Models, level: &H2Level, tr
                     img.sampler = bevy::image::ImageSampler::Descriptor(crate::content::repeat_sampler());
                 }
             }
-            let n = crate::h2water::spawn(commands, level, &sh, &mut models.meshes, &mut models.h2water, &mut models.images, bump, phy::WATER_CELL.max(1.0));
+            let n = crate::h2water::spawn(commands, level, &sh, &mut models.meshes, &mut models.h2water, &mut models.images, bump.clone(), phy::WATER_CELL.max(1.0));
+            let lux = models.content.lux.clone();
+            if let Some(blob) = lux.get("shad4.FX_Waterfall") {
+                let art = [format!("pt_{}_waterfall1", level.code), "pt_wa_waterfall1".into()].iter().find_map(|n| models.lux_texture(n)).unwrap_or_else(|| bump.clone());
+                let falls = crate::h2water::spawn_waterfalls(commands, level, &mut models.shaders, blob, &mut models.meshes, &mut models.waterfalls, &mut models.images, art);
+                info!("h2water: {falls} waterfalls with shad4.FX_Waterfall");
+            }
             info!("h2water: {n} sectors with shad4.FX_Water2");
             n > 0
         });

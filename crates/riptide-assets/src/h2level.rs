@@ -204,7 +204,21 @@ pub struct WaterEdge {
     pub whitewash_color: [f32; 4],
     pub specular_color: [f32; 4],
     pub reflection_tint: [f32; 4],
+    /// The waterfall the original draws where the water drops after this edge (`Waterfall *`).
+    pub waterfall: WaterfallFields,
     pub light: Option<WaterLight>,
+}
+
+/// An edge's `Waterfall *` properties (engine defaults when unset).
+#[derive(Debug, Clone, Copy, Default)]
+pub struct WaterfallFields {
+    pub disable: bool,
+    pub width: f32,
+    pub speed: f32,
+    pub flare: f32,
+    pub curve: f32,
+    pub light_scale: f32,
+    pub color: [f32; 4],
 }
 
 /// A `CSPropLightEdgeInfo` (an edge's `Light Info Ob`): one directional light plus ambient.
@@ -606,6 +620,15 @@ fn water_sectors(lux: &LuxArchive, code: &str, lvl: &mut H2Level) {
             specular_color: c4("Specular Color motif color"),
             reflection_tint: c4("Reflection Tint motif color"),
             light: o.get("Light Info Ob").and_then(|n| lights.get(n.trim())).copied(),
+            waterfall: WaterfallFields {
+                disable: o.get("Waterfall Disable").is_some_and(|v| v.trim() == "1"),
+                width: o.f32("Waterfall Width").unwrap_or(1.0),
+                speed: o.f32("Waterfall Speed").unwrap_or(0.5),
+                flare: o.f32("Waterfall Flare").unwrap_or(0.2),
+                curve: o.f32("Waterfall Curve").unwrap_or(0.2),
+                light_scale: o.f32("Waterfall Light Scale").unwrap_or(1.3),
+                color: c4("Waterfall Color motif color"),
+            },
         });
     }
     for s in objs.iter().filter(|o| o.class == "CSPropWaterSector") {

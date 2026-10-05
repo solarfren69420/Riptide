@@ -602,6 +602,12 @@ fn main() -> Result<()> {
             }
             if args.get(2).map(String::as_str) == Some("WATER") {
                 println!("{} water edges, {} water sectors", lvl.water_edges.len(), lvl.water_sectors.len());
+                for s in &lvl.water_sectors {
+                    let (a, b) = (&lvl.water_edges[s.leading], &lvl.water_edges[s.trailing]);
+                    if (a.water - b.water).abs() > 30.0 {
+                        println!("DROP {} -> {}: {:.0} -> {:.0} ({:+.0})", a.name, b.name, a.water, b.water, b.water - a.water);
+                    }
+                }
                 for e in &lvl.water_edges {
                     println!("{e:?}");
                 }

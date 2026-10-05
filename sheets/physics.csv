@@ -176,3 +176,9 @@ ht_water_reflection,f32,0.55,-,riptide design: Hydro Thunder generated water edg
 h2water_clip_lift,f32,2,units,riptide design: the reflection camera clips everything this little above the water surface and below (no seam where geometry meets the water)
 boatshader_specular_exponent,f32,20,-,observed: H2Overdrive boat materials (mesh32 material record +0x2b0) carry specular exponent 20
 boatshader_ambient,f32,0.6,-,riptide design: the scene ambient colour scaled for the boat shader (the original fed its own ambient)
+waterfall_min_drop,f32,150,units,riptide design: a water sector dropping more than this (and steeply) is drawn as a waterfall (shad4.FX_Waterfall)
+waterfall_min_steepness,f32,0.4,drop per unit run,riptide design: a water sector this steep is a waterfall
+waterfall_gravity,f32,2000,units/s^2,riptide design: the waterfall sheet falls under this (sets its fall time and launch speed so it lands on the bottom edge)
+waterfall_columns,f32,24,vertices,riptide design: waterfall sheet grid across
+waterfall_rows,f32,24,vertices,riptide design: waterfall sheet grid down
+waterfall_white_bias,f32,2,-,riptide design (CSWaterfall White Bias default unknown): the waterfall program clamps light x bias to 0..1; 2 saturates sunlit falls to white

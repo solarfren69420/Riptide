@@ -204,6 +204,7 @@ pub struct Models<'w> {
     pub water: ResMut<'w, Assets<crate::water::WaterMat>>,
     /// H2Overdrive's own water shader (crate::h2water) and the shaders it translates into.
     pub h2water: ResMut<'w, Assets<crate::h2water::H2WaterMaterial>>,
+    pub waterfalls: ResMut<'w, Assets<crate::h2water::WaterfallMaterial>>,
     pub boats: ResMut<'w, Assets<crate::boatshader::BoatMaterial>>,
     pub shaders: ResMut<'w, Assets<Shader>>,
 }

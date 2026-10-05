@@ -33,6 +33,7 @@ pub struct H2WaterPlugin;
 impl Plugin for H2WaterPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugins(MaterialPlugin::<H2WaterMaterial>::default())
+            .add_plugins(MaterialPlugin::<WaterfallMaterial>::default())
             .add_systems(PostUpdate, follow_reflection.before(bevy::transform::TransformSystems::Propagate));
     }
 }
@@ -333,6 +334,10 @@ pub fn spawn(
             hi: corners.iter().fold(Vec2::MIN, |m, c| m.max(c.xz())),
         });
 
+        // Waterfalls are drawn by FX_Waterfall (spawn_waterfalls), not as a steep slab of water.
+        if is_waterfall(a, b) {
+            continue;
+        }
         // A grid over the sector's quad; positions are (x, z) from the mesh origin.
         let along = ((c1 - c0).length().max((c2 - c3).length()) / cell).ceil().clamp(1.0, 96.0) as u32;
         let across = ((c3 - c0).length().max((c2 - c1).length()) / cell).ceil().clamp(1.0, 96.0) as u32;
@@ -553,6 +558,7 @@ pub fn edges_from_river(level: &mut H2Level, river: &[([f32; 3], [f32; 3], f32, 
             specular_color: [0.65, 0.65, 0.65, 1.0],
             reflection_tint: [phy::HT_WATER_REFLECTION, phy::HT_WATER_REFLECTION, phy::HT_WATER_REFLECTION, 1.0],
             light: Some(WaterLight { direction: [-0.5, -0.7, 0.3], color: [1.0, 0.95, 0.85, 1.0], intensity: 1.0, ambient: [0.75, 0.8, 0.85, 1.0], ambient_intensity: 0.4 }),
+            waterfall: riptide_assets::h2level::WaterfallFields { disable: false, width: 1.0, speed: 0.5, flare: 0.2, curve: 0.2, light_scale: 1.3, color: [1.0; 4] },
         });
         index.push((k, i));
         i
@@ -585,4 +591,219 @@ pub fn tint_from(level: &mut H2Level, image: &Image) {
     for e in level.water_edges.iter_mut().filter(|e| e.name.starts_with("river")) {
         e.water_color = color;
     }
+}
+
+// ---- Waterfalls: shad4.FX_Waterfall ----------------------------------------------------------
+
+const FALL_VERTEX: Handle<Shader> = uuid_handle!("6f0b8c52-3a51-4b0e-9a8e-2f1d6c0a9e31");
+const FALL_FRAGMENT: Handle<Shader> = uuid_handle!("6f0b8c52-3a51-4b0e-9a8e-2f1d6c0a9e32");
+
+/// The original's falling sheet of water where a sector drops steeply: a grid launched from the
+/// top edge that falls under gravity (its vertex program), textured by scrolling layers of the
+/// waterfall art faded by a ramp (its pixel program).
+#[derive(Asset, AsBindGroup, TypePath, Clone, Debug)]
+pub struct WaterfallMaterial {
+    #[uniform(0)]
+    pub vs: D3d9Block,
+    #[uniform(1)]
+    pub ps: D3d9Block,
+    #[texture(2)]
+    #[sampler(3)]
+    pub art: Handle<Image>,
+    #[texture(4)]
+    #[sampler(5)]
+    pub ramp: Handle<Image>,
+}
+
+impl Material for WaterfallMaterial {
+    fn vertex_shader() -> ShaderRef {
+        FALL_VERTEX.into()
+    }
+    fn fragment_shader() -> ShaderRef {
+        FALL_FRAGMENT.into()
+    }
+    fn alpha_mode(&self) -> AlphaMode {
+        AlphaMode::Blend
+    }
+    fn enable_prepass() -> bool {
+        false
+    }
+    fn enable_shadows() -> bool {
+        false
+    }
+    fn specialize(
+        _pipeline: &MaterialPipeline,
+        descriptor: &mut RenderPipelineDescriptor,
+        layout: &MeshVertexBufferLayoutRef,
+        _key: MaterialPipelineKey<Self>,
+    ) -> Result<(), SpecializedMeshPipelineError> {
+        // One input: texcoord0 = (column, row) of the grid.
+        descriptor.vertex.buffers = vec![layout.0.get_layout(&[Mesh::ATTRIBUTE_POSITION.at_shader_location(0)])?];
+        descriptor.vertex.entry_point = Some("vertex".into());
+        if let Some(f) = descriptor.fragment.as_mut() {
+            f.entry_point = Some("fragment".into());
+        }
+        descriptor.primitive.cull_mode = None;
+        Ok(())
+    }
+}
+
+/// Translate `shad4.FX_Waterfall`'s fullest vertex / pixel pair once per run.
+fn install_waterfall(shaders: &mut Assets<Shader>, blob: &[u8]) -> Option<H2WaterShaders> {
+    static DONE: std::sync::OnceLock<H2WaterShaders> = std::sync::OnceLock::new();
+    if let Some(sh) = DONE.get() {
+        if shaders.contains(&FALL_VERTEX) {
+            return Some(sh.clone());
+        }
+    }
+    let progs = d3d9_shader::programs(blob);
+    let vs = progs.iter().filter(|p| !p.pixel).max_by_key(|p| p.tokens.len())?.clone();
+    let ps = progs.iter().filter(|p| p.pixel).max_by_key(|p| p.tokens.len())?.clone();
+    let mut o = wgsl::Options { group: "#{MATERIAL_BIND_GROUP}".into(), constants_binding: 0, first_texture: 2, entry: "vertex".into(), ..default() };
+    o.prelude = "#import bevy_pbr::mesh_view_bindings::{view, globals}".into();
+    let reg = |p: &Program, name: &str| p.constants.iter().find(|c| c.name == name && c.set == 2).map(|c| c.index as u32);
+    if let Some(r) = reg(&vs, "g_MtxViewProj") {
+        for k in 0..4 {
+            o.constants.insert(r + k, format!("vec4<f32>(view.clip_from_world[0][{k}], view.clip_from_world[1][{k}], view.clip_from_world[2][{k}], view.clip_from_world[3][{k}])"));
+        }
+    }
+    if let Some(r) = reg(&vs, "g_CamPos_WS") {
+        o.constants.insert(r, "vec4<f32>(view.world_position, 1.0)".into());
+    }
+    if let Some(r) = reg(&vs, "g_fElapsedSecs") {
+        o.constants.insert(r, "vec4<f32>(globals.time)".into());
+    }
+    let vs_src = wgsl::translate(&vs, &o);
+    let o = wgsl::Options { group: "#{MATERIAL_BIND_GROUP}".into(), constants_binding: 1, first_texture: 2, entry: "fragment".into(), ..default() };
+    let ps_src = wgsl::translate(&ps, &o);
+    if std::env::var_os("RIPTIDE_H2WATER_DUMP").is_some() {
+        let _ = std::fs::write("waterfall_vs.wgsl", &vs_src);
+        let _ = std::fs::write("waterfall_ps.wgsl", &ps_src);
+    }
+    let _ = shaders.insert(&FALL_VERTEX, Shader::from_wgsl(vs_src, "riptide://waterfall_vs.wgsl"));
+    let _ = shaders.insert(&FALL_FRAGMENT, Shader::from_wgsl(ps_src, "riptide://waterfall_ps.wgsl"));
+    let sh = H2WaterShaders { vs, ps };
+    let _ = DONE.set(sh.clone());
+    Some(sh)
+}
+
+/// Is the sector from `a` to `b` a waterfall (steep drop)?
+pub fn is_waterfall(a: &WaterEdge, b: &WaterEdge) -> bool {
+    let drop = a.water - b.water;
+    let mid = |e: &WaterEdge| Vec2::new((e.start[0] + e.end[0]) * 0.5, (e.start[2] + e.end[2]) * 0.5);
+    let run = mid(a).distance(mid(b)).max(1.0);
+    !a.waterfall.disable && drop > phy::WATERFALL_MIN_DROP && drop > run * phy::WATERFALL_MIN_STEEPNESS
+}
+
+/// A fade ramp for the pixel program's second sampler: opaque in the middle of the sheet,
+/// fading out at its sides and lightly towards the bottom.
+fn waterfall_ramp(images: &mut Assets<Image>) -> Handle<Image> {
+    let n = 64u32;
+    let mut data = Vec::with_capacity((n * n * 4) as usize);
+    for y in 0..n {
+        for x in 0..n {
+            let u = (x as f32 + 0.5) / n as f32;
+            let v = (y as f32 + 0.5) / n as f32;
+            let side = ((u * std::f32::consts::PI).sin() * 1.6).min(1.0);
+            let a = (side * (1.0 - 0.35 * v)).clamp(0.0, 1.0);
+            data.extend_from_slice(&[255, 255, 255, (a * 255.0) as u8]);
+        }
+    }
+    let mut img = Image::new(
+        bevy::render::render_resource::Extent3d { width: n, height: n, depth_or_array_layers: 1 },
+        bevy::render::render_resource::TextureDimension::D2,
+        data,
+        bevy::render::render_resource::TextureFormat::Rgba8Unorm,
+        bevy::asset::RenderAssetUsages::RENDER_WORLD,
+    );
+    img.sampler = bevy::image::ImageSampler::Descriptor(crate::content::repeat_sampler());
+    images.add(img)
+}
+
+/// Spawn the waterfalls of `level` (steep sectors): returns how many.
+pub fn spawn_waterfalls(
+    commands: &mut Commands,
+    level: &H2Level,
+    shaders: &mut Assets<Shader>,
+    blob: &[u8],
+    meshes: &mut Assets<Mesh>,
+    materials: &mut Assets<WaterfallMaterial>,
+    images: &mut Assets<Image>,
+    art: Handle<Image>,
+) -> usize {
+    let Some(sh) = install_waterfall(shaders, blob) else { return 0 };
+    let ramp = waterfall_ramp(images);
+    let (nx, ny) = (phy::WATERFALL_COLUMNS.max(2.0) as u32, phy::WATERFALL_ROWS.max(2.0) as u32);
+    let mut pos = Vec::new();
+    for j in 0..ny {
+        for i in 0..nx {
+            pos.push([i as f32, j as f32, 0.0]);
+        }
+    }
+    let mut idx = Vec::new();
+    for j in 0..ny - 1 {
+        for i in 0..nx - 1 {
+            let k = j * nx + i;
+            idx.extend_from_slice(&[k, k + nx, k + 1, k + 1, k + nx, k + nx + 1]);
+        }
+    }
+    let mesh = meshes.add(
+        Mesh::new(PrimitiveTopology::TriangleList, bevy::asset::RenderAssetUsages::RENDER_WORLD)
+            .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, pos)
+            .with_inserted_indices(Indices::U32(idx)),
+    );
+    let edges = &level.water_edges;
+    let mut count = 0;
+    for s in &level.water_sectors {
+        let (a, b) = (&edges[s.leading], &edges[s.trailing]);
+        if !is_waterfall(a, b) {
+            continue;
+        }
+        let mid = |e: &WaterEdge| Vec3::new((e.start[0] + e.end[0]) * 0.5, e.water, (e.start[2] + e.end[2]) * 0.5);
+        let width = |e: &WaterEdge| Vec2::new(e.end[0] - e.start[0], e.end[2] - e.start[2]).length();
+        let (top, bottom) = (mid(a), mid(b));
+        let dir = (bottom - top).xz().normalize_or(Vec2::Y);
+        let run = (bottom - top).xz().length();
+        let drop = top.y - bottom.y;
+        // Launched flat, falling under gravity: the fall time lands the sheet on the bottom edge.
+        let g = phy::WATERFALL_GRAVITY.max(1.0);
+        let t = (2.0 * drop / g).sqrt().max(0.05);
+        let mut vs = D3d9Block::default();
+        let mut ps = D3d9Block::default();
+        let w = |vs: &mut D3d9Block, n: &str, v: Vec4| set(vs, &sh.vs, n, 0, v);
+        w(&mut vs, "g_vTopPos", top.extend(1.0));
+        w(&mut vs, "g_vUnitDirXZ", Vec4::new(dir.x, 0.0, dir.y, 0.0));
+        w(&mut vs, "g_fTopWidth", Vec4::splat(width(a) * a.waterfall.width));
+        w(&mut vs, "g_fBottomWidthMult", Vec4::splat((width(b) / width(a).max(1.0)).clamp(0.25, 4.0)));
+        w(&mut vs, "g_fTopSpeed", Vec4::splat(run / t));
+        w(&mut vs, "g_fTopPitchSin", Vec4::splat(0.0));
+        w(&mut vs, "g_fTopPitchCos", Vec4::splat(1.0));
+        w(&mut vs, "g_fGravity", Vec4::splat(-g));
+        w(&mut vs, "g_fDescentSecs", Vec4::splat(t));
+        w(&mut vs, "g_fDeltaSecsBetweenVtx", Vec4::splat(t / (ny - 1) as f32));
+        w(&mut vs, "g_fVtxInvCountX", Vec4::splat(1.0 / (nx - 1) as f32));
+        w(&mut vs, "g_fVtxInvCountY", Vec4::splat(1.0 / (ny - 1) as f32));
+        w(&mut vs, "g_fFlowSpeedMult", Vec4::splat(a.waterfall.speed));
+        // White Bias is CSWaterfall's own property (a brightness multiplier on the light: the program
+        // clamps light x bias to 0..1), not the edge's Waterfall Flare.
+        w(&mut vs, "g_fWhiteBias", Vec4::splat(phy::WATERFALL_WHITE_BIAS));
+        let l = a.light.unwrap_or_default();
+        let to_light = -Vec3::from_array(l.direction).normalize_or(Vec3::NEG_Y);
+        w(&mut vs, "g_DirLight_uCount", Vec4::splat(1.0));
+        w(&mut vs, "g_DirLight_avUnitDir", to_light.extend(0.0));
+        w(&mut vs, "g_DirLight_avColor", Vec4::from_array(l.color) * l.intensity * a.waterfall.light_scale);
+        w(&mut vs, "g_AmbLight_vColor", Vec4::from_array(l.ambient) * l.ambient_intensity.max(0.3) * a.waterfall.light_scale);
+        set(&mut ps, &sh.ps, "g_vColorTint", 0, Vec4::from_array(a.waterfall.color));
+        let material = materials.add(WaterfallMaterial { vs, ps, art: art.clone(), ramp: ramp.clone() });
+        commands.spawn((
+            Mesh3d(mesh.clone()),
+            MeshMaterial3d(material),
+            Transform::IDENTITY,
+            bevy::camera::visibility::NoFrustumCulling,
+            DespawnOnExit(crate::Screen::Race),
+            Name::new(format!("h2 waterfall {count}")),
+        ));
+        count += 1;
+    }
+    count
 }
