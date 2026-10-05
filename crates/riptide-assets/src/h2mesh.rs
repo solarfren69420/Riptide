@@ -220,8 +220,15 @@ fn decode(name: &str, blob: &[u8], rigged: bool) -> Result<Model> {
 
         let nidx = rd(mb + 0x4b8).unwrap_or(0) as usize;
         let idx_bytes = rd(mb + 0x4bc).unwrap_or(0) as usize;
-        let Some(idx_ptr) = ptr(mb + 0x4c0) else { continue };
+        let dbg = std::env::var_os("RIPTIDE_MESH_DEBUG").is_some();
+        // 16-bit indices hang off 0x4c0, 32-bit ones off 0x4c4 (big sector meshes switch once their
+        // vertices pass 65535; reading only 0x4c0 dropped every material after that point).
+        let Some(idx_ptr) = ptr(mb + 0x4c0).or_else(|| ptr(mb + 0x4c4)) else {
+            if dbg { eprintln!("  material {m}: skipped, no index pointer (nidx {nidx} bytes {idx_bytes})"); }
+            continue;
+        };
         if nidx == 0 || idx_bytes == 0 {
+            if dbg { eprintln!("  material {m}: skipped, nidx {nidx} bytes {idx_bytes}"); }
             continue;
         }
         let isize = idx_bytes / nidx;

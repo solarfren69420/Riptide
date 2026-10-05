@@ -600,6 +600,17 @@ fn main() -> Result<()> {
                 }
                 return Ok(());
             }
+            if args.get(2).map(String::as_str) == Some("PROPS") {
+                // Each prop: mesh, position, and the water height of the nearest path edge.
+                for p in &lvl.props {
+                    let w = lvl.path.iter().min_by(|a, b| {
+                        let d = |e: &riptide_assets::h2level::Edge| (e.start[0] + e.end[0] - 2.0 * p.position[0]).powi(2) + (e.start[2] + e.end[2] - 2.0 * p.position[2]).powi(2);
+                        d(a).total_cmp(&d(b))
+                    }).map(|e| e.water).unwrap_or(0.0);
+                    println!("{} {:.0} {:.0} {:.0} water {:.0} above {:+.0} scale {:.2}", p.mesh, p.position[0], p.position[1], p.position[2], w, p.position[1] - w, p.scale);
+                }
+                return Ok(());
+            }
             if args.get(2).map(String::as_str) == Some("WATER") {
                 println!("{} water edges, {} water sectors", lvl.water_edges.len(), lvl.water_sectors.len());
                 for s in &lvl.water_sectors {
