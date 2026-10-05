@@ -2050,8 +2050,9 @@ fn hud(
                     }
                 } else if p.timed_out {
                     "TIME UP!\nR: race again   Esc: menu".into()
-                } else if let Some((msg, _)) = timer.as_ref().and_then(|t| t.banner.clone()) {
-                    msg
+                } else if timer.as_ref().is_some_and(|t| t.banner.is_some()) {
+                    // The original TIME EXTENDED card is drawn by hud::banners; no text over it.
+                    String::new()
                 } else if p.wipeout > 0.0 {
                     "WIPEOUT!".into()
                 } else if matches!(p.crush, Crush::Deploy(_)) {
