@@ -1888,17 +1888,22 @@ pub(crate) fn place_boats(
     let t = time.elapsed_secs();
     for (mut b, mut tf, hull) in &mut boats {
         let norm = (b.speed / phy::SPEED_NORM).clamp(0.0, 1.0);
+        // Riding terrain (a ramp, a mound): the hull sits on it, not in it. No water bob, no water
+        // draft, and it pitches with the slope (level on a ramp, its nose dug into the surface).
+        let on_floor = !b.airborne && b.surface > b.tp.water + 1.0;
         let target_roll = -b.control.steer * norm * 0.22;
         let target_pitch = if b.airborne {
             (b.vy / 900.0).clamp(-0.35, 0.3)
+        } else if on_floor {
+            b.climb_rate.atan2(b.vel.length().max(1.0)).clamp(-0.6, 0.6)
         } else {
             0.04 + 0.05 * (b.speed / phy::SPEED_NORM).clamp(0.0, 1.3)
         };
         b.roll += (target_roll - b.roll) * (dt * 5.0).min(1.0);
         b.pitch += (target_pitch - b.pitch) * (dt * 4.0).min(1.0);
         // Under H2Overdrive's water shader: sit on the surface it draws (crate::h2water::H2Waves).
-        let h2 = h2waves.as_ref().filter(|_| !b.airborne).and_then(|w| w.height(b.pos.xz(), time.elapsed_secs_wrapped()));
-        let bob = if let Some(h) = h2 { (h - b.pos.y).clamp(-phy::H2WATER_BOB_MAX, phy::H2WATER_BOB_MAX) } else if b.airborne { 0.0 } else {
+        let h2 = h2waves.as_ref().filter(|_| !b.airborne && !on_floor).and_then(|w| w.height(b.pos.xz(), time.elapsed_secs_wrapped()));
+        let bob = if let Some(h) = h2 { (h - b.pos.y).clamp(-phy::H2WATER_BOB_MAX, phy::H2WATER_BOB_MAX) } else if b.airborne || on_floor { 0.0 } else {
             // Match the rendered surface. Keeping the rig on the mean water
             // plane submerges its low exhaust nozzles whenever a crest passes.
             let k = std::f32::consts::TAU / phy::WAVE_LENGTH.max(1.0);
@@ -1915,7 +1920,7 @@ pub(crate) fn place_boats(
         let lift = hull.map_or(0.0, |h| {
             let d = b.info.def;
             let plane = (b.speed.max(0.0) / phy::SPEED_SCALE / d.onplane_speed.max(1.0)).clamp(0.0, 1.0);
-            let draft = d.buoyancy_depth_max + (d.buoyancy_depth_min - d.buoyancy_depth_max) * plane;
+            let draft = if on_floor { 0.0 } else { d.buoyancy_depth_max + (d.buoyancy_depth_min - d.buoyancy_depth_max) * plane };
             (h.0 - draft).max(0.0)
         });
         tf.translation = b.pos + Vec3::Y * (bob + lift);
