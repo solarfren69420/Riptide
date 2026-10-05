@@ -157,6 +157,18 @@ fn decode(name: &str, blob: &[u8], rigged: bool) -> Result<Model> {
         find(usage, 12).map(|s| (0..vcount).map(|i| { let o = s.0 + i * s.2; [f32_at(o), f32_at(o + 4), f32_at(o + 8)] }).collect())
     };
     let (binormals, tangents) = (vec3s(2), vec3s(3));
+    // A second texcoord stream (two-texture terrain): the second usage-5 stream of this size.
+    let uvs1: Option<Vec<[f32; 2]>> = streams.iter().filter(|s| s.3 == 5 && s.1 == vcount && s.2 >= 8).nth(1).map(|s| {
+        (0..vcount).map(|i| { let o = s.0 + i * s.2; [f32_at(o), f32_at(o + 4)] }).collect()
+    });
+    if std::env::var_os("RIPTIDE_MESH_DEBUG").is_some() {
+        for (k, set) in [("uv0", find(5, 8).map(|s| (0..vcount).map(|i| { let o = s.0 + i * s.2; [f32_at(o), f32_at(o + 4)] }).collect::<Vec<_>>())), ("uv1", uvs1.clone())] {
+            if let Some(v) = set {
+                let (lo, hi) = v.iter().fold(([f32::MAX; 2], [f32::MIN; 2]), |(lo, hi), p| ([lo[0].min(p[0]), lo[1].min(p[1])], [hi[0].max(p[0]), hi[1].max(p[1])]));
+                eprintln!("{name}: {k} range {lo:?}..{hi:?} first {:?}", &v[..3.min(v.len())]);
+            }
+        }
+    }
     let uvs: Option<Vec<[f32; 2]>> = find(5, 8).map(|s| {
         (0..vcount)
             .map(|i| {
@@ -304,6 +316,9 @@ fn decode(name: &str, blob: &[u8], rigged: bool) -> Result<Model> {
                     }
                     if let Some(t) = &uvs {
                         part.uvs.push(t[vi]);
+                    }
+                    if let Some(t) = &uvs1 {
+                        part.uvs1.push(t[vi]);
                     }
                     if let (Some(n), Some(t), Some(bn)) = (&normals, &tangents, &binormals) {
                         let dir = |v: [f32; 3]| -> [f32; 3] {

@@ -491,7 +491,7 @@ fn spawn_race(
         if let Some(p) = models.lux(s) {
             commands.entity(world).with_children(|c| {
                 for piece in p.iter() {
-                    c.spawn((Mesh3d(piece.mesh.clone()), MeshMaterial3d(piece.material.clone()), NotShadowCaster));
+                    { let mut e = c.spawn((Mesh3d(piece.mesh.clone()), NotShadowCaster)); piece.apply(&mut e); }
                 }
             });
         }
@@ -626,7 +626,7 @@ fn spawn_race(
                 .id();
             commands.entity(e).with_children(|c| {
                 for piece in p.iter() {
-                    c.spawn((Mesh3d(piece.mesh.clone()), MeshMaterial3d(piece.material.clone()), NoFrustumCulling, NotShadowCaster));
+                    { let mut e = c.spawn((Mesh3d(piece.mesh.clone()), NoFrustumCulling, NotShadowCaster)); piece.apply(&mut e); }
                 }
             });
             // The dome is a half sphere: from high up, past the terrain's edge, nothing is drawn
@@ -903,7 +903,7 @@ fn spawn_water(commands: &mut Commands, models: &mut Models, level: &H2Level, tr
             }
             let n = crate::h2water::spawn(commands, level, &sh, &mut models.meshes, &mut models.h2water, &mut models.images, bump.clone(), phy::WATER_CELL.max(1.0));
             let lux = models.content.lux.clone();
-            if let Some(blob) = lux.get("shad4.FX_Waterfall") {
+            if let Some(blob) = lux.get("shad4.FX_Waterfall").filter(|_| !std::env::var("RIPTIDE_WATERFALLS").is_ok_and(|v| v == "0")) {
                 let art = [format!("pt_{}_waterfall1", level.code), "pt_wa_waterfall1".into()].iter().find_map(|n| models.lux_texture(n)).unwrap_or_else(|| bump.clone());
                 let falls = crate::h2water::spawn_waterfalls(commands, level, &mut models.shaders, blob, &mut models.meshes, &mut models.waterfalls, &mut models.images, art);
                 info!("h2water: {falls} waterfalls with shad4.FX_Waterfall");

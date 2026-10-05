@@ -9,9 +9,9 @@ tmp=$(mktemp -d)
 icd=$(ls /usr/share/vulkan/icd.d/lvp_icd*.json 2>/dev/null | head -1)
 run() { # run <record file> <env...>
     out=$1; shift
-    env RIPTIDE_RECORD="$out" VK_ICD_FILENAMES="$icd" LP_NUM_THREADS=4 XDG_CONFIG_HOME="$tmp/cfg" \
+    env RIPTIDE_RECORD="$out" VK_ICD_FILENAMES="$icd" LP_NUM_THREADS=2 XDG_CONFIG_HOME="$tmp/cfg" \
         RIPTIDE_SHOT="$tmp/shot" RIPTIDE_SHOT_SIZE=160x90 RIPTIDE_SIM_DT=0.05 "$@" \
-        timeout 900 nice -n 19 "$bin" > /dev/null 2>&1
+        timeout 900 scripts/light.sh "$bin" > /dev/null 2>&1
 }
 : > web/manifests.txt.new
 for t in $(awk -F, 'NR>2 && $7=="ok" && $8=="ok" {print $1}' sheets/tracks.csv); do

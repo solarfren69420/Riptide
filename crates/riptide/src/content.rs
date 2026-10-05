@@ -142,8 +142,22 @@ pub struct Piece {
     pub material: Handle<StandardMaterial>,
     /// H2Overdrive boat parts: the original boat shader (crate::boatshader), drawn instead of `material`.
     pub boat: Option<Handle<crate::boatshader::BoatMaterial>>,
+    /// H2Overdrive two-texture terrain (crate::terrain), drawn instead of `material`.
+    pub terrain: Option<Handle<crate::terrain::TerrainMat>>,
     /// Rigged models: the bone the piece rides (its vertices are in that bone's space).
     pub bone: Option<u16>,
+}
+
+impl Piece {
+    /// Give `e` this piece's material: the original boat shader or two-texture terrain where the
+    /// piece has one, else its standard material.
+    pub fn apply(&self, e: &mut bevy::ecs::system::EntityCommands) {
+        match (&self.boat, &self.terrain) {
+            (Some(b), _) => e.insert(MeshMaterial3d(b.clone())),
+            (None, Some(t)) => e.insert(MeshMaterial3d(t.clone())),
+            _ => e.insert(MeshMaterial3d(self.material.clone())),
+        };
+    }
 }
 
 #[derive(Resource, Default)]
@@ -206,6 +220,7 @@ pub struct Models<'w> {
     pub h2water: ResMut<'w, Assets<crate::h2water::H2WaterMaterial>>,
     pub waterfalls: ResMut<'w, Assets<crate::h2water::WaterfallMaterial>>,
     pub boats: ResMut<'w, Assets<crate::boatshader::BoatMaterial>>,
+    pub terrains: ResMut<'w, Assets<crate::terrain::TerrainMat>>,
     pub shaders: ResMut<'w, Assets<Shader>>,
 }
 
@@ -245,9 +260,15 @@ impl Models<'_> {
             .get(&format!("mesh32.{name}"))
             .and_then(|b| decode_mesh(name, b).map_err(|e| warn!("{name}: {e:#}")).ok());
         let pieces = model.map(|mut m| {
-            // H2Overdrive lighting lives in lightmaps; its vertex colour stream is black.
+            // H2Overdrive lighting lives in lightmaps; its vertex colour stream is black. Its alpha is
+            // the two-texture terrain blend (crate::terrain): kept as white with that alpha.
             for p in &mut m.parts {
-                p.colors.clear();
+                let two = p.uvs1.len() == p.positions.len() && p.textures.len() >= 2 && p.colors.len() == p.positions.len();
+                if two && p.shader.as_deref().is_some_and(|s| s.starts_with("OP_2V")) {
+                    p.colors = p.colors.iter().map(|c| [1.0, 1.0, 1.0, c[3]]).collect();
+                } else {
+                    p.colors.clear();
+                }
             }
             Arc::new(self.build(&m, Source::Lux, false))
         });
@@ -465,6 +486,22 @@ impl Models<'_> {
         }))
     }
 
+    /// H2Overdrive two-texture terrain (`OP_2*`): the second texture on the second UV set, blended by
+    /// its alpha x the vertex alpha (crate::terrain). Sets the mesh's UV_1 and white-with-alpha colour.
+    fn terrain_material(&mut self, source: Source, part: &riptide_assets::model::MeshPart, mesh: &mut Mesh, base: &StandardMaterial) -> Option<Handle<crate::terrain::TerrainMat>> {
+        let n = part.positions.len();
+        if source != Source::Lux || !part.shader.as_deref().is_some_and(|s| s.starts_with("OP_2V")) || part.uvs1.len() != n || part.colors.len() != n {
+            return None;
+        }
+        // On by default; RIPTIDE_TERRAIN2=0 draws the first texture only.
+        if std::env::var("RIPTIDE_TERRAIN2").is_ok_and(|v| v == "0") {
+            return None;
+        }
+        let second = self.texture(source, part.textures.get(1)?)?.0;
+        mesh.insert_attribute(Mesh::ATTRIBUTE_COLOR, part.colors.clone());
+        Some(self.terrains.add(crate::terrain::TerrainMat { base: base.clone(), extension: crate::terrain::TerrainExt { second } }))
+    }
+
     fn boat_defaults(&mut self) -> [Handle<Image>; 4] {
         if let Some(d) = &self.cache.boat_defaults {
             return d.clone();
@@ -532,14 +569,16 @@ impl Models<'_> {
                 fog_enabled: !unlit,
                 ..default()
             };
-            let handle = self.materials.add(material);
+            let handle = self.materials.add(material.clone());
             let boat = self.boat_material(source, part, &mut mesh);
+            // Not on sky domes (unlit): their materials stay as they are.
+            let terrain = if unlit { None } else { self.terrain_material(source, part, &mut mesh, &material) };
             if deferred {
                 self.cache.deferred.push(DeferredMaterial {
                     handle: handle.clone(), source, texture: part.texture.clone().unwrap(), shader: shader.to_string(), blend: part.blend,
                 });
             }
-            out.push(Piece { mesh: self.meshes.add(mesh), material: handle, bone: part.bone, boat });
+            out.push(Piece { mesh: self.meshes.add(mesh), material: handle, bone: part.bone, boat, terrain });
         }
         out
     }
@@ -642,10 +681,7 @@ pub fn attach(commands: &mut Commands, parent: Entity, pieces: &[Piece]) {
     commands.entity(parent).with_children(|c| {
         for p in pieces {
             let mut e = c.spawn((Mesh3d(p.mesh.clone()), Transform::IDENTITY));
-            match &p.boat {
-                Some(b) => e.insert(MeshMaterial3d(b.clone())),
-                None => e.insert(MeshMaterial3d(p.material.clone())),
-            };
+            p.apply(&mut e);
         }
     });
 }

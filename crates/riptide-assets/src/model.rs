@@ -24,6 +24,8 @@ pub struct MeshPart {
     pub positions: Vec<[f32; 3]>,
     pub normals: Vec<[f32; 3]>,
     pub uvs: Vec<[f32; 2]>,
+    /// Second texture coordinate set, when the source has one (H2Overdrive two-texture terrain).
+    pub uvs1: Vec<[f32; 2]>,
     /// Tangent (xyz) and handedness (w: the binormal is cross(normal, tangent) * w), when the
     /// source has tangent and binormal streams (H2Overdrive boats: their normal maps).
     pub tangents: Vec<[f32; 4]>,
