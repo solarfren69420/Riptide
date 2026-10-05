@@ -379,6 +379,8 @@ pub fn spawn(
 
 /// The render layer the water is on: the main camera sees it, the reflection camera doesn't.
 const WATER_LAYER: usize = 9;
+/// Geometry only the reflection camera draws (materials named `REFLECTION_ONLY`).
+pub const REFLECTION_ONLY_LAYER: usize = 11;
 
 /// The reflection camera (the original's `g_TexReflection` render): the main camera mirrored in
 /// the water plane under it, rendering everything but the water into an image the shader reads
@@ -398,7 +400,7 @@ pub fn spawn_reflection(commands: &mut Commands, images: &mut Assets<Image>, siz
         Camera3d::default(),
         Camera { order: -1, ..default() },
         bevy::camera::RenderTarget::Image(image.clone().into()),
-        bevy::camera::visibility::RenderLayers::layer(0),
+        bevy::camera::visibility::RenderLayers::from_layers(&[0, REFLECTION_ONLY_LAYER]),
         bevy::core_pipeline::tonemapping::Tonemapping::None,
         Msaa::Off,
         ReflectionCam,

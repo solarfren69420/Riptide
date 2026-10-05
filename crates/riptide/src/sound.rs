@@ -123,6 +123,27 @@ impl Sfx<'_, '_> {
         }
     }
 
+    /// Loop a sound def (its first variant) at `gain` x its volume, for positional level sounds; the
+    /// caller sets the volume each frame through the entity's `AudioSink`.
+    pub fn def_loop(&mut self, def: usize, gain: f32, scope: impl Bundle) -> Option<Entity> {
+        let d = &H2_SOUNDDEFS[def];
+        let v = variant(d, 0)?;
+        let src = self.source(v.sample)?;
+        if std::env::var_os("RIPTIDE_DEBUG").is_some() {
+            info!("sound: loop {} vol {:.2}", d.id, d.volume_2d * v.volume * gain);
+        }
+        if muted() {
+            return None;
+        }
+        let settings = PlaybackSettings::LOOP.with_volume(Volume::Linear(d.volume_2d * v.volume * gain));
+        Some(self.commands.spawn((AudioPlayer(src), settings, scope)).id())
+    }
+
+    /// A sound def by its id (`com_TarzanYell`).
+    pub fn def_id(id: &str) -> Option<usize> {
+        H2_SOUNDDEFS.iter().position(|d| d.id.eq_ignore_ascii_case(id))
+    }
+
     /// Play the sound a `sound_events` row names (see `crate::sheets::sound_events_ids`).
     pub fn event(&mut self, ev: usize) {
         self.event_gain(ev, 1.0);

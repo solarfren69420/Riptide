@@ -148,12 +148,17 @@ pub struct Piece {
     pub lightmap: Option<Handle<Image>>,
     /// Rigged models: the bone the piece rides (its vertices are in that bone's space).
     pub bone: Option<u16>,
+    /// Drawn only by the water reflection camera (crate::h2water::REFLECTION_ONLY_LAYER).
+    pub reflection_only: bool,
 }
 
 impl Piece {
     /// Give `e` this piece's material: the original boat shader or two-texture terrain where the
     /// piece has one, else its standard material.
     pub fn apply(&self, e: &mut bevy::ecs::system::EntityCommands) {
+        if self.reflection_only {
+            e.insert(bevy::camera::visibility::RenderLayers::layer(crate::h2water::REFLECTION_ONLY_LAYER));
+        }
         if let Some(lm) = &self.lightmap {
             e.insert(bevy::pbr::Lightmap { image: lm.clone(), uv_rect: Rect::new(0.0, 0.0, 1.0, 1.0), bicubic_sampling: false });
         }
@@ -641,7 +646,7 @@ impl Models<'_> {
                     handle: handle.clone(), source, texture: part.texture.clone().unwrap(), shader: shader.to_string(), blend: part.blend,
                 });
             }
-            out.push(Piece { mesh: self.meshes.add(mesh), material: handle, bone: part.bone, boat, terrain, lightmap });
+            out.push(Piece { mesh: self.meshes.add(mesh), material: handle, bone: part.bone, boat, terrain, lightmap, reflection_only: part.reflection_only });
         }
         out
     }

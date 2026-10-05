@@ -269,6 +269,7 @@ fn decode(name: &str, blob: &[u8], rigged: bool) -> Result<Model> {
             texture: texture.map(|t| t.trim_start_matches("txtr1.").to_string()),
             textures: textures.iter().map(|t| t.1.trim_start_matches("txtr1.").to_string()).collect(),
             shader: shader.as_ref().map(|s| s.trim_start_matches("shad4.").to_string()),
+            reflection_only: body.get(mb..mb + 0x20).is_some_and(|n| n.starts_with(b"REFLECTION_ONLY")),
             ..Default::default()
         };
         let mut split: Vec<(MeshPart, HashMap<(u32, usize), u32>)> = Vec::new();

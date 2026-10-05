@@ -38,6 +38,9 @@ pub struct MeshPart {
     /// Every texture the source material binds, in slot order (H2Overdrive: diffuse, normal map,
     /// light masks, cube map), without the `txtr1.` prefix.
     pub textures: Vec<String>,
+    /// H2Overdrive material named `REFLECTION_ONLY`: drawn only into the water reflection (Wild
+    /// America's burning-forest glow walls), never in the main view.
+    pub reflection_only: bool,
     /// Source shader/material name, for blend heuristics.
     pub shader: Option<String>,
     pub blend: Blend,

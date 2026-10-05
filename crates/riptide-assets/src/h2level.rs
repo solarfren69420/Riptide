@@ -259,6 +259,19 @@ pub struct Booster {
     pub placement: Placement,
 }
 
+/// A level sound (`<code>_sounds`): a positional loop (CSSound: full volume inside `inner`, silent
+/// beyond `outer`) or a one-shot gate (CSMusicTripwire with a Sound Def: the Tarzan yell on Wild
+/// America's final drop).
+#[derive(Clone, Debug)]
+pub struct LevelSound {
+    pub name: String,
+    pub sound: String,
+    pub position: [f32; 3],
+    pub volume: f32,
+    /// `Some((inner, outer))` for a positional loop, `None` for a gate.
+    pub radii: Option<(f32, f32)>,
+}
+
 /// A level fire, smoke or torch (`<code>_Fire`, CRocketFlameEntity): a rocket flame def run at a
 /// fixed spot, emitting along its local +Z (Riptide -Z after the mirror).
 #[derive(Clone, Debug)]
@@ -273,6 +286,7 @@ pub struct LevelFire {
 pub struct H2Level {
     pub code: String,
     pub fires: Vec<LevelFire>,
+    pub sounds: Vec<LevelSound>,
     pub title: String,
     /// Terrain meshes (`sg_<code>_PropSectorN`), placed at the origin.
     pub sector_meshes: Vec<String>,
@@ -387,6 +401,19 @@ pub fn load_level(lux: &LuxArchive, code: &str) -> Result<H2Level> {
                 lvl.props.push(placement);
             }
         }
+    }
+
+    for o in load_list_with_defaults(lux, &format!("{code}_sounds")).unwrap_or_default() {
+        let (Some(sound), Some(position)) = (o.get("Sound Def").filter(|d| !d.is_empty()), o.vec3("Position")) else { continue };
+        let radii = match o.class.as_str() {
+            "CSSound" => {
+                let outer = o.f32("OuterRadiusOverride").filter(|r| *r > 0.0).or(o.f32("Scale")).unwrap_or(1000.0);
+                Some((o.f32("InnerRadiiOverride").unwrap_or(outer * 0.5).min(outer), outer))
+            }
+            "CSMusicTripwire" => None,
+            _ => continue,
+        };
+        lvl.sounds.push(LevelSound { name: o.name.clone(), sound: sound.to_string(), position, volume: o.f32("Volume").unwrap_or(1.0), radii });
     }
 
     for o in load_list_with_defaults(lux, &format!("{code}_Fire")).unwrap_or_default() {
