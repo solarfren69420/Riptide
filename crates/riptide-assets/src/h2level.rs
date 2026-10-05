@@ -279,6 +279,8 @@ pub struct H2Level {
     pub skyboxes: Vec<Placement>,
     /// Centre of the finish-line buoys (`*Finish*` game meshes), when the level has them.
     pub finish: Option<[f32; 3]>,
+    /// Every finish buoy, for the line between them.
+    pub finish_buoys: Vec<[f32; 3]>,
 }
 
 /// Levels that ship complete data (sectors, AI, start points).
@@ -330,12 +332,14 @@ pub fn load_level(lux: &LuxArchive, code: &str) -> Result<H2Level> {
         let slides = slide_controllers(&objs);
         let buoys: Vec<[f32; 3]> = objs
             .iter()
-            .filter(|o| o.name.to_ascii_lowercase().contains("finish"))
+            // Finish buoys only: Wild America also has `Finish_line_Balloons_01` decorations elsewhere.
+            .filter(|o| { let n = o.name.to_ascii_lowercase(); n.contains("finish") && n.contains("buoy") })
             .filter_map(|o| o.vec3("Position"))
             .collect();
         if !buoys.is_empty() {
             let n = buoys.len() as f32;
             lvl.finish = Some([0, 1, 2].map(|k| buoys.iter().map(|b| b[k]).sum::<f32>() / n));
+            lvl.finish_buoys = buoys.clone();
         }
         for o in &objs {
             let Some(position) = o.vec3("Position") else { continue };

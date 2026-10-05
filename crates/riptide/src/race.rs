@@ -400,6 +400,17 @@ fn spawn_race(
     if let Some(f) = level.finish {
         let here = track.locate_anywhere(Vec3::from(f));
         track.finish = Some((Vec2::new(f[0], f[2]), here.forward, here.progress));
+        // The line between the two buoys farthest apart (the gate's posts), across the course.
+        let bs: Vec<Vec2> = level.finish_buoys.iter().map(|b| Vec2::new(b[0], b[2])).collect();
+        let mut best: Option<(Vec2, Vec2)> = None;
+        for (i, a) in bs.iter().enumerate() {
+            for b in &bs[i + 1..] {
+                if best.is_none_or(|(p, q)| a.distance(*b) > p.distance(q)) {
+                    best = Some((*a, *b));
+                }
+            }
+        }
+        track.finish_line = best.filter(|(a, b)| a.distance(*b) > phy::BOAT_RADIUS);
     } else if !track.edges.is_empty() {
         // No finish buoys (Hydro Thunder, some H2 levels): the course's last cross-section.
         let n = track.edges.len();
@@ -479,6 +490,16 @@ fn spawn_race(
     let turned = track.orient();
     if turned > 0 {
         info!("{code}: turned {turned} reversed cross-sections");
+    }
+    // No finish buoys (Hydro Thunder, Reverse Sydney/Tundra, Down Underdrive): the line is the
+    // cross-section at the finish point, so those races also end the instant a nose touches it.
+    if let (false, None, Some((p, dir, _))) = (track.looped, track.finish_line, track.finish) {
+        let at = track.locate_anywhere(Vec3::new(p.x, 0.0, p.y));
+        let l = track.point_at(at, 0.0).xz();
+        let r = track.point_at(at, 1.0).xz();
+        let half = (l.distance(r) * 0.5).max(phy::BOAT_RADIUS);
+        let across = dir.perp().normalize_or(Vec2::X);
+        track.finish_line = Some((p - across * half, p + across * half));
     }
     info!(
         "{code}: {} sectors, {} props, {} boosters, track {:.0} units",
@@ -1677,15 +1698,50 @@ fn boat_physics(
         b.tp = tp;
         // Point to point: the finish buoys' plane when the level has them (crossed, not reached
         // by centre-line distance), else the end of the racing line.
+        // The finish line (buoys): the nose crossing it this frame, the time interpolated to the
+        // instant it touched, so the race ends exactly on the line.
+        let mut exact: Option<f32> = None;
+        if let (false, Some((a, c)), Some((_, fwd, at))) = (track.looped, track.finish_line, track.finish) {
+            let heading = Vec2::new(-b.yaw.sin(), -b.yaw.cos());
+            let nose = b.pos.xz() + heading * phy::BOAT_RADIUS * b.info.scale;
+            let prev = nose - b.vel * dt;
+            let dir = c - a;
+            let n = { let p = dir.perp().normalize_or_zero(); if p.dot(fwd) < 0.0 { -p } else { p } };
+            let (d0, d1) = ((prev - a).dot(n), (nose - a).dot(n));
+            if tp.progress >= at - phy::GATE_WINDOW && d0 < 0.0 && d1 >= 0.0 {
+                let f = d0 / (d0 - d1);
+                // The buoys mark part of the river; the line spans the whole course there.
+                let hit = prev.lerp(nose, f);
+                let u = track.locate(Vec3::new(hit.x, b.pos.y, hit.y), tp.seg).u;
+                if (-phy::FINISH_LINE_REACH..=1.0 + phy::FINISH_LINE_REACH).contains(&u) {
+                    exact = Some(clock.t - dt * (1.0 - f));
+                }
+            }
+        }
+        // Circuits count a lap when the centre passes the start/finish cross-section; the final one
+        // is timed back to the instant the nose touched it.
+        if track.looped && b.finished.is_none() && b.lap >= track.laps && exact.is_none() {
+            let e = &track.edges[0];
+            let (a, c) = (Vec2::new(e.start[0], e.start[2]), Vec2::new(e.end[0], e.end[2]));
+            let n = { let p = (c - a).perp().normalize_or_zero(); if p.dot(track.locate(b.pos, 0).forward) < 0.0 { -p } else { p } };
+            let past = (b.pos.xz() - a).dot(n) + phy::BOAT_RADIUS * b.info.scale;
+            let speed = b.vel.dot(n).max(1.0);
+            exact = Some(clock.t - (past / speed).clamp(0.0, dt * 4.0));
+        }
         let done = if track.looped {
             b.lap >= track.laps
+        } else if track.finish_line.is_some() {
+            exact.is_some()
         } else if let Some((p, n, at)) = track.finish {
             (tp.progress >= at - phy::GATE_WINDOW && (b.pos.xz() - p).dot(n) >= 0.0) || (tp.seg >= track.last_seg() && tp.s >= 0.98)
         } else {
             tp.seg >= track.last_seg() && tp.s >= 0.98
         };
         if racing && b.finished.is_none() && done {
-            b.finished = Some(clock.t);
+            b.finished = Some(exact.unwrap_or(clock.t).max(0.0));
+            if b.player && std::env::var_os("RIPTIDE_PROBE").is_some() {
+                info!("FINISH at {:.2}s exact {} pos {:.0} {:.0} line {:?}", b.finished.unwrap_or(0.0), exact.is_some(), b.pos.x, b.pos.z, track.finish_line);
+            }
         }
     }
 }

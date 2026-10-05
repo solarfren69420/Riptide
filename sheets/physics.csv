@@ -198,3 +198,4 @@ floater_bob,f32,3,units,riptide design: floating objects bob this much
 floater_max_radius,f32,400,units,riptide design: footprint radius cap for a floating object (houseboats and containers)
 h2water_surface_max,f32,400,units,riptide design: boats ride the H2Overdrive water sector under them when it is within this of the racing-line water height (else the racing line)
 chute_half_way_fraction,f32,0.25,-,riptide design: a racing-line drop is a sloped chute when the level's drawn water halfway along it is already down by this fraction of the drop (else the water steps and boats fly off)
+finish_line_reach,f32,0.25,fraction of the course width,riptide design: the finish line (through the finish buoys) spans the course and this far past either bank (the original tripwire spans the course)

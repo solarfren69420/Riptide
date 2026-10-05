@@ -21,6 +21,9 @@ pub struct Track {
     pub lanes: Vec<[f32; 2]>,
     /// Finish plane (point, course direction, race distance) for point-to-point courses.
     pub finish: Option<(Vec2, Vec2, f32)>,
+    /// The finish line itself (ends, XZ) where the level marks it with buoys: the race ends when a
+    /// hull's nose crosses it.
+    pub finish_line: Option<(Vec2, Vec2)>,
     /// The course's own gravity (units/s²) when boats don't bring theirs: Hydro Thunder courses,
     /// whose physics isn't decoded (H2Overdrive boat defs carry their own).
     pub gravity: Option<f32>,
@@ -100,7 +103,7 @@ impl Track {
             dist.push(dist[i - 1] + d);
         }
         let looped = edges.len() > 3 && Self::mid_of(&edges[0]).distance(Self::mid_of(&edges[edges.len() - 1])) < 2500.0;
-        Self { edges, dist, looped, laps: if looped { 3 } else { 1 }, starts: Vec::new(), lanes: Vec::new(), finish: None, chutes: Vec::new(), open: false, branches: Vec::new(), gravity: None }
+        Self { edges, dist, looped, laps: if looped { 3 } else { 1 }, starts: Vec::new(), lanes: Vec::new(), finish: None, finish_line: None, chutes: Vec::new(), open: false, branches: Vec::new(), gravity: None }
     }
 
     /// Make every cross-section run the same way across the course as the one before it (a
