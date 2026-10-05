@@ -130,12 +130,12 @@ impl Sfx<'_, '_> {
         let v = variant(d, 0)?;
         let src = self.source(v.sample)?;
         if std::env::var_os("RIPTIDE_DEBUG").is_some() {
-            info!("sound: loop {} vol {:.2}", d.id, d.volume_2d * v.volume * gain);
+            info!("sound: loop {} vol {:.2}", d.id, d.volume_3d * v.volume * gain);
         }
         if muted() {
             return None;
         }
-        let settings = PlaybackSettings::LOOP.with_volume(Volume::Linear(d.volume_2d * v.volume * gain));
+        let settings = PlaybackSettings::LOOP.with_volume(Volume::Linear(d.volume_3d * v.volume * gain));
         Some(self.commands.spawn((AudioPlayer(src), settings, scope)).id())
     }
 

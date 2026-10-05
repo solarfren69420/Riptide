@@ -39,11 +39,11 @@ pub fn spawn(commands: &mut Commands, level: &riptide_assets::h2level::H2Level, 
         let at = Vec3::from(s.position);
         match s.radii {
             Some((inner, outer)) => {
-                commands.spawn((Transform::from_translation(at), LevelLoop { def, inner, outer: outer.max(inner + 1.0), gain: s.volume, playing: None }, scope.clone()));
+                commands.spawn((Transform::from_translation(at), LevelLoop { def, inner, outer: outer.max(inner + 1.0), gain: s.volume.min(1.0) * phy::LEVEL_SOUND_GAIN, playing: None }, scope.clone()));
             }
             None => {
                 let normal = track.locate_anywhere(at).forward;
-                commands.spawn((LevelGate { def, point: at.xz(), normal, gain: s.volume, done: false }, scope.clone()));
+                commands.spawn((LevelGate { def, point: at.xz(), normal, gain: s.volume.min(1.0), done: false }, scope.clone()));
             }
         }
         n += 1;
@@ -85,8 +85,10 @@ pub fn level_sounds(
             }
             continue;
         }
-        let fall = if d <= l.inner { 1.0 } else { (1.0 - (d - l.inner) / (l.outer - l.inner)).clamp(0.0, 1.0) };
-        let base = H2_SOUNDDEFS[l.def].volume_2d * l.gain;
+        // Squared fade (a linear one stayed loud to the very edge).
+        let lin = if d <= l.inner { 1.0 } else { (1.0 - (d - l.inner) / (l.outer - l.inner)).clamp(0.0, 1.0) };
+        let fall = lin * lin;
+        let base = H2_SOUNDDEFS[l.def].volume_3d * l.gain;
         match l.playing {
             // Muted runs get no entity: remember a placeholder so the loop is not restarted every frame.
             None if fall > 0.0 => l.playing = Some(sfx.def_loop(l.def, l.gain * fall, DespawnOnExit(crate::Screen::Race)).unwrap_or(Entity::PLACEHOLDER)),
