@@ -130,6 +130,8 @@ pub struct Placement {
     pub slide: Option<Slide>,
     /// A physics object (mesh def Physics Type 1 or 2): boats collide with it and ride over it.
     pub solid: bool,
+    /// Physics Type 2 (logs, rafts, crates, houseboats): it floats and boats push it; its `Coll Mass`.
+    pub float_mass: Option<f32>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -316,6 +318,11 @@ pub fn load_level(lux: &LuxArchive, code: &str) -> Result<H2Level> {
     // boats hit and ride over; 0 is scenery.
     let solid_defs: std::collections::HashSet<String> =
         defs.iter().filter(|o| matches!(o.f32("Physics Type").map(|t| t as i32), Some(1 | 2))).map(|o| o.name.clone()).collect();
+    let float_defs: HashMap<String, f32> = defs
+        .iter()
+        .filter(|o| o.f32("Physics Type").map(|t| t as i32) == Some(2))
+        .map(|o| (o.name.clone(), o.f32("Coll Mass").unwrap_or(1000.0)))
+        .collect();
 
     if let Ok(objs) = load_list_with_defaults(lux, &format!("{code}_worldobs")) {
         let paths = motion_paths(&objs);
@@ -352,7 +359,8 @@ pub fn load_level(lux: &LuxArchive, code: &str) -> Result<H2Level> {
                 start: o.f32("Anim Start").unwrap_or(0.0),
             });
             let solid = o.get("Game Mesh Def").is_some_and(|d| solid_defs.contains(d));
-            let placement = Placement { mesh, position, rotation, scale, path, anim, spin, slide, solid };
+            let float_mass = o.get("Game Mesh Def").and_then(|d| float_defs.get(d)).copied();
+            let placement = Placement { mesh, position, rotation, scale, path, anim, spin, slide, solid, float_mass };
             if o.class == "CBooster" {
                 let kind = match o.f32("Type").map(|t| t as i32).unwrap_or(0) {
                     1 => BoostKind::Red,
@@ -389,6 +397,7 @@ pub fn load_level(lux: &LuxArchive, code: &str) -> Result<H2Level> {
                         spin: None,
                         slide: None,
                         solid: false,
+                        float_mass: None,
                     });
                 }
             }

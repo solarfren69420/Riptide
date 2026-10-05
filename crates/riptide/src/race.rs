@@ -38,6 +38,7 @@ impl Plugin for RacePlugin {
                     crate::ramps::ramp_test,
                     boat_physics,
                     boat_contacts,
+                    crate::floating::float_and_push,
                     crate::recovery::recover,
                     crate::net::send_state,
                     crate::net::apply_remote,
@@ -454,6 +455,7 @@ fn spawn_race(
     );
     let scope = DespawnOnExit(Screen::Race);
 
+    let mut floater_sizes: std::collections::HashMap<usize, (f32, f32)> = Default::default();
     // Terrain.
     let world = commands.spawn((Transform::IDENTITY, Visibility::default(), scope.clone(), Name::new("terrain"))).id();
     // H2Overdrive's own world collision mesh (`coll4.wc_<level>`), Z mirrored like everything else.
@@ -470,8 +472,22 @@ fn spawn_race(
             // and ride over them, which is where many of the original's jumps come from. They
             // stay where they were placed (the original floats and pushes them).
             let mut solid = 0;
-            for prop in level.props.iter().filter(|p| p.solid) {
+            for (i, prop) in level.props.iter().enumerate().filter(|(_, p)| p.solid) {
                 let Some(m) = models.content.lux.get(&format!("mesh32.{}", prop.mesh)).and_then(|b| riptide_assets::h2mesh::decode_mesh(&prop.mesh, b).ok()) else { continue };
+                // Floating ones (Physics Type 2) move: crate::floating, not the static collider.
+                if prop.float_mass.is_some() {
+                    let s = prop.scale.max(0.01);
+                    let (mut lo, mut hi) = (Vec3::MAX, Vec3::MIN);
+                    for part in &m.parts {
+                        for p in &part.positions {
+                            lo = lo.min(Vec3::from(*p));
+                            hi = hi.max(Vec3::from(*p));
+                        }
+                    }
+                    let half = ((hi - lo).xz() * 0.5 * s).max(Vec2::splat(1.0));
+                    floater_sizes.insert(i, (half.x.max(half.y).min(phy::FLOATER_MAX_RADIUS), (hi.y * s).max(1.0)));
+                    continue;
+                }
                 let place = Transform::from_translation(Vec3::from(prop.position)).with_rotation(Quat::from_array(prop.rotation).normalize()).with_scale(Vec3::splat(prop.scale.max(0.01)));
                 for mut part in m.parts {
                     for p in &mut part.positions {
@@ -499,7 +515,7 @@ fn spawn_race(
     // Props.
     let mut animated = 0;
     let mut moving = 0;
-    for prop in &level.props {
+    for (i, prop) in level.props.iter().enumerate() {
         let Some(p) = models.lux(&prop.mesh) else { continue };
         let mover = prop.path.as_ref().map(|path| PathMover::new(path, Vec3::from(prop.position), prop.scale));
         let e = commands
@@ -511,6 +527,18 @@ fn spawn_race(
                 scope.clone(),
             ))
             .id();
+        if let (Some(mass), Some(&(radius, height))) = (prop.float_mass, floater_sizes.get(&i)) {
+            let water = track.locate_anywhere(Vec3::from(prop.position)).water;
+            commands.entity(e).insert(crate::floating::Floater {
+                vel: Vec2::ZERO,
+                spin: 0.0,
+                radius,
+                height,
+                mass,
+                draft: prop.position[1] - water,
+                phase: i as f32 * 1.37,
+            });
+        }
         if let Some(m) = mover {
             commands.entity(e).insert(m);
         } else if prop.spin.is_some() || prop.slide.is_some() {
@@ -529,6 +557,9 @@ fn spawn_race(
             }
             None => attach(&mut commands, e, &p),
         }
+    }
+    if !floater_sizes.is_empty() {
+        info!("{code}: {} floating objects (logs, rafts, crates...)", floater_sizes.len());
     }
     if animated + moving > 0 {
         info!("{code}: {animated} animated props, {moving} spinning or sliding");

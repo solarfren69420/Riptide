@@ -184,3 +184,15 @@ waterfall_rows,f32,24,vertices,riptide design: waterfall sheet grid down
 waterfall_white_bias,f32,2,-,riptide design (CSWaterfall White Bias default unknown): the waterfall program clamps light x bias to 0..1; 2 saturates sunlit falls to white
 lightmap_strength,f32,1,-,riptide calibration: H2Overdrive lightmaps (OP_*L*) add surface x lightmap x this as light (the original adds lightmap x emissive)
 nav_narrow_clearance,f32,0.3,cells,riptide design: last-resort nav attempt with this blocked-test radius (a narrow opening a boat fits through: Venice Canals tunnel arch)
+floater_boat_mass,f32,1500,Coll Mass units,riptide design: a boat against a floating object (Physics Type 2) weighs this in the push (logs and crates default to 1000)
+floater_bounce,f32,0.3,-,riptide design: how much of the closing speed bounces a floating object away
+floater_spin,f32,0.6,-,riptide design: spin a glancing hit gives a floating object
+floater_drag_on_boat,f32,0.25,-,riptide design: speed a boat loses hitting a floating object (scaled by how heavy it is)
+floater_launch_speed,f32,250,units/s,riptide design: closing speed above which a boat rides up over a floating object into the air
+floater_min_ramp_height,f32,8,units,riptide design: floating objects at least this tall launch a fast boat
+floater_launch,f32,0.45,-,riptide design: launch speed up per unit closing speed off a floating object (recorded log jumps ~200 up)
+floater_launch_max,f32,260,units/s,riptide design: cap on the launch off a floating object
+floater_clear,f32,10,units,riptide design: a boat this far above a floating object top passes over it
+floater_water_drag,f32,0.8,1/s,riptide design: floating objects slow down in the water
+floater_bob,f32,3,units,riptide design: floating objects bob this much
+floater_max_radius,f32,400,units,riptide design: footprint radius cap for a floating object (houseboats and containers)
