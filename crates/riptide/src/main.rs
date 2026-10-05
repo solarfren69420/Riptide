@@ -25,6 +25,7 @@ mod menu;
 mod nav;
 mod net;
 mod race;
+mod levelsound;
 mod ramps;
 mod recovery;
 mod sheets;

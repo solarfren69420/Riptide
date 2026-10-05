@@ -202,3 +202,4 @@ finish_line_reach,f32,0.25,fraction of the course width,riptide design: the fini
 level_fire_max_particles,f32,600,particles,riptide design: live particle budget for level fires / smoke / torches / leaks (separate from the boats' rocket flames)
 level_fire_range,f32,9000,units,riptide design: level fire emitters farther than this from the camera are idle
 level_fire_max_rate,f32,60,per second,riptide design: cap on one level fire layer's puff rate
+sound_gate_radius,f32,2500,units,riptide design: a level sound gate (CSMusicTripwire) fires when the player crosses its plane within this distance of its position

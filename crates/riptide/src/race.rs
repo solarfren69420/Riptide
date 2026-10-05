@@ -52,6 +52,7 @@ impl Plugin for RacePlugin {
                     race_keys,
                     water_flow,
                     move_props,
+                    crate::levelsound::level_sounds,
                 )
                     .chain()
                     .run_if(in_state(Screen::Race)),
@@ -566,6 +567,11 @@ fn spawn_race(
                 }
             });
         }
+    }
+    // Level sounds: positional loops and one-shot gates (`<code>_sounds`).
+    let sounds = crate::levelsound::spawn(&mut commands, &level, &track, scope.clone());
+    if sounds > 0 {
+        info!("{code}: {sounds} level sounds");
     }
     // Level fires, smoke, torches, leaks and splashes (`<code>_Fire`): rocket flame defs at fixed spots.
     let mut fires = 0;
