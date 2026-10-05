@@ -266,6 +266,9 @@ impl Models<'_> {
             .content
             .lux
             .get(&format!("mesh32.{name}"))
+            // Variants named with a number the archive leaves off (Hong Kong's start lanterns
+            // `pg_hk_STRT_LNTRNS01` and `03` are both `pg_hk_STRT_LNTRNS`).
+            .or_else(|| self.content.lux.get(&format!("mesh32.{}", name.trim_end_matches(|c: char| c.is_ascii_digit()))))
             .and_then(|b| decode_mesh(name, b).map_err(|e| warn!("{name}: {e:#}")).ok());
         let pieces = model.map(|mut m| {
             // H2Overdrive lighting lives in lightmaps; its vertex colour stream is black. Its alpha is

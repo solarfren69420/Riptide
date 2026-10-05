@@ -499,6 +499,29 @@ pub struct H2Waves {
 }
 
 impl H2Waves {
+    /// Still-water height of the sector under `p` (x, z): where sectors stack (a chute beside its
+    /// side pools, a river under a bridge) the one nearest `near` in height. Physics rides this, so a
+    /// chute slopes down while the pools beside it stay at their own level.
+    pub fn surface(&self, p: Vec2, near: f32) -> Option<f32> {
+        let mut best: Option<f32> = None;
+        for s in &self.sectors {
+            if p.x < s.lo.x || p.y < s.lo.y || p.x > s.hi.x || p.y > s.hi.y {
+                continue;
+            }
+            let (a, c) = (s.c0.xz(), s.c2.xz());
+            let (d0, d1, d2, d3) = ((p - a).dot(s.normals[0]), (p - c).dot(s.normals[1]), (p - c).dot(s.normals[2]), (p - a).dot(s.normals[3]));
+            if d0 < -1.0 || d1 < -1.0 || d2 < -1.0 || d3 < -1.0 {
+                continue;
+            }
+            let f = (d3 / (d3 + d1).max(1e-7)).clamp(0.0, 1.0);
+            let h = s.c0.y + (s.c1.y - s.c0.y) * f;
+            if best.is_none_or(|b| (h - near).abs() < (b - near).abs()) {
+                best = Some(h);
+            }
+        }
+        best
+    }
+
     /// Surface height at `p` (x, z) at shader time `t`, if `p` is in a water sector.
     pub fn height(&self, p: Vec2, t: f32) -> Option<f32> {
         let sum = |ws: &[Wave]| -> f32 {

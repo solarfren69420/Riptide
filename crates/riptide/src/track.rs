@@ -28,6 +28,9 @@ pub struct Track {
     pub open: bool,
     /// Additional playable corridors; the main path still defines AI and race progress.
     pub branches: Vec<[Edge; 2]>,
+    /// Segments that drop like a waterfall but are sloped chutes in the original (no waterfall
+    /// water sector there): their water slopes down with the visible surface. Empty = none.
+    pub chutes: Vec<bool>,
 }
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -97,7 +100,7 @@ impl Track {
             dist.push(dist[i - 1] + d);
         }
         let looped = edges.len() > 3 && Self::mid_of(&edges[0]).distance(Self::mid_of(&edges[edges.len() - 1])) < 2500.0;
-        Self { edges, dist, looped, laps: if looped { 3 } else { 1 }, starts: Vec::new(), lanes: Vec::new(), finish: None, open: false, branches: Vec::new(), gravity: None }
+        Self { edges, dist, looped, laps: if looped { 3 } else { 1 }, starts: Vec::new(), lanes: Vec::new(), finish: None, chutes: Vec::new(), open: false, branches: Vec::new(), gravity: None }
     }
 
     /// Make every cross-section run the same way across the course as the one before it (a
@@ -157,8 +160,7 @@ impl Track {
         let l = v2(a.start).lerp(v2(b.start), s);
         let r = v2(a.end).lerp(v2(b.end), s);
         let p = l.lerp(r, u);
-        // Same waterfall rule as `locate`: the upper level holds to the edge.
-        let water = if a.water - b.water > crate::sheets::physics::WATERFALL_DROP { a.water } else { a.water + (b.water - a.water) * s };
+        let water = self.water_on(seg, a, b, s);
         Vec3::new(p.x, water, p.y)
     }
 
@@ -173,6 +175,13 @@ impl Track {
     }
 
     /// Locate `p` with no hint: the segment whose quad holds it, else the nearest cross-section.
+    /// Water height at fraction `s` of segment `seg` (edges `a`, `b`). A waterfall holds the upper
+    /// level to the edge (boats fly off it); a sloped chute and ordinary water slope with it.
+    pub fn water_on(&self, seg: usize, a: &Edge, b: &Edge, s: f32) -> f32 {
+        let fall = a.water - b.water > crate::sheets::physics::WATERFALL_DROP && !self.chutes.get(seg).copied().unwrap_or(false);
+        if fall { a.water } else { a.water + (b.water - a.water) * s }
+    }
+
     pub fn locate_anywhere(&self, p: Vec3) -> TrackPos {
         let q = Vec2::new(p.x, p.z);
         let seg = (0..=self.last_seg()).find(|&s| self.contains(s, q)).unwrap_or_else(|| {
@@ -226,7 +235,7 @@ impl Track {
             s,
             u,
             // A waterfall holds the upper level to the edge instead of sloping down to the pool.
-            water: if a.water - b.water > crate::sheets::physics::WATERFALL_DROP { a.water } else { a.water + (b.water - a.water) * sc },
+            water: self.water_on(seg, a, b, sc),
             progress: self.dist[seg] + (self.dist[seg + 1] - self.dist[seg]) * s,
             forward,
             branch: None,

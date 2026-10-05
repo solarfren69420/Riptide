@@ -90,7 +90,7 @@ pub fn recover(
         let going = if b.vel.length() > phy::AI_STUCK_SPEED { b.vel.normalize() } else { heading };
         // Only where the boat really is in the course's corridor does "along the course" mean
         // anything (off it, on a side route, the nearest segment's direction can point anywhere).
-        let located = b.tp.branch.is_none() && (0.0..=1.0).contains(&b.tp.s);
+        let located = b.tp.branch.is_none() && (0.0..=1.0).contains(&b.tp.s) && (0.0..=1.0).contains(&b.tp.u);
         let steady = located && !b.airborne && b.wipeout <= 0.0 && r.turn.is_none();
 
         // Wrong Way.

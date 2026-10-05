@@ -425,6 +425,40 @@ fn spawn_race(
             track.open = true;
         }
         (CourseSource::H2(lvl), _) => {
+            // A racing-line drop is a sloped chute when the level's own water is already partway down
+            // halfway along it (Hong Kong's flumes: holding the upper level floated boats over the chute
+            // walls into the collision mesh, where the AI kept respawning). Where the drawn water is
+            // still up there it steps down at the end: a fall to fly off (Temple of Flume).
+            let drawn = |p: Vec2| -> Option<f32> {
+                let v = |q: [f32; 3]| Vec2::new(q[0], q[2]);
+                level.water_sectors.iter().find_map(|ws| {
+                    let (a, b) = (level.water_edges.get(ws.leading)?, level.water_edges.get(ws.trailing)?);
+                    let quad = [v(a.start), v(a.end), v(b.end), v(b.start)];
+                    let side = |i: usize| (quad[(i + 1) % 4] - quad[i]).perp_dot(p - quad[i]);
+                    let s: Vec<f32> = (0..4).map(side).collect();
+                    let inside = s.iter().all(|x| *x >= 0.0) || s.iter().all(|x| *x <= 0.0);
+                    if !inside {
+                        return None;
+                    }
+                    let (ma, mb) = ((quad[0] + quad[1]) * 0.5, (quad[2] + quad[3]) * 0.5);
+                    let f = ((p - ma).dot(mb - ma) / (mb - ma).length_squared().max(1.0)).clamp(0.0, 1.0);
+                    Some(a.water + (b.water - a.water) * f)
+                })
+            };
+            let mid = |e: &Edge| Vec2::new((e.start[0] + e.end[0]) * 0.5, (e.start[2] + e.end[2]) * 0.5);
+            track.chutes = track
+                .edges
+                .windows(2)
+                .map(|w| {
+                    let drop = w[0].water - w[1].water;
+                    drop > phy::WATERFALL_DROP
+                        && drawn((mid(&w[0]) + mid(&w[1])) * 0.5).is_some_and(|h| w[0].water - h > drop * phy::CHUTE_HALF_WAY_FRACTION)
+                })
+                .collect();
+            let chutes = track.chutes.iter().filter(|c| **c).count();
+            if chutes > 0 {
+                info!("{code}: {chutes} sloped chutes");
+            }
             if let Some(row) = H2_LEVELS.iter().find(|l| l.id == *lvl) {
                 track.looped = row.num_laps > 0;
                 track.laps = row.num_laps.max(1) as u32;
@@ -1327,6 +1361,7 @@ fn boat_physics(
     cheats: Res<Cheats>,
     tuning: Res<Tuning>,
     collider: Option<Res<Collider>>,
+    h2waves: Option<Res<crate::h2water::H2Waves>>,
     mut boats: Query<&mut Boat, Without<crate::net::Remote>>,
 ) {
     let g = &tuning.0;
@@ -1535,8 +1570,16 @@ fn boat_physics(
             b.lap += 1;
             tp = track.locate(b.pos, 0);
         }
+        // Off the racing line but over the level's own water (a secret path, a shortcut, a side pool)
+        // on a course whose collision mesh is authoritative (H2Overdrive): no corridor bank there, the
+        // collision mesh is the only wall. The bank stays as the edge of the world where there is no
+        // water.
+        let off_line = tp.u < phy::WALL_MARGIN || tp.u > 1.0 - phy::WALL_MARGIN;
+        let free_water = off_line
+            && collider.as_ref().is_some_and(|c| c.trusted)
+            && h2waves.as_ref().and_then(|w| w.surface(b.pos.xz(), b.pos.y)).is_some();
         // Banks: a real impact costs `Hit Wall Speed Penalty Mult`, a glancing scrape just drags.
-        if !track.open && (tp.u < phy::WALL_MARGIN || tp.u > 1.0 - phy::WALL_MARGIN) {
+        if !track.open && off_line && !free_water {
             let u = tp.u.clamp(phy::WALL_MARGIN, 1.0 - phy::WALL_MARGIN);
             let on = track.point_at(tp, u);
             b.pos.x = on.x;
@@ -1567,6 +1610,16 @@ fn boat_physics(
             b.vel = tp.forward * b.vel.length();
         }
         // Water surface and gravity.
+        // In and beside a sloped chute, the level of the H2Overdrive water sector actually under the hull: a racing-line
+        // cross-section has one height, but a chute drops between side pools that stay up (Hong
+        // Kong's flumes); riding the cross-section there sank boats in the pools into the weir.
+        let mut tp = tp;
+        let near_chute = (tp.seg.saturating_sub(1)..=tp.seg + 1).any(|s| track.chutes.get(s).copied().unwrap_or(false));
+        if let Some(h) = h2waves.as_ref().filter(|_| near_chute || free_water).and_then(|w| w.surface(b.pos.xz(), b.pos.y.min(tp.water + phy::H2WATER_SURFACE_MAX))) {
+            if (h - tp.water).abs() < phy::H2WATER_SURFACE_MAX {
+                tp.water = h;
+            }
+        }
         // The surface a hull rides: the water, or a terrain floor (ramp, mound) within step-up reach.
         let reach = b.pos.y + phy::FLOOR_STEP_UP;
         let inside = (phy::FLOOR_CORRIDOR_MARGIN..=1.0 - phy::FLOOR_CORRIDOR_MARGIN).contains(&tp.u);
