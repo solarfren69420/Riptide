@@ -601,6 +601,22 @@ fn spawn_race(
                 scope.clone(),
             ))
             .id();
+        // Knockable props on a bungee near the water: shoved aside when hit, springing back.
+        if prop.bungee.is_some() && prop.path.is_none() && prop.spin.is_none() && prop.slide.is_none() && prop.anim.is_none() {
+            let water = track.locate_anywhere(Vec3::from(prop.position)).water;
+            if (prop.position[1] - water).abs() < phy::BUNGEE_MAX_ABOVE_WATER {
+                commands.entity(e).insert(crate::floating::Floater {
+                    vel: Vec2::ZERO,
+                    spin: 0.0,
+                    radius: phy::BUNGEE_RADIUS * prop.scale.max(0.1),
+                    height: 1.0,
+                    mass: phy::BUNGEE_MASS,
+                    draft: prop.position[1] - water,
+                    phase: i as f32 * 1.37,
+                    anchor: Some(Vec2::new(prop.position[0], prop.position[2])),
+                });
+            }
+        }
         if let (Some(mass), Some(&(radius, height))) = (prop.float_mass, floater_sizes.get(&i)) {
             let water = track.locate_anywhere(Vec3::from(prop.position)).water;
             commands.entity(e).insert(crate::floating::Floater {
@@ -611,6 +627,7 @@ fn spawn_race(
                 mass,
                 draft: prop.position[1] - water,
                 phase: i as f32 * 1.37,
+                anchor: None,
             });
         }
         if let Some(m) = mover {

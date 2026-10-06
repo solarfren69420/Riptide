@@ -618,12 +618,14 @@ fn main() -> Result<()> {
                         let d = |e: &riptide_assets::h2level::Edge| (e.start[0] + e.end[0] - 2.0 * p.position[0]).powi(2) + (e.start[2] + e.end[2] - 2.0 * p.position[2]).powi(2);
                         d(a).total_cmp(&d(b))
                     }).map(|e| e.water).unwrap_or(0.0);
+                    if p.bungee.is_some() { print!("BUNGEE "); }
                     println!("{} {:.0} {:.0} {:.0} water {:.0} above {:+.0} scale {:.2}", p.mesh, p.position[0], p.position[1], p.position[2], w, p.position[1] - w, p.scale);
                 }
                 return Ok(());
             }
             if args.get(2).map(String::as_str) == Some("WATER") {
 println!("{} sounds: {:?}", lvl.sounds.len(), lvl.sounds.iter().filter(|s| s.radii.is_none()).map(|s| (&s.name, &s.sound)).collect::<Vec<_>>());
+println!("{} bungee props", lvl.props.iter().filter(|p| p.bungee.is_some()).count());
 println!("{} fires: {:?}", lvl.fires.len(), lvl.fires.iter().take(3).map(|f| (&f.def, f.position, f.scale)).collect::<Vec<_>>());
                 println!("{} water edges, {} water sectors", lvl.water_edges.len(), lvl.water_sectors.len());
                 for s in &lvl.water_sectors {

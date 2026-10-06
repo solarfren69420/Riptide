@@ -217,3 +217,8 @@ hull_spray_life,f32,0.7,s,riptide design: hull spray droplet life
 spray_drag,f32,1.2,1/s,riptide design: spray droplets slow down in the air (the original drag 0.99 per update)
 spray_streak,f32,0.04,s,riptide design: spray streak length = speed x this (FX_Waterspray draws droplets head to tail)
 hull_spray_lift,f32,2,units,riptide design: hull spray points sit this far above the water surface (heights measured from the hull waterline)
+bungee_spring,f32,2.5,1/s^2,riptide design: a knocked bungee prop (buoy / moored boat / drum) is pulled back to its spot this hard (original Bungee Force XZ 1500)
+bungee_mass,f32,300,Coll Mass units,riptide design: knockable bungee props are light (Coll Obj Resistance 0.2: hitting one barely slows the boat)
+bungee_radius,f32,20,units x prop scale,riptide design: hit radius of a knockable bungee prop
+bungee_max_above_water,f32,60,units,riptide design: bungee props further than this from the water (signs on land) stay put
+bungee_resistance,f32,0.2,x,riptide design: share of the floating-object speed loss a knockable bungee prop costs a boat (the original Coll Obj Resistance 0.2)

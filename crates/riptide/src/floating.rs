@@ -21,6 +21,8 @@ pub struct Floater {
     /// Height of the mesh origin above the water when placed (keeps its authored draft).
     pub draft: f32,
     pub phase: f32,
+    /// Anchored on a bungee (buoys, moored boats, drums: mesh def Bungee Force XZ): springs back here.
+    pub anchor: Option<Vec2>,
 }
 
 pub(crate) fn float_and_push(
@@ -59,7 +61,9 @@ pub(crate) fn float_and_push(
                 f.spin += n.perp_dot(boat_vel.normalize_or_zero()) * closing * phy::FLOATER_SPIN / f.radius.max(1.0);
                 // Push the floater out of the hull; the boat loses some speed.
                 tf.translation += (n * (reach - dist) * share).extend(0.0).xzy();
-                b.speed *= 1.0 - phy::FLOATER_DRAG_ON_BOAT * (1.0 - share);
+                // Knockable bungee props barely slow a boat (their Coll Obj Resistance is 0.2).
+                let resist = if f.anchor.is_some() { phy::BUNGEE_RESISTANCE } else { 1.0 };
+                b.speed *= 1.0 - phy::FLOATER_DRAG_ON_BOAT * (1.0 - share) * resist;
                 // Fast enough: the hull rides up over it and is thrown into the air.
                 if !b.airborne && closing > phy::FLOATER_LAUNCH_SPEED && f.height > phy::FLOATER_MIN_RAMP_HEIGHT {
                     b.vy = b.vy.max((closing * phy::FLOATER_LAUNCH).min(phy::FLOATER_LAUNCH_MAX));
@@ -76,6 +80,9 @@ pub(crate) fn float_and_push(
         } else {
             tf.translation.x = next.x;
             tf.translation.z = next.y;
+        }
+        if let Some(home) = f.anchor {
+            f.vel += (home - tf.translation.xz()) * phy::BUNGEE_SPRING * dt;
         }
         f.vel *= (1.0 - phy::FLOATER_WATER_DRAG * dt).max(0.0);
         f.spin *= (1.0 - phy::FLOATER_WATER_DRAG * dt).max(0.0);

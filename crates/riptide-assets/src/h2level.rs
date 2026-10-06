@@ -132,6 +132,8 @@ pub struct Placement {
     pub solid: bool,
     /// Physics Type 2 (logs, rafts, crates, houseboats): it floats and boats push it; its `Coll Mass`.
     pub float_mass: Option<f32>,
+    /// Anchored on a bungee (buoys: mesh def `Bungee Force XZ`): knocked aside when hit, springing back.
+    pub bungee: Option<f32>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -345,6 +347,8 @@ pub fn load_level(lux: &LuxArchive, code: &str) -> Result<H2Level> {
     // boats hit and ride over; 0 is scenery.
     let solid_defs: std::collections::HashSet<String> =
         defs.iter().filter(|o| matches!(o.f32("Physics Type").map(|t| t as i32), Some(1 | 2))).map(|o| o.name.clone()).collect();
+    let bungee_defs: HashMap<String, f32> =
+        defs.iter().filter_map(|o| Some((o.name.clone(), o.f32("Bungee Force XZ").filter(|f| *f > 0.0)?))).collect();
     let float_defs: HashMap<String, f32> = defs
         .iter()
         .filter(|o| o.f32("Physics Type").map(|t| t as i32) == Some(2))
@@ -389,7 +393,8 @@ pub fn load_level(lux: &LuxArchive, code: &str) -> Result<H2Level> {
             });
             let solid = o.get("Game Mesh Def").is_some_and(|d| solid_defs.contains(d));
             let float_mass = o.get("Game Mesh Def").and_then(|d| float_defs.get(d)).copied();
-            let placement = Placement { mesh, position, rotation, scale, path, anim, spin, slide, solid, float_mass };
+            let bungee = o.get("Game Mesh Def").and_then(|d| bungee_defs.get(d)).copied().filter(|_| float_mass.is_none());
+            let placement = Placement { mesh, position, rotation, scale, path, anim, spin, slide, solid, float_mass, bungee };
             if o.class == "CBooster" {
                 let kind = match o.f32("Type").map(|t| t as i32).unwrap_or(0) {
                     1 => BoostKind::Red,
@@ -450,6 +455,7 @@ pub fn load_level(lux: &LuxArchive, code: &str) -> Result<H2Level> {
                         slide: None,
                         solid: false,
                         float_mass: None,
+                        bungee: None,
                     });
                 }
             }
