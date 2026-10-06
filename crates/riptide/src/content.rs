@@ -295,6 +295,28 @@ impl Models<'_> {
     }
 
     /// Pieces of a Hydro Thunder geometry object (or several, comma separated).
+    /// An animated Hydro Thunder object (`G<name>H1`): one piece per node, `bone` = node id, for
+    /// crate::htmotion to move with its `A<name>H1` clip.
+    pub fn ht_nodes(&mut self, name: &str) -> Option<Arc<Vec<Piece>>> {
+        let key = format!("htn:{name}");
+        if let Some(hit) = self.cache.models.get(&key) {
+            return hit.clone();
+        }
+        let ht = self.content.ht.clone()?;
+        let mut model = ht.geometry_nodes(name).ok()?;
+        keep_bright_colors(&mut model);
+        model.parts.retain(|p| !p.indices.is_empty());
+        let pieces = (!model.parts.is_empty()).then(|| Arc::new(self.build(&model, Source::Ht, false)));
+        if pieces.is_some() || !self.pending() {
+            self.cache.models.insert(key, pieces.clone());
+        }
+        pieces
+    }
+
+    pub fn ht_clip(&self, name: &str) -> Option<Arc<riptide_assets::htanim::HtClip>> {
+        self.content.ht.as_ref()?.clip(name).ok().map(Arc::new)
+    }
+
     pub fn ht(&mut self, names: &str) -> Option<Arc<Vec<Piece>>> {
         let key = format!("ht:{names}");
         if let Some(hit) = self.cache.models.get(&key) {

@@ -21,6 +21,7 @@ mod effects;
 mod events;
 mod floating;
 mod geyser;
+mod htmotion;
 mod hud;
 mod controls;
 mod menu;

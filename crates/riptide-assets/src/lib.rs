@@ -7,6 +7,7 @@ pub mod h2coll;
 pub mod h2level;
 pub mod h2mesh;
 pub mod ht;
+pub mod htanim;
 pub mod htgeom;
 pub mod httrack;
 pub mod kat;

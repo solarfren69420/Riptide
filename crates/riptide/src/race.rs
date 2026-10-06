@@ -58,7 +58,7 @@ impl Plugin for RacePlugin {
                     .chain()
                     .run_if(in_state(Screen::Race)),
             );
-        app.add_systems(Update, (race_audio, engine_audio, crate::sound::fade_music, crate::geyser::geysers, crate::events::run_events, crate::h2water::apply_tides).run_if(in_state(Screen::Race)));
+        app.add_systems(Update, (race_audio, engine_audio, crate::sound::fade_music, crate::geyser::geysers, crate::events::run_events, crate::h2water::apply_tides, crate::htmotion::animate).run_if(in_state(Screen::Race)));
     }
 }
 
@@ -756,6 +756,27 @@ fn spawn_race(
         for inst in &t.instances {
             let at = Vec3::from(inst.position) * s;
             let pickup = PICKUPS.iter().position(|p| p.ht_geometry == inst.geometry && p.status.is_ok());
+            // Animated objects (`G?????H1` with an `A?????H1` clip): node pieces moved by the clip.
+            // Instances name the static `H0`; the animated `H1` geometry and its clip sit beside it.
+            let h1 = inst.geometry.strip_suffix("H0").map(|b| format!("{b}H1")).unwrap_or_else(|| inst.geometry.clone());
+            let clip = h1.ends_with("H1").then(|| format!("A{}", &h1[1..])).and_then(|c| models.ht_clip(&c));
+            if let (Some(clip), Some(nodes)) = (clip.clone(), clip.as_ref().and_then(|_| models.ht_nodes(&h1))) {
+                let e = commands
+                    .spawn((
+                        Transform::from_translation(at).with_rotation(Quat::from_rotation_y(inst.yaw)).with_scale(Vec3::splat(s * inst.scale)),
+                        Visibility::default(),
+                        crate::htmotion::HtAnimator { clip: clip.clone(), t: inst.position[0].abs() * 0.001 },
+                        scope.clone(),
+                    ))
+                    .id();
+                commands.entity(e).with_children(|c| {
+                    for piece in nodes.iter() {
+                        let mut n = c.spawn((Mesh3d(piece.mesh.clone()), Transform::IDENTITY, crate::htmotion::HtNode { track: crate::htmotion::track_for(&clip, piece.bone) }));
+                        piece.apply(&mut n);
+                    }
+                });
+                continue;
+            }
             let Some(p) = models.ht(&inst.geometry) else { continue };
             let mut e = commands.spawn((
                 Transform::from_translation(at).with_rotation(Quat::from_rotation_y(inst.yaw)).with_scale(Vec3::splat(s * inst.scale)),

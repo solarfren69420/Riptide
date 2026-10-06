@@ -24,6 +24,16 @@ pub fn decode_geometry(obj: &R2Object) -> Result<Model> {
 /// Decode a geometry header starting at body offset `base`. Objects draw their first group;
 /// a track (`all_groups`) draws every group (one per sector), each draw record once.
 pub fn decode_geometry_at(obj: &R2Object, base: usize, all_groups: bool) -> Result<Model> {
+    decode_impl(obj, base, all_groups, false)
+}
+
+/// An animated object (`G<name>H1`): every group is a node an `A_<name>H1` clip moves; each
+/// group's draw records come out as parts tagged `bone` = the node id (group +0x00).
+pub fn decode_geometry_nodes(obj: &R2Object) -> Result<Model> {
+    decode_impl(obj, 0, false, true)
+}
+
+fn decode_impl(obj: &R2Object, base: usize, all_groups: bool, nodes: bool) -> Result<Model> {
     let nvert = obj.u32(base + 0x14).context("header")? as usize;
     let nuv = obj.u32(base + 0x18).context("header")? as usize;
     let nnorm = obj.u32(base + 0x20).context("header")? as usize;
@@ -32,7 +42,7 @@ pub fn decode_geometry_at(obj: &R2Object, base: usize, all_groups: bool) -> Resu
     let uvs = obj.ptr(base + 0x3c);
     let corners = obj.ptr(base + 0x40);
     let normals = obj.ptr(base + 0x44);
-    let ngroups = if all_groups { obj.u32(base + 4).unwrap_or(0) as usize } else { 1 };
+    let ngroups = if all_groups || nodes { obj.u32(base + 4).unwrap_or(0) as usize } else { 1 };
     if nvert == 0 || nvert > 1_000_000 {
         bail!("{}: implausible vertex count {nvert}", obj.name);
     }
@@ -73,12 +83,13 @@ pub fn decode_geometry_at(obj: &R2Object, base: usize, all_groups: bool) -> Resu
         };
         for r in 0..nrec.min(if all_groups { 4096 } else { 64 }) {
             if seen.insert(recs + r * 12) {
-                records.push(recs + r * 12);
+                let node = nodes.then(|| obj.u32(gb).unwrap_or(0) as u16);
+                records.push((recs + r * 12, node));
             }
         }
     }
     let mut model = Model { name: obj.name.clone(), ..Default::default() };
-    for rb in records {
+    for (rb, node) in records {
         let npoly = obj.u32(rb).unwrap_or(0) as usize;
         let Some(polys) = obj.ptr(rb + 4) else { continue };
         let mat = obj.ptr(rb + 8);
@@ -95,7 +106,7 @@ pub fn decode_geometry_at(obj: &R2Object, base: usize, all_groups: bool) -> Resu
         } else {
             Blend::Opaque
         };
-        let mut part = MeshPart { texture, ..Default::default() };
+        let mut part = MeshPart { texture, bone: node, ..Default::default() };
         for p in 0..npoly.min(65_536) {
             let pb = polys + p * 48;
             let mut tri = [(0usize, 0usize, 0usize); 3];

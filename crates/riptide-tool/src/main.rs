@@ -326,6 +326,19 @@ fn main() -> Result<()> {
                 }
             }
         }
+        Some("ht-anim") => {
+            // ht-anim <R2> <A_name>: tracks, node ids and how far each part moves.
+            let g = riptide_assets::gdi::GdRom::open(&riptide_assets::default_gdi_path())?;
+            let r2 = riptide_assets::r2::R2Archive::parse(g.read(a(1)?)?)?;
+            let clip = riptide_assets::htanim::decode_clip(&r2.object(a(2)?)?)?;
+            println!("{} tracks, {:.4} s/frame", clip.tracks.len(), clip.seconds_per_frame);
+            for t in &clip.tracks {
+                let p = |m: &[f32; 16]| [m[12], m[13], m[14]];
+                let travel = t.poses.iter().map(|m| { let (a, b) = (p(m), p(&t.poses[0])); ((a[0]-b[0]).powi(2) + (a[1]-b[1]).powi(2) + (a[2]-b[2]).powi(2)).sqrt() }).fold(0.0f32, f32::max);
+                let tilt = t.poses.iter().map(|m| (m[5] / (m[4].powi(2) + m[5].powi(2) + m[6].powi(2)).sqrt()).clamp(-1.0, 1.0).acos().to_degrees()).fold(0.0f32, f32::max);
+                println!("  node {:?}: {} frames, max move {travel:.1}, max tilt {tilt:.0} deg", t.node, t.poses.len());
+            }
+        }
         Some("ht-obj") => {
             // Dump one R2 entry body to a file and print its pointer table.
             let g = riptide_assets::gdi::GdRom::open(&riptide_assets::default_gdi_path())?;

@@ -55,6 +55,26 @@ impl HydroThunder {
         decode_geometry(&self.main.object(name)?)
     }
 
+    /// An animated object's geometry, one part per node (`G<name>H1`, crate::htgeom).
+    pub fn geometry_nodes(&self, name: &str) -> Result<Model> {
+        for a in self.archives() {
+            if a.contains(name) {
+                return crate::htgeom::decode_geometry_nodes(&a.object(name)?);
+            }
+        }
+        crate::htgeom::decode_geometry_nodes(&self.main.object(name)?)
+    }
+
+    /// A node animation clip (`A<name>H1`, crate::htanim).
+    pub fn clip(&self, name: &str) -> Result<crate::htanim::HtClip> {
+        for a in self.archives() {
+            if a.contains(name) {
+                return crate::htanim::decode_clip(&a.object(name)?);
+            }
+        }
+        crate::htanim::decode_clip(&self.main.object(name)?)
+    }
+
     pub fn texture(&self, name: &str) -> Result<RgbaImage> {
         for a in self.archives() {
             if let Some(raw) = a.raw(name) {
