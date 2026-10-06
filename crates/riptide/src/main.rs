@@ -18,6 +18,7 @@ mod cheats;
 mod collide;
 mod content;
 mod effects;
+mod events;
 mod floating;
 mod geyser;
 mod hud;

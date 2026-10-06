@@ -261,6 +261,29 @@ pub struct Booster {
     pub placement: Placement,
 }
 
+/// One action of a level tripwire (`<code>_tripwires`, slots 1..4): a script verb (Fire, Tripwire,
+/// StartAnim, CameraShake, TidalWave, Skybox, PlaySound2D, ...) on a referenced object, with its
+/// blind data and delay.
+#[derive(Clone, Debug, Default)]
+pub struct TripAction {
+    pub script: String,
+    pub target: String,
+    pub int: i32,
+    pub float: f32,
+    pub delay: f32,
+}
+
+/// A level tripwire: crossing it runs its actions (the dam collapse, eruptions, rock slides, sky
+/// swaps). Trigger Shape 4 is a plane across the course through `position`.
+#[derive(Clone, Debug, Default)]
+pub struct Tripwire {
+    pub name: String,
+    pub position: [f32; 3],
+    pub scale: f32,
+    pub shape: i32,
+    pub actions: Vec<TripAction>,
+}
+
 /// A geyser (CGeyser): its flame def erupts on a cycle, Off -> Low (a trickle) -> High (the
 /// eruption, which throws boats over it), starting at `phase` seconds in.
 #[derive(Clone, Debug)]
@@ -297,6 +320,7 @@ pub struct LevelSound {
 /// fixed spot, emitting along its local +Z (Riptide -Z after the mirror).
 #[derive(Clone, Debug)]
 pub struct LevelFire {
+    pub name: String,
     pub def: String,
     pub position: [f32; 3],
     pub rotation: [f32; 4],
@@ -309,6 +333,7 @@ pub struct H2Level {
     pub fires: Vec<LevelFire>,
     pub sounds: Vec<LevelSound>,
     pub geysers: Vec<Geyser>,
+    pub tripwires: Vec<Tripwire>,
     pub title: String,
     /// Terrain meshes (`sg_<code>_PropSectorN`), placed at the origin.
     pub sector_meshes: Vec<String>,
@@ -482,9 +507,38 @@ pub fn load_level(lux: &LuxArchive, code: &str) -> Result<H2Level> {
         lvl.sounds.push(LevelSound { name: o.name.clone(), sound: sound.to_string(), position, volume: o.f32("Volume").unwrap_or(1.0), radii, voice: false });
     }
 
+    for o in load_list_with_defaults(lux, &format!("{code}_tripwires")).unwrap_or_default() {
+        let Some(position) = o.vec3("Position") else { continue };
+        let int = |k: &str| o.get(k).and_then(|v| v.trim().parse::<i32>().ok()).unwrap_or(0);
+        let actions = ["", " 2", " 3", " 4"]
+            .iter()
+            .filter_map(|n| {
+                let script = o.get(&format!("Script Name{n}"))?.trim();
+                if script.is_empty() || script == "(none)" {
+                    return None;
+                }
+                Some(TripAction {
+                    script: script.to_string(),
+                    target: o.get(&format!("Reference Object{n}")).unwrap_or("").trim().to_string(),
+                    int: int(&format!("Blind Int Data{n}")),
+                    float: o.f32(&format!("Blind Float Data{n}")).unwrap_or(0.0),
+                    delay: o.f32(&format!("Delay Seconds{n}")).unwrap_or(0.0),
+                })
+            })
+            .collect();
+        lvl.tripwires.push(Tripwire {
+            name: o.name.clone(),
+            position,
+            scale: o.f32("Scale").unwrap_or(1.0),
+            shape: int("Trigger Shape"),
+            actions,
+        });
+    }
+
     for o in load_list_with_defaults(lux, &format!("{code}_Fire")).unwrap_or_default() {
         let (Some(def), Some(position)) = (o.get("FlameDef").filter(|d| !d.is_empty()), o.vec3("Position")) else { continue };
         lvl.fires.push(LevelFire {
+            name: o.name.clone(),
             def: def.to_string(),
             position,
             rotation: o.quat("Orientation").unwrap_or([0.0, 0.0, 0.0, 1.0]),

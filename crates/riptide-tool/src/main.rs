@@ -634,6 +634,7 @@ fn main() -> Result<()> {
             if args.get(2).map(String::as_str) == Some("WATER") {
 println!("{} sounds: {:?}", lvl.sounds.len(), lvl.sounds.iter().filter(|s| s.radii.is_none()).map(|s| (&s.name, &s.sound)).collect::<Vec<_>>());
 println!("{} geysers", lvl.geysers.len());
+if std::env::var_os("TRIP_DUMP").is_some() { for t in &lvl.tripwires { println!("TRIP {} shape {} scale {:.0}: {:?}", t.name, t.shape, t.scale, t.actions.iter().map(|a| format!("{}({}) i{} f{} d{}", a.script, a.target, a.int, a.float, a.delay)).collect::<Vec<_>>()); } }
 println!("{} bungee props", lvl.props.iter().filter(|p| p.bungee.is_some()).count());
 println!("{} fires: {:?}", lvl.fires.len(), lvl.fires.iter().take(3).map(|f| (&f.def, f.position, f.scale)).collect::<Vec<_>>());
                 println!("{} water edges, {} water sectors", lvl.water_edges.len(), lvl.water_sectors.len());

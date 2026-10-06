@@ -58,7 +58,7 @@ impl Plugin for RacePlugin {
                     .chain()
                     .run_if(in_state(Screen::Race)),
             );
-        app.add_systems(Update, (race_audio, engine_audio, crate::sound::fade_music, crate::geyser::geysers).run_if(in_state(Screen::Race)));
+        app.add_systems(Update, (race_audio, engine_audio, crate::sound::fade_music, crate::geyser::geysers, crate::events::run_events).run_if(in_state(Screen::Race)));
     }
 }
 
@@ -584,9 +584,16 @@ fn spawn_race(
     }
     // Level fires, smoke, torches, leaks and splashes (`<code>_Fire`): rocket flame defs at fixed spots.
     let mut fires = 0;
+    let mut events = crate::events::LevelEvents::new(&level.tripwires, &track);
+    let off = crate::events::LevelEvents::starts_off(&level.tripwires);
     for f in &level.fires {
         let Some(fire) = crate::effects::LevelFire::new(&f.def, f.scale) else { continue };
-        commands.spawn((Transform::from_translation(Vec3::from(f.position)).with_rotation(Quat::from_array(f.rotation).normalize()), fire, scope.clone()));
+        let mut fire = fire;
+        if off.contains(&f.name) {
+            fire.intensity = 0.0;
+        }
+        let e = commands.spawn((Transform::from_translation(Vec3::from(f.position)).with_rotation(Quat::from_array(f.rotation).normalize()), fire, scope.clone())).id();
+        events.add_fire(&f.name, e);
         fires += 1;
     }
     // Geysers: a flame def driven by its cycle (crate::geyser).
@@ -602,6 +609,7 @@ fn spawn_race(
         ));
         fires += 1;
     }
+    commands.insert_resource(events);
     if fires > 0 {
         info!("{code}: {fires} level fires / smoke / splashes");
     }
