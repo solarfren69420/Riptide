@@ -272,6 +272,8 @@ pub struct LevelSound {
     pub volume: f32,
     /// `Some((inner, outer))` for a positional loop, `None` for a gate.
     pub radii: Option<(f32, f32)>,
+    /// An announcer voice-over (CVoiceOver): its gate is tight, so a secret's line plays only on the secret.
+    pub voice: bool,
 }
 
 /// A level fire, smoke or torch (`<code>_Fire`, CRocketFlameEntity): a rocket flame def run at a
@@ -409,6 +411,29 @@ pub fn load_level(lux: &LuxArchive, code: &str) -> Result<H2Level> {
     }
 
     for o in load_list_with_defaults(lux, &format!("{code}_sounds")).unwrap_or_default() {
+        // Voice-overs (CVoiceOver): a Message number 0..13 into the announcer's lines, matched by the
+        // objects' own names across every level (message 6, the default, is both the secrets and
+        // the shortcuts: picked by name). Played once, like a gate.
+        if o.class == "CVoiceOver" {
+            let msg = o.get("Message").and_then(|m| m.trim().parse::<i32>().ok()).unwrap_or(6);
+            let line = match msg {
+                1 => Some("com_StayOnTarget"),
+                2 => Some("com_TightTurnsAhead"),
+                3 => Some("com_DontLikeLooksOfThis"),
+                4 => Some("com_FinishLineAhead"),
+                5 => Some("com_GetThatBooster"),
+                6 if o.name.to_ascii_lowercase().contains("shortcut") => Some("com_HeyAShortcut"),
+                6 => Some("com_YouFoundASecret"),
+                8 => Some("com_ThisLooksTricky"),
+                9 => Some("com_OhSoClose"),
+                10 => Some("com_StaySharp"),
+                _ => None,
+            };
+            if let (Some(line), Some(position)) = (line, o.vec3("Position")) {
+                lvl.sounds.push(LevelSound { name: o.name.clone(), sound: line.to_string(), position, volume: 1.0, radii: None, voice: true });
+            }
+            continue;
+        }
         let (Some(sound), Some(position)) = (o.get("Sound Def").filter(|d| !d.is_empty()), o.vec3("Position")) else { continue };
         let radii = match o.class.as_str() {
             "CSSound" => {
@@ -418,7 +443,7 @@ pub fn load_level(lux: &LuxArchive, code: &str) -> Result<H2Level> {
             "CSMusicTripwire" => None,
             _ => continue,
         };
-        lvl.sounds.push(LevelSound { name: o.name.clone(), sound: sound.to_string(), position, volume: o.f32("Volume").unwrap_or(1.0), radii });
+        lvl.sounds.push(LevelSound { name: o.name.clone(), sound: sound.to_string(), position, volume: o.f32("Volume").unwrap_or(1.0), radii, voice: false });
     }
 
     for o in load_list_with_defaults(lux, &format!("{code}_Fire")).unwrap_or_default() {

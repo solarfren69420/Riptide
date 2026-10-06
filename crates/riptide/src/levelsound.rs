@@ -25,6 +25,7 @@ pub struct LevelGate {
     normal: Vec2,
     gain: f32,
     done: bool,
+    radius: f32,
 }
 
 /// Spawn the level's sounds (race setup).
@@ -43,7 +44,7 @@ pub fn spawn(commands: &mut Commands, level: &riptide_assets::h2level::H2Level, 
             }
             None => {
                 let normal = track.locate_anywhere(at).forward;
-                commands.spawn((LevelGate { def, point: at.xz(), normal, gain: s.volume.min(1.0), done: false }, scope.clone()));
+                commands.spawn((LevelGate { def, point: at.xz(), normal, gain: s.volume.min(1.0), done: false, radius: if s.voice { phy::VOICE_GATE_RADIUS } else { phy::SOUND_GATE_RADIUS } }, scope.clone()));
             }
         }
         n += 1;
@@ -71,7 +72,7 @@ pub fn level_sounds(
             }
             let (d0, d1) = ((prev - g.point).dot(g.normal), (now - g.point).dot(g.normal));
             let across = (now - g.point).perp_dot(g.normal).abs();
-            if d0 < 0.0 && d1 >= 0.0 && across < phy::SOUND_GATE_RADIUS {
+            if d0 < 0.0 && d1 >= 0.0 && across < g.radius {
                 g.done = true;
                 sfx.def(g.def, g.gain);
             }
