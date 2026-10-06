@@ -89,6 +89,8 @@ pub fn run_events(
     events: Option<ResMut<LevelEvents>>,
     boats: Query<&Boat>,
     mut fires: Query<&mut LevelFire>,
+    mut skies: Query<(&crate::race::SkyIndex, &mut Visibility)>,
+    mut shake: ResMut<crate::race::CameraShake>,
 ) {
     let Some(mut ev) = events else { return };
     if clock.t < 0.0 {
@@ -128,6 +130,19 @@ pub fn run_events(
                 if let Some(mut f) = ev.fires.get(&a.target).and_then(|e| fires.get_mut(*e).ok()) {
                     f.intensity = if a.int != 0 { 1.0 } else { 0.0 };
                 }
+            }
+            "skybox" => {
+                // An index into the level's skyboxes; 999 and up hide the sky (inside the temple).
+                let n = skies.iter().count();
+                let show = if a.int >= 999 || n == 0 { None } else { Some((a.int.max(0) as usize).min(n - 1)) };
+                for (i, mut v) in &mut skies {
+                    *v = if Some(i.0) == show { Visibility::Inherited } else { Visibility::Hidden };
+                }
+            }
+            "camerashake" => {
+                shake.amp = (a.int as f32 * phy::CAM_SHAKE_PER_UNIT).min(phy::CAM_SHAKE_MAX);
+                shake.start = clock.t;
+                shake.until = clock.t + a.float.max(0.1);
             }
             "tripwire" => {
                 if let Some(&i) = ev.by_name.get(&a.target) {

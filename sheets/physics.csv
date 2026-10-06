@@ -231,3 +231,5 @@ geyser_min_reach,f32,120,units,riptide design: a boat this close to an erupting 
 trip_gate_radius,f32,2500,units,riptide design: a plane tripwire (Trigger Shape 4) fires when the player crosses it this close to its point
 trip_volume_scale,f32,20,x Scale,riptide design: a volume tripwire (Trigger Shape 5) fires inside Scale x this of its point
 trip_volume_min,f32,300,units,riptide design: smallest volume tripwire radius
+cam_shake_per_unit,f32,0.03,units per strength,riptide design: camera shake amplitude per unit of a CameraShake event's strength (dam collapse 1000 -> 30 units)
+cam_shake_max,f32,60,units,riptide design: largest camera shake

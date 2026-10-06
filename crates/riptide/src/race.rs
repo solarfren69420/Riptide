@@ -28,7 +28,7 @@ pub struct RacePlugin;
 
 impl Plugin for RacePlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<CamView>();
+        app.init_resource::<CamView>().init_resource::<CameraShake>();
         app.add_systems(Update, probe.run_if(in_state(Screen::Race)))
             .add_systems(OnEnter(Screen::Race), (spawn_race, choose_collision, start_race_audio, crate::net::race_ready).chain())
             .add_systems(
@@ -179,7 +179,19 @@ struct Pickup {
 pub struct ChaseCam;
 
 #[derive(Component)]
-struct Sky;
+pub struct Sky;
+
+/// Which of the level's skyboxes this dome is (Skybox event actions switch between them).
+#[derive(Component)]
+pub struct SkyIndex(pub usize);
+
+/// A camera shake from a level event: amplitude (units) fading out by `until` (race time).
+#[derive(Resource, Default)]
+pub struct CameraShake {
+    pub amp: f32,
+    pub start: f32,
+    pub until: f32,
+}
 
 #[derive(Component)]
 enum HudText {
@@ -762,6 +774,26 @@ fn spawn_race(
     // Seen from high up (big launches), H2Overdrive levels end where the camera normally can't
     // see: lay their most common ground texture out underneath, so the gaps read as distant land.
     let apron = if matches!(choice.source, CourseSource::H2(_)) { ground_apron(&mut models, &level) } else { None };
+    // The level's other skyboxes, hidden until a Skybox event shows them (crate::events).
+    for (i, sky) in level.skyboxes.iter().enumerate().skip(1) {
+        if let Some(p) = models.lux_unlit(&sky.mesh) {
+            let e = commands
+                .spawn((
+                    Transform::from_rotation(Quat::from_array(sky.rotation)).with_scale(Vec3::splat(sky.scale.max(1.0))),
+                    Visibility::Hidden,
+                    Sky,
+                    SkyIndex(i),
+                    scope.clone(),
+                ))
+                .id();
+            commands.entity(e).with_children(|c| {
+                for piece in p.iter() {
+                    let mut e = c.spawn((Mesh3d(piece.mesh.clone()), NoFrustumCulling, NotShadowCaster));
+                    piece.apply(&mut e);
+                }
+            });
+        }
+    }
     // Sky.
     if let Some(sky) = level.skyboxes.first() {
         if let Some(p) = models.lux_unlit(&sky.mesh) {
@@ -770,6 +802,7 @@ fn spawn_race(
                     Transform::from_rotation(Quat::from_array(sky.rotation)).with_scale(Vec3::splat(sky.scale.max(1.0))),
                     Visibility::default(),
                     Sky,
+                    SkyIndex(0),
                     scope.clone(),
                 ))
                 .id();
@@ -2000,6 +2033,8 @@ pub(crate) fn place_boats(
 
 fn chase_camera(
     time: Res<Time>,
+    shake: Res<CameraShake>,
+    race_clock: Res<RaceClock>,
     view: Res<CamView>,
     track: Res<Track>,
     cheats: Res<Cheats>,
@@ -2043,6 +2078,12 @@ fn chase_camera(
             tf.translation.x += push.x;
             tf.translation.z += push.y;
         }
+    }
+    // Level event camera shake (the dam collapse, rock slides): a jitter fading out.
+    if race_clock.t < shake.until && shake.amp > 0.0 {
+        let left = (shake.until - race_clock.t) / (shake.until - shake.start).max(1e-3);
+        let t = race_clock.t * 37.0;
+        tf.translation += Vec3::new(t.sin(), (t * 1.31).cos(), (t * 0.77).sin()) * shake.amp * left;
     }
     let target = b.pos + heading * phy::CAM_LOOK_AHEAD + Vec3::Y * 18.0;
     let l = look.get_or_insert(target);
