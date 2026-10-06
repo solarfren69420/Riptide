@@ -633,6 +633,7 @@ fn main() -> Result<()> {
             }
             if args.get(2).map(String::as_str) == Some("WATER") {
 println!("{} sounds: {:?}", lvl.sounds.len(), lvl.sounds.iter().filter(|s| s.radii.is_none()).map(|s| (&s.name, &s.sound)).collect::<Vec<_>>());
+println!("{} geysers", lvl.geysers.len());
 println!("{} bungee props", lvl.props.iter().filter(|p| p.bungee.is_some()).count());
 println!("{} fires: {:?}", lvl.fires.len(), lvl.fires.iter().take(3).map(|f| (&f.def, f.position, f.scale)).collect::<Vec<_>>());
                 println!("{} water edges, {} water sectors", lvl.water_edges.len(), lvl.water_sectors.len());

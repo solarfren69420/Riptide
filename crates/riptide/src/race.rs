@@ -58,7 +58,7 @@ impl Plugin for RacePlugin {
                     .chain()
                     .run_if(in_state(Screen::Race)),
             );
-        app.add_systems(Update, (race_audio, engine_audio, crate::sound::fade_music).run_if(in_state(Screen::Race)));
+        app.add_systems(Update, (race_audio, engine_audio, crate::sound::fade_music, crate::geyser::geysers).run_if(in_state(Screen::Race)));
     }
 }
 
@@ -587,6 +587,19 @@ fn spawn_race(
     for f in &level.fires {
         let Some(fire) = crate::effects::LevelFire::new(&f.def, f.scale) else { continue };
         commands.spawn((Transform::from_translation(Vec3::from(f.position)).with_rotation(Quat::from_array(f.rotation).normalize()), fire, scope.clone()));
+        fires += 1;
+    }
+    // Geysers: a flame def driven by its cycle (crate::geyser).
+    for (k, g) in level.geysers.iter().enumerate() {
+        let Some(mut fire) = crate::effects::LevelFire::new(&g.def, 1.0) else { continue };
+        fire.intensity = 0.0;
+        let phase = if g.random_phase { (k as f32 * 2.399).rem_euclid(g.off + g.low + g.high) } else { g.phase };
+        commands.spawn((
+            Transform::from_translation(Vec3::from(g.position)).with_rotation(Quat::from_array(g.rotation).normalize()),
+            fire,
+            crate::geyser::Geyser { off: g.off, low: g.low, high: g.high, low_intensity: g.low_intensity, high_intensity: g.high_intensity, phase, radius: g.radius },
+            scope.clone(),
+        ));
         fires += 1;
     }
     if fires > 0 {

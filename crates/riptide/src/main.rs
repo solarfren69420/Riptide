@@ -19,6 +19,7 @@ mod collide;
 mod content;
 mod effects;
 mod floating;
+mod geyser;
 mod hud;
 mod controls;
 mod menu;

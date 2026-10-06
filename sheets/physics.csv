@@ -226,3 +226,5 @@ spray_sink,f32,4,units,riptide design: a falling spray droplet this far below th
 spray_tint,f32,0.5,0..1,riptide design: how far spray takes the course water whitewash colour (0 white and 1 the whitewash colour; FX_Waterspray colours spray with the water tint ramp)
 voice_gate_radius,f32,700,units,riptide design: an announcer voice-over (CVoiceOver) plays when the player crosses its plane this close to it (a secret's line only on the secret)
 music_crossfade,f32,2,s,riptide design: a level music tripwire (CSMusicTripwire with a *_mus* sound) crossfades the course music over this long
+geyser_launch,f32,450,units/s,riptide design: an erupting geyser throws a boat over it up at this speed (launch not decoded from the original yet)
+geyser_min_reach,f32,120,units,riptide design: a boat this close to an erupting geyser is thrown (its trigger Scale is 40)

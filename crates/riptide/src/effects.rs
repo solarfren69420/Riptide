@@ -733,13 +733,15 @@ fn hull_bolts(
 pub struct LevelFire {
     flame: usize,
     scale: f32,
+    /// Emission scale (geysers: 0 off, Low / High Unit Intensity while erupting).
+    pub intensity: f32,
     due: HashMap<usize, f32>,
 }
 
 impl LevelFire {
     pub fn new(def: &str, scale: f32) -> Option<Self> {
         let flame = H2_ROCKET_FLAMES.iter().position(|f| f.id.eq_ignore_ascii_case(def))?;
-        Some(Self { flame, scale: scale.max(0.01), due: HashMap::new() })
+        Some(Self { flame, scale: scale.max(0.01), intensity: 1.0, due: HashMap::new() })
     }
 }
 
@@ -768,6 +770,9 @@ fn emit_level_fires(
     let mut near: Vec<_> = fires.iter_mut().filter(|(tf, _)| tf.translation.distance(eye) < phy::LEVEL_FIRE_RANGE).collect();
     near.sort_by(|a, b| a.0.translation.distance(eye).total_cmp(&b.0.translation.distance(eye)));
     for (tf, mut fire) in near {
+        if fire.intensity < 0.01 {
+            continue;
+        }
         let f = &H2_ROCKET_FLAMES[fire.flame];
         let direction = tf.rotation * Vec3::NEG_Z;
         let s = fire.scale;
@@ -775,7 +780,7 @@ fn emit_level_fires(
             let mat = flames.0.entry(layer).or_insert_with(|| flame_materials(&mut models, layer))[0].clone();
             let l = &H2_ROCKET_LAYERS[layer];
             // A puff each time the last one has travelled Puff Dist (the emitter stands still).
-            let rate = (l.high_motion_speed.abs() / l.high_motion_puff_dist.max(0.01)).min(phy::LEVEL_FIRE_MAX_RATE);
+            let rate = (l.high_motion_speed.abs() / l.high_motion_puff_dist.max(0.01)).min(phy::LEVEL_FIRE_MAX_RATE) * fire.intensity.min(1.0);
             let due = fire.due.entry(layer).or_default();
             *due += rate * dt;
             let n = *due as usize;

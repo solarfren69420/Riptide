@@ -261,6 +261,23 @@ pub struct Booster {
     pub placement: Placement,
 }
 
+/// A geyser (CGeyser): its flame def erupts on a cycle, Off -> Low (a trickle) -> High (the
+/// eruption, which throws boats over it), starting at `phase` seconds in.
+#[derive(Clone, Debug)]
+pub struct Geyser {
+    pub def: String,
+    pub position: [f32; 3],
+    pub rotation: [f32; 4],
+    pub radius: f32,
+    pub off: f32,
+    pub low: f32,
+    pub high: f32,
+    pub low_intensity: f32,
+    pub high_intensity: f32,
+    pub phase: f32,
+    pub random_phase: bool,
+}
+
 /// A level sound (`<code>_sounds`): a positional loop (CSSound: full volume inside `inner`, silent
 /// beyond `outer`) or a one-shot gate (CSMusicTripwire with a Sound Def: the Tarzan yell on Wild
 /// America's final drop).
@@ -291,6 +308,7 @@ pub struct H2Level {
     pub code: String,
     pub fires: Vec<LevelFire>,
     pub sounds: Vec<LevelSound>,
+    pub geysers: Vec<Geyser>,
     pub title: String,
     /// Terrain meshes (`sg_<code>_PropSectorN`), placed at the origin.
     pub sector_meshes: Vec<String>,
@@ -373,6 +391,24 @@ pub fn load_level(lux: &LuxArchive, code: &str) -> Result<H2Level> {
             lvl.finish_buoys = buoys.clone();
         }
         for o in &objs {
+            if o.class == "CGeyser" {
+                if let (Some(def), Some(position)) = (o.get("Geyser Flame Def").filter(|d| !d.is_empty()), o.vec3("Position")) {
+                    lvl.geysers.push(Geyser {
+                        def: def.to_string(),
+                        position,
+                        rotation: o.quat("Orientation").unwrap_or([0.0, 0.0, 0.0, 1.0]),
+                        radius: o.f32("Scale").unwrap_or(40.0),
+                        off: o.f32("Off Sec").unwrap_or(3.0),
+                        low: o.f32("Low Sec").unwrap_or(1.5),
+                        high: o.f32("High Sec").unwrap_or(3.0),
+                        low_intensity: o.f32("Low Unit Intensity").unwrap_or(0.0),
+                        high_intensity: o.f32("High Unit Intensity").unwrap_or(1.0),
+                        phase: o.f32("Phase Sec").unwrap_or(0.0),
+                        random_phase: o.get("Random Phase").is_some_and(|v| v.trim() == "1"),
+                    });
+                }
+                continue;
+            }
             let Some(position) = o.vec3("Position") else { continue };
             let rotation = o.quat("Orientation").unwrap_or([0.0, 0.0, 0.0, 1.0]);
             let scale = o.f32("Scale").unwrap_or(1.0);
