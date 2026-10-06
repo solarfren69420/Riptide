@@ -115,8 +115,11 @@ pub fn load_list_with_defaults(lux: &LuxArchive, name: &str) -> Result<Vec<XmlOb
 
 #[derive(Debug, Clone)]
 pub struct Placement {
-    pub mesh: String,
-    pub position: [f32; 3],
+    /// The object's own name (level events reference it: StartAnim Dam).
+    pub name: String,
+    /// Init Flags (0x40: its animation waits for a StartAnim event).
+    pub init_flags: u32,
+    pub mesh: String,    pub position: [f32; 3],
     pub rotation: [f32; 4],
     pub scale: f32,
     /// Set when a path controller drives the object (traffic, trains, gondolas).
@@ -457,7 +460,8 @@ pub fn load_level(lux: &LuxArchive, code: &str) -> Result<H2Level> {
             let solid = o.get("Game Mesh Def").is_some_and(|d| solid_defs.contains(d));
             let float_mass = o.get("Game Mesh Def").and_then(|d| float_defs.get(d)).copied();
             let bungee = o.get("Game Mesh Def").and_then(|d| bungee_defs.get(d)).copied().filter(|_| float_mass.is_none());
-            let placement = Placement { mesh, position, rotation, scale, path, anim, spin, slide, solid, float_mass, bungee };
+            let init_flags = o.get("Init Flags").and_then(|v| u32::from_str_radix(v.trim(), 16).ok()).unwrap_or(1);
+            let placement = Placement { name: o.name.clone(), init_flags, mesh, position, rotation, scale, path, anim, spin, slide, solid, float_mass, bungee };
             if o.class == "CBooster" {
                 let kind = match o.f32("Type").map(|t| t as i32).unwrap_or(0) {
                     1 => BoostKind::Red,
@@ -560,6 +564,8 @@ pub fn load_level(lux: &LuxArchive, code: &str) -> Result<H2Level> {
                     let rot = info.f32(&format!("Skybox {i} Rotation")).unwrap_or(0.0);
                     let (s, c) = (rot * 0.5).sin_cos();
                     lvl.skyboxes.push(Placement {
+                        name: String::new(),
+                        init_flags: 1,
                         mesh: mesh.to_string(),
                         position: [0.0; 3],
                         rotation: [0.0, s, 0.0, c],

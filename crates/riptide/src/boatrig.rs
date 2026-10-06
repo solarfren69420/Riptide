@@ -334,6 +334,10 @@ fn pose_menu(time: Res<Time>, mut rigs: Query<&mut BoatRig, Without<Boat>>, mut 
 pub struct PropRig {
     clip: Bound,
     speed: f32,
+    /// Waiting for a StartAnim level event (Init Flags bit 0x40): posed at its start, not moving.
+    pub held: bool,
+    /// An event animation (the dam collapse, rock slides): plays once and stops on its last frame.
+    pub once: bool,
 }
 
 /// Build `mesh`'s skeleton under `node` and bind `anim.clip` to it, starting at `anim.start` of
@@ -358,14 +362,17 @@ pub fn spawn_prop(commands: &mut Commands, models: &mut Models, mesh: &str, anim
     }
     let mut bound = bind(clip, &bones, &rests);
     bound.t = anim.start.rem_euclid(1.0) * bound.clip.duration;
-    Some(PropRig { clip: bound, speed: anim.speed })
+    Some(PropRig { clip: bound, speed: anim.speed, held: false, once: false })
 }
 
 fn animate_props(time: Res<Time>, mut rigs: Query<&mut PropRig>, mut bones: Query<&mut Transform, Without<PropRig>>) {
     let dt = time.delta_secs();
     for mut rig in &mut rigs {
         let len = rig.clip.clip.duration.max(1e-3);
-        rig.clip.t = (rig.clip.t + dt * rig.speed).rem_euclid(len);
+        if !rig.held {
+            let t = rig.clip.t + dt * rig.speed;
+            rig.clip.t = if rig.once { t.min(len) } else { t.rem_euclid(len) };
+        }
         for &(ti, e, rest) in &rig.clip.nodes {
             if let Ok(mut tf) = bones.get_mut(e) {
                 *tf = sample(&rig.clip, ti, rest);

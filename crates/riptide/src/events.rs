@@ -29,6 +29,8 @@ pub struct LevelEvents {
     trips: Vec<Trip>,
     by_name: HashMap<String, usize>,
     fires: HashMap<String, Entity>,
+    /// Animated props by name (StartAnim targets).
+    props: HashMap<String, Entity>,
     /// (race time due, action).
     pending: Vec<(f32, TripAction)>,
 }
@@ -68,6 +70,10 @@ impl LevelEvents {
         self.fires.insert(name.to_string(), e);
     }
 
+    pub fn add_prop(&mut self, name: &str, e: Entity) {
+        self.props.insert(name.to_string(), e);
+    }
+
     fn fire(&mut self, i: usize, now: f32) {
         let t = &mut self.trips[i];
         if t.done {
@@ -91,6 +97,7 @@ pub fn run_events(
     mut fires: Query<&mut LevelFire>,
     mut skies: Query<(&crate::race::SkyIndex, &mut Visibility)>,
     mut shake: ResMut<crate::race::CameraShake>,
+    mut rigs: Query<&mut crate::boatrig::PropRig>,
 ) {
     let Some(mut ev) = events else { return };
     if clock.t < 0.0 {
@@ -137,6 +144,11 @@ pub fn run_events(
                 let show = if a.int >= 999 || n == 0 { None } else { Some((a.int.max(0) as usize).min(n - 1)) };
                 for (i, mut v) in &mut skies {
                     *v = if Some(i.0) == show { Visibility::Inherited } else { Visibility::Hidden };
+                }
+            }
+            "startanim" => {
+                if let Some(mut r) = ev.props.get(&a.target).and_then(|e| rigs.get_mut(*e).ok()) {
+                    r.held = false;
                 }
             }
             "camerashake" => {

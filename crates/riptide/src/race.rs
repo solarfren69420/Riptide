@@ -621,7 +621,6 @@ fn spawn_race(
         ));
         fires += 1;
     }
-    commands.insert_resource(events);
     if fires > 0 {
         info!("{code}: {fires} level fires / smoke / splashes");
     }
@@ -682,6 +681,14 @@ fn spawn_race(
         // skeleton; the rest are drawn whole.
         match prop.anim.as_ref().and_then(|a| crate::boatrig::spawn_prop(&mut commands, &mut models, &prop.mesh, a, e)) {
             Some(rig) => {
+                let mut rig = rig;
+                // Init Flags 0x40: an event animation (Quake Canyon's dam, rock slides) waits for its
+                // StartAnim and plays once.
+                if prop.init_flags & 0x40 != 0 {
+                    rig.held = true;
+                    rig.once = true;
+                }
+                events.add_prop(&prop.name, e);
                 commands.entity(e).insert(rig);
                 animated += 1;
             }
@@ -691,6 +698,7 @@ fn spawn_race(
     if !floater_sizes.is_empty() {
         info!("{code}: {} floating objects (logs, rafts, crates...)", floater_sizes.len());
     }
+    commands.insert_resource(events);
     if animated + moving > 0 {
         info!("{code}: {animated} animated props, {moving} spinning or sliding");
     }
