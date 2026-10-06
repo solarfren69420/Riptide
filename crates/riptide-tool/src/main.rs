@@ -382,6 +382,13 @@ fn main() -> Result<()> {
             }).sum();
             println!("{}: {} tris, {} parts, path {} edges ({len:.0} units, looped {}), {} instances, {} starts", a(2)?, t.terrain.triangle_count(), t.terrain.parts.len(), t.path.len(), t.looped, t.instances.len(), t.starts.len());
             println!("  river: {} sectors (including side routes), {} drops over 40 Riptide units", t.river.len(), t.river.iter().filter(|[a,b]| (a.water-b.water)*1.6 > 40.0).count());
+            if std::env::var_os("RIVER_DUMP").is_some() {
+                for (i, [a, b]) in t.river.iter().enumerate().filter(|(i, _)| (12..=19).contains(i)) {
+                    let m = |e: &riptide_assets::h2level::Edge| [(e.start[0] + e.end[0]) * 0.5, (e.start[2] + e.end[2]) * 0.5];
+                    let (ma, mb) = (m(a), m(b));
+                    println!("  river {i}: water {:.0} -> {:.0}, a mid {:.0},{:.0} b mid {:.0},{:.0} len {:.0} width {:.0}", a.water, b.water, ma[0], ma[1], mb[0], mb[1], ((ma[0]-mb[0]).powi(2)+(ma[1]-mb[1]).powi(2)).sqrt(), ((a.start[0]-a.end[0]).powi(2)+(a.start[2]-a.end[2]).powi(2)).sqrt());
+                }
+            }
             for (i, [a, b]) in t.river.iter().enumerate() {
                 if (b.water - a.water) * 1.6 > 20.0 {
                     println!("  RISE river {i}: {:.0} -> {:.0} at [{:.0}, {:.0}] (Riptide {:.0}, {:.0})", a.water, b.water, (b.start[0] + b.end[0]) * 0.5, (b.start[2] + b.end[2]) * 0.5, (b.start[0] + b.end[0]) * 0.8, -(b.start[2] + b.end[2]) * 0.8);
@@ -619,6 +626,7 @@ fn main() -> Result<()> {
                         d(a).total_cmp(&d(b))
                     }).map(|e| e.water).unwrap_or(0.0);
                     if p.bungee.is_some() { print!("BUNGEE "); }
+                    if let Some(a) = &p.anim { print!("ANIM[{}] ", a.clip); }
                     println!("{} {:.0} {:.0} {:.0} water {:.0} above {:+.0} scale {:.2}", p.mesh, p.position[0], p.position[1], p.position[2], w, p.position[1] - w, p.scale);
                 }
                 return Ok(());

@@ -19,6 +19,7 @@ impl Plugin for EffectsPlugin {
         app.init_resource::<FlameArt>()
             .add_systems(OnEnter(Screen::Race), (load_art, load_bolt_art))
             .add_systems(Update, (emit, animate, hull_bolts).chain().run_if(in_state(Screen::Race)))
+            .add_systems(Update, tint_spray.run_if(in_state(Screen::Race)))
             .add_systems(Update, (emit_flames, emit_level_fires, animate_flames).chain()
                 .after(emit)
                 .after(crate::race::place_boats)
@@ -55,6 +56,9 @@ struct Particle {
     life: f32,
     size: (f32, f32),
     art: usize,
+    /// Water height where it was thrown: spray sinking below it is gone (FX_Waterspray fades
+    /// droplets under the wave surface).
+    floor: f32,
 }
 
 /// Per-boat emission state.
@@ -175,7 +179,7 @@ fn emit(
                         Kind::Spray => art.spray[0][0].clone(),
                     }),
                     Transform::from_translation(pos).with_scale(Vec3::splat(size.0)),
-                    Particle { kind, vel, age: 0.0, life, size, art: (rnd * art_n as f32) as usize % art_n },
+                    Particle { kind, vel, age: 0.0, life, size, art: (rnd * art_n as f32) as usize % art_n, floor: b.surface },
                     NotShadowCaster,
                     scope.clone(),
                 ))
@@ -276,6 +280,10 @@ fn animate(
                 p.vel.y -= phy::GRAVITY * dt;
                 p.vel *= (1.0 - phy::SPRAY_DRAG * dt).max(0.0);
                 tf.translation += p.vel * dt;
+                if p.vel.y < 0.0 && tf.translation.y < p.floor - phy::SPRAY_SINK {
+                    commands.entity(e).despawn();
+                    continue;
+                }
                 // FX_Waterspray draws each droplet as a camera-facing streak from where it is to where
                 // it was: stretch the quad along the velocity, its face toward the eye.
                 if let Some(eye) = eye {
@@ -842,4 +850,23 @@ fn hull_spray_points(lux: &riptide_assets::lux::LuxArchive, def: &crate::sheets:
         }
     }
     out
+}
+
+/// The course's water whitewash colour (its water edges' average): FX_Waterspray colours spray
+/// with the water's tint, not plain white.
+#[derive(Resource)]
+pub struct SprayTint(pub Vec3);
+
+fn tint_spray(tint: Option<Res<SprayTint>>, art: Option<Res<FxArt>>, mut mats: ResMut<Assets<StandardMaterial>>) {
+    let (Some(tint), Some(art)) = (tint, art) else { return };
+    if !tint.is_changed() && !art.is_changed() {
+        return;
+    }
+    let c = Vec3::ONE.lerp(tint.0, phy::SPRAY_TINT);
+    for h in art.spray.iter().flatten() {
+        if let Some(m) = mats.get_mut(h) {
+            let a = m.base_color.alpha();
+            m.base_color = Color::srgba(c.x, c.y, c.z, a);
+        }
+    }
 }

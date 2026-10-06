@@ -571,6 +571,12 @@ fn spawn_race(
             });
         }
     }
+    // Spray takes the water's whitewash colour (crate::effects::SprayTint).
+    if !level.water_edges.is_empty() {
+        let n = level.water_edges.len() as f32;
+        let c = level.water_edges.iter().map(|e| Vec3::new(e.whitewash_color[0], e.whitewash_color[1], e.whitewash_color[2])).sum::<Vec3>() / n;
+        commands.insert_resource(crate::effects::SprayTint(c));
+    }
     // Level sounds: positional loops and one-shot gates (`<code>_sounds`).
     let sounds = crate::levelsound::spawn(&mut commands, &level, &track, scope.clone());
     if sounds > 0 {
