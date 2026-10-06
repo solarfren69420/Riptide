@@ -28,7 +28,7 @@ pub struct RacePlugin;
 
 impl Plugin for RacePlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<CamView>().init_resource::<CameraShake>();
+        app.init_resource::<CamView>().init_resource::<CameraShake>().init_resource::<crate::h2water::Tides>();
         app.add_systems(Update, probe.run_if(in_state(Screen::Race)))
             .add_systems(OnEnter(Screen::Race), (spawn_race, choose_collision, start_race_audio, crate::net::race_ready).chain())
             .add_systems(
@@ -58,7 +58,7 @@ impl Plugin for RacePlugin {
                     .chain()
                     .run_if(in_state(Screen::Race)),
             );
-        app.add_systems(Update, (race_audio, engine_audio, crate::sound::fade_music, crate::geyser::geysers, crate::events::run_events).run_if(in_state(Screen::Race)));
+        app.add_systems(Update, (race_audio, engine_audio, crate::sound::fade_music, crate::geyser::geysers, crate::events::run_events, crate::h2water::apply_tides).run_if(in_state(Screen::Race)));
     }
 }
 
@@ -598,6 +598,8 @@ fn spawn_race(
     let mut fires = 0;
     let mut events = crate::events::LevelEvents::new(&level.tripwires, &track);
     let off = crate::events::LevelEvents::starts_off(&level.tripwires);
+    events.add_tidals(&level.tidals);
+    commands.insert_resource(crate::h2water::Tides::default());
     for f in &level.fires {
         let Some(fire) = crate::effects::LevelFire::new(&f.def, f.scale) else { continue };
         let mut fire = fire;
@@ -1488,6 +1490,7 @@ fn boat_physics(
     tuning: Res<Tuning>,
     collider: Option<Res<Collider>>,
     h2waves: Option<Res<crate::h2water::H2Waves>>,
+    tides: Res<crate::h2water::Tides>,
     mut boats: Query<&mut Boat, Without<crate::net::Remote>>,
 ) {
     let g = &tuning.0;
@@ -1745,6 +1748,10 @@ fn boat_physics(
             if (h - tp.water).abs() < phy::H2WATER_SURFACE_MAX {
                 tp.water = h;
             }
+        }
+        // A rolling tidal wave (crate::h2water::Tides, started by level events) lifts the water.
+        if !tides.0.is_empty() {
+            tp.water += tides.height(b.pos.xz(), clock.t);
         }
         // The surface a hull rides: the water, or a terrain floor (ramp, mound) within step-up reach.
         let reach = b.pos.y + phy::FLOOR_STEP_UP;

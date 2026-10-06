@@ -31,6 +31,8 @@ pub struct LevelEvents {
     fires: HashMap<String, Entity>,
     /// Animated props by name (StartAnim targets).
     props: HashMap<String, Entity>,
+    /// Tidal waves by name (TidalWave targets).
+    tidals: HashMap<String, riptide_assets::h2level::TidalDef>,
     /// (race time due, action).
     pending: Vec<(f32, TripAction)>,
 }
@@ -70,6 +72,10 @@ impl LevelEvents {
         self.fires.insert(name.to_string(), e);
     }
 
+    pub fn add_tidals(&mut self, defs: &[riptide_assets::h2level::TidalDef]) {
+        self.tidals = defs.iter().map(|d| (d.name.clone(), d.clone())).collect();
+    }
+
     pub fn add_prop(&mut self, name: &str, e: Entity) {
         self.props.insert(name.to_string(), e);
     }
@@ -98,6 +104,7 @@ pub fn run_events(
     mut skies: Query<(&crate::race::SkyIndex, &mut Visibility)>,
     mut shake: ResMut<crate::race::CameraShake>,
     mut rigs: Query<&mut crate::boatrig::PropRig>,
+    mut tides: ResMut<crate::h2water::Tides>,
 ) {
     let Some(mut ev) = events else { return };
     if clock.t < 0.0 {
@@ -144,6 +151,20 @@ pub fn run_events(
                 let show = if a.int >= 999 || n == 0 { None } else { Some((a.int.max(0) as usize).min(n - 1)) };
                 for (i, mut v) in &mut skies {
                     *v = if Some(i.0) == show { Visibility::Inherited } else { Visibility::Hidden };
+                }
+            }
+            "tidalwave" => {
+                if let Some(d) = ev.tidals.get(&a.target) {
+                    tides.0.push(crate::h2water::Tide {
+                        epicentre: Vec3::from(d.position),
+                        length: d.length,
+                        speed: d.speed,
+                        height: d.height,
+                        dist_start: d.dist_start,
+                        dist_max: d.dist_max,
+                        dist_fade: d.dist_fade,
+                        started: clock.t,
+                    });
                 }
             }
             "startanim" => {

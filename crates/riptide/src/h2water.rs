@@ -115,19 +115,21 @@ pub struct H2WaterShaders {
     pub ps: Program,
 }
 
+/// The translated FX_Water2 programs (their constant layout), once per run.
+static WATER_SHADERS: std::sync::OnceLock<H2WaterShaders> = std::sync::OnceLock::new();
+
 /// Translate `shad4.FX_Water2` (its fullest vertex / pixel pair: leading and trailing edges,
 /// lights, tidal waves) and install it as the material's shaders.
 pub fn install(shaders: &mut Assets<Shader>, blob: &[u8]) -> Option<H2WaterShaders> {
     // Once per run: inserting the shaders again (a restart) replaced them under the materials of
     // the new race, which then drew as a flat mirror.
-    static DONE: std::sync::OnceLock<H2WaterShaders> = std::sync::OnceLock::new();
-    if let Some(sh) = DONE.get() {
+    if let Some(sh) = WATER_SHADERS.get() {
         if shaders.contains(&VERTEX) && shaders.contains(&FRAGMENT) {
             return Some(sh.clone());
         }
     }
     let sh = install_once(shaders, blob)?;
-    let _ = DONE.set(sh.clone());
+    let _ = WATER_SHADERS.set(sh.clone());
     Some(sh)
 }
 
@@ -831,4 +833,78 @@ pub fn spawn_waterfalls(
         count += 1;
     }
     count
+}
+
+/// A rolling tidal wave (CSWaterTidal, started by a TidalWave level event): a ring rising out of
+/// the water at `epicentre`, travelling out from `dist_start` at `speed`, fading over `dist_fade`
+/// before `dist_max` (FX_Water2's g_afTidal* constants, at most two at once).
+#[derive(Clone, Copy, Debug)]
+pub struct Tide {
+    pub epicentre: Vec3,
+    pub length: f32,
+    pub speed: f32,
+    pub height: f32,
+    pub dist_start: f32,
+    pub dist_max: f32,
+    pub dist_fade: f32,
+    pub started: f32,
+}
+
+impl Tide {
+    pub fn travel(&self, t: f32) -> f32 {
+        self.dist_start + self.speed * (t - self.started).max(0.0)
+    }
+
+    /// Height the wave adds at `p` (x, z) at race time `t`: FX_Water2's tidal term on the CPU.
+    pub fn height(&self, p: Vec2, t: f32) -> f32 {
+        let d = p.distance(self.epicentre.xz());
+        if d >= self.dist_max {
+            return 0.0;
+        }
+        let start_fade = self.dist_max - self.dist_fade;
+        let fade = if d > start_fade { (1.0 - (d - start_fade) / self.dist_fade.max(1.0)).clamp(0.0, 1.0) } else { 1.0 };
+        let fade = 0.5 - 0.5 * (fade * std::f32::consts::PI).cos();
+        let x = (d - self.travel(t)) / self.length.max(1.0);
+        if !(-1.0..0.0).contains(&x) {
+            return 0.0;
+        }
+        // One crest a wavelength long behind the front.
+        let s = 0.5 - 0.5 * ((x + 1.0) * std::f32::consts::TAU).cos();
+        s * fade * self.height
+    }
+}
+
+/// The level's rolling tides.
+#[derive(Resource, Default)]
+pub struct Tides(pub Vec<Tide>);
+
+impl Tides {
+    pub fn height(&self, p: Vec2, t: f32) -> f32 {
+        self.0.iter().map(|w| w.height(p, t)).sum()
+    }
+}
+
+/// Feed active tides into every H2Overdrive water material's FX_Water2 tidal constants, and drop
+/// the ones that have run out.
+pub fn apply_tides(clock: Res<crate::race::RaceClock>, mut tides: ResMut<Tides>, mut mats: ResMut<Assets<H2WaterMaterial>>, mut was: Local<usize>) {
+    let t = clock.t;
+    tides.0.retain(|w| w.travel(t) < w.dist_max + w.length);
+    let n = tides.0.len().min(2);
+    if n == 0 && *was == 0 {
+        return;
+    }
+    *was = n;
+    let Some(sh) = WATER_SHADERS.get() else { return };
+    for (_, m) in mats.iter_mut() {
+        set(&mut m.vs, &sh.vs, "g_uTidalWaveCount", 0, Vec4::splat(n as f32));
+        for (i, w) in tides.0.iter().take(2).enumerate() {
+            set(&mut m.vs, &sh.vs, "g_avTidalEpicenterPos", i, w.epicentre.extend(0.0));
+            set(&mut m.vs, &sh.vs, "g_afTidalWaveNum", i, Vec4::splat(std::f32::consts::TAU / w.length.max(1.0)));
+            set(&mut m.vs, &sh.vs, "g_afTidalWaveHeight", i, Vec4::splat(w.height));
+            set(&mut m.vs, &sh.vs, "g_afTidalTravelDist", i, Vec4::splat(w.travel(t)));
+            set(&mut m.vs, &sh.vs, "g_afTidalMaxDist", i, Vec4::splat(w.dist_max));
+            set(&mut m.vs, &sh.vs, "g_afTidalStartFadeDist", i, Vec4::splat(w.dist_max - w.dist_fade));
+            set(&mut m.vs, &sh.vs, "g_afTidalInvFadeDist", i, Vec4::splat(1.0 / w.dist_fade.max(1.0)));
+        }
+    }
 }

@@ -287,6 +287,19 @@ pub struct Tripwire {
     pub actions: Vec<TripAction>,
 }
 
+/// A tidal wave (CSWaterTidal) a TidalWave level event starts: a ring rolling out of the water.
+#[derive(Clone, Debug)]
+pub struct TidalDef {
+    pub name: String,
+    pub position: [f32; 3],
+    pub length: f32,
+    pub speed: f32,
+    pub height: f32,
+    pub dist_start: f32,
+    pub dist_max: f32,
+    pub dist_fade: f32,
+}
+
 /// A geyser (CGeyser): its flame def erupts on a cycle, Off -> Low (a trickle) -> High (the
 /// eruption, which throws boats over it), starting at `phase` seconds in.
 #[derive(Clone, Debug)]
@@ -337,6 +350,7 @@ pub struct H2Level {
     pub sounds: Vec<LevelSound>,
     pub geysers: Vec<Geyser>,
     pub tripwires: Vec<Tripwire>,
+    pub tidals: Vec<TidalDef>,
     pub title: String,
     /// Terrain meshes (`sg_<code>_PropSectorN`), placed at the origin.
     pub sector_meshes: Vec<String>,
@@ -419,6 +433,21 @@ pub fn load_level(lux: &LuxArchive, code: &str) -> Result<H2Level> {
             lvl.finish_buoys = buoys.clone();
         }
         for o in &objs {
+            if o.class == "CSWaterTidal" {
+                if let Some(position) = o.vec3("Position") {
+                    lvl.tidals.push(TidalDef {
+                        name: o.name.clone(),
+                        position,
+                        length: o.f32("Wave Length").unwrap_or(8000.0),
+                        speed: o.f32("Wave Speed").unwrap_or(500.0),
+                        height: o.f32("Wave Height").unwrap_or(75.0),
+                        dist_start: o.f32("Dist Start").unwrap_or(0.0),
+                        dist_max: o.f32("Dist Max").unwrap_or(5000.0),
+                        dist_fade: o.f32("Dist Fade").unwrap_or(1000.0),
+                    });
+                }
+                continue;
+            }
             if o.class == "CGeyser" {
                 if let (Some(def), Some(position)) = (o.get("Geyser Flame Def").filter(|d| !d.is_empty()), o.vec3("Position")) {
                     lvl.geysers.push(Geyser {
