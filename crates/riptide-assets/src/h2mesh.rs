@@ -392,3 +392,66 @@ mod tests {
         assert_eq!(placed, [6., 8., -7., 1.]);
     }
 }
+
+/// A spray surface on a boat hull (a mesh record named `spray`): triangles along the waterline
+/// (sides, bow) or across the stern (the rooster tail). The original spaces water spray emitters
+/// along it, each using the boat def's `Waterspray <index>` entry (CWaterspraySys, FUN_004f0a50).
+/// Positions and normals are Riptide space (Z mirrored).
+#[derive(Clone, Debug, Default)]
+pub struct SprayLine {
+    pub index: u32,
+    pub triangles: Vec<[[f32; 3]; 3]>,
+    pub normals: Vec<[f32; 3]>,
+}
+
+/// Every `spray` record in a mesh blob.
+pub fn spray_lines(blob: &[u8]) -> Vec<SprayLine> {
+    if blob.len() < 0x14 || &blob[0x0c..0x10] != b"MESH" {
+        return Vec::new();
+    }
+    let nfix = u32_at(blob, 8) as usize;
+    let body_start = 0x14 + nfix * 0x2c;
+    if body_start > blob.len() {
+        return Vec::new();
+    }
+    let body = &blob[body_start..];
+    let mut internal: HashMap<usize, usize> = HashMap::new();
+    for i in 0..nfix {
+        let r = &blob[0x14 + i * 0x2c..0x14 + (i + 1) * 0x2c];
+        if u32_at(r, 0) == 1 {
+            internal.insert(u32_at(r, 4) as usize, u32_at(r, 8) as usize);
+        }
+    }
+    let floats = |at: usize, n: usize| -> Vec<f32> {
+        (0..n).filter_map(|k| body.get(at + k * 4..at + k * 4 + 4).map(|b| f32::from_le_bytes(b.try_into().unwrap()))).collect()
+    };
+    let mut out = Vec::new();
+    let mut i = 0;
+    while i + 80 <= body.len() {
+        if &body[i..i + 6] == b"spray\0" {
+            let idx = std::str::from_utf8(&body[i + 0x20..i + 0x40]).ok().and_then(|s| s.trim_end_matches('\0').parse::<u32>().ok());
+            let (ca, cb) = (u32_at(body, i + 0x40) as usize, u32_at(body, i + 0x48) as usize);
+            if let (Some(index), Some(&pa), Some(&pb)) = (idx, internal.get(&(i + 0x44)), internal.get(&(i + 0x4c))) {
+                if ca < 4096 && cb < 4096 {
+                    // Triangles: face normal + 3 u32 vertex indices (24 B); vertices: pos, normal, 4 spare (40 B).
+                    let tris = floats(pa, ca * 6);
+                    let verts = floats(pb, cb * 10);
+                    let vert = |k: usize| verts.get(k * 10..k * 10 + 3).map(|p| [p[0], p[1], -p[2]]);
+                    let mut line = SprayLine { index, ..Default::default() };
+                    for t in tris.chunks_exact(6) {
+                        let ids = [t[3], t[4], t[5]].map(|f| f.to_bits() as usize);
+                        if let (Some(a), Some(b), Some(c)) = (vert(ids[0]), vert(ids[1]), vert(ids[2])) {
+                            line.triangles.push([a, b, c]);
+                            line.normals.push([t[0], t[1], -t[2]]);
+                        }
+                    }
+                    out.push(line);
+                }
+            }
+            i += 80;
+        } else {
+            i += 4;
+        }
+    }
+    out
+}

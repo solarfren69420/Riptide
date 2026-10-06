@@ -209,3 +209,11 @@ checklist_after_go,f32,1.5,s,riptide design: the Go / No Go systems checklist pl
 cam_view_near,f32,0.6,x distance,riptide design: chase camera distance and height in the near view (C cycles normal / near / far)
 cam_view_far,f32,1.6,x distance,riptide design: chase camera distance and height in the far view
 level_sound_gain,f32,0.3,x volume,riptide design: mix level for positional level ambience (fires / saws / machines; the original ducks its Environment group) - at 1 a dozen overlapping loops were deafening
+hull_spray_rate,f32,40,per second,riptide design: droplets per hull spray point per second at full speed and intensity 1 (points from the boat mesh spray surfaces x Waterspray Subdivisions)
+hull_spray_kick,f32,0.35,x speed,riptide design: hull spray launch speed per unit boat speed (x Waterspray Intensity); upward part x tan(Waterspray Angle)
+hull_spray_up,f32,60,units/s,riptide design: random extra upward speed of hull spray
+hull_spray_carry,f32,0.6,x boat velocity,riptide design: share of the boat velocity hull spray keeps
+hull_spray_life,f32,0.7,s,riptide design: hull spray droplet life
+spray_drag,f32,1.2,1/s,riptide design: spray droplets slow down in the air (the original drag 0.99 per update)
+spray_streak,f32,0.04,s,riptide design: spray streak length = speed x this (FX_Waterspray draws droplets head to tail)
+hull_spray_lift,f32,2,units,riptide design: hull spray points sit this far above the water surface (heights measured from the hull waterline)

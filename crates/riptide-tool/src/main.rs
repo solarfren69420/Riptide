@@ -153,6 +153,12 @@ fn main() -> Result<()> {
                 println!("{o:#06x}: {shown}");
             }
         }
+        Some("mesh-spray") => {
+            let l = open_lux()?;
+            for s in riptide_assets::h2mesh::spray_lines(l.get(&format!("mesh32.{}", a(1)?)).context("no mesh")?) {
+                println!("spray {}: {} triangles, normal {:?}, first {:?}", s.index, s.triangles.len(), s.normals.first(), s.triangles.first());
+            }
+        }
         Some("lux-mesh") => {
             let l = open_lux()?;
             let m = lux_model(&l, a(1)?)?;

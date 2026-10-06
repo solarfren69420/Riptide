@@ -58,10 +58,23 @@ struct Particle {
 }
 
 /// Per-boat emission state.
+/// A hull spray emitter (boat local, unscaled): a point on a mesh `spray` surface's waterline edge
+/// (CWaterspraySys, FUN_004f0a50) with its boat def `Waterspray <i>` entry.
+#[derive(Clone, Copy)]
+struct SprayPoint {
+    pos: Vec3,
+    out: Vec3,
+    slope: f32,
+    intensity: f32,
+    due: f32,
+}
+
 #[derive(Component, Default)]
 struct Emitter {
     foam_due: f32,
     spray_due: f32,
+    /// Hull spray points, decoded from the boat mesh on first use (None = not yet).
+    hull: Option<Vec<SprayPoint>>,
     flame_due: HashMap<usize, f32>,
     was_airborne: bool,
 }
@@ -124,6 +137,7 @@ fn emit(
     art: Option<Res<FxArt>>,
     live: Query<(), With<Particle>>,
     h2water: Option<Res<crate::h2water::H2WaterOn>>,
+    content: Res<crate::content::Content>,
     mut boats: Query<(Entity, &Boat, Option<&mut Emitter>)>,
 ) {
     let Some(art) = art else { return };
@@ -184,6 +198,28 @@ fn emit(
                 spawn(Kind::Foam, p, drift, phy::WAKE_LIFE, (phy::WAKE_SIZE_START * s, phy::WAKE_SIZE_END * s), art.foam.len(), rand());
             }
         }
+        // Hull spray: thrown off the hull's spray surfaces (stern plate, waterline strips) while
+        // planing, each point along its outward normal at its Waterspray angle, harder with speed.
+        if em.hull.is_none() {
+            em.hull = Some(hull_spray_points(&content.lux, b.info.def));
+            if std::env::var_os("RIPTIDE_DEBUG").is_some() {
+                info!("hull spray: {} points for {}", em.hull.as_ref().map_or(0, |h| h.len()), b.info.def.mesh_name_local);
+            }
+        }
+        if on_water && speed > phy::WAKE_MIN_SPEED {
+            let carry = Vec3::new(b.vel.x, 0.0, b.vel.y) * phy::HULL_SPRAY_CARRY;
+            let n_art = art.spray.len();
+            for p in em.hull.as_mut().into_iter().flatten() {
+                p.due += phy::HULL_SPRAY_RATE * p.intensity * unit * dt;
+                while p.due >= 1.0 {
+                    p.due -= 1.0;
+                    let kick = speed * phy::HULL_SPRAY_KICK * p.intensity * (0.8 + 0.2 * rand());
+                    let out = rot * p.out;
+                    let vel = carry + out * kick + Vec3::Y * (kick * p.slope + phy::HULL_SPRAY_UP * rand());
+                    spawn(Kind::Spray, b.pos + rot * p.pos * s, vel, phy::HULL_SPRAY_LIFE * (0.7 + 0.6 * rand()), (phy::SPRAY_SIZE_START * s * 0.6, phy::SPRAY_SIZE_END * s * 0.6), n_art, rand());
+                }
+            }
+        }
         // Rooster tail: spray thrown up and back from the boat def's rooster offset while boosting.
         if on_water && b.boosting && speed > phy::WAKE_MIN_SPEED {
             let def = b.info.def;
@@ -238,9 +274,18 @@ fn animate(
             }
             Kind::Spray => {
                 p.vel.y -= phy::GRAVITY * dt;
+                p.vel *= (1.0 - phy::SPRAY_DRAG * dt).max(0.0);
                 tf.translation += p.vel * dt;
+                // FX_Waterspray draws each droplet as a camera-facing streak from where it is to where
+                // it was: stretch the quad along the velocity, its face toward the eye.
                 if let Some(eye) = eye {
-                    tf.look_at(eye, Vec3::Y);
+                    let dir = p.vel.normalize_or(Vec3::Y);
+                    let to_eye = (eye - tf.translation).normalize_or(Vec3::Z);
+                    let side = dir.cross(to_eye).normalize_or(Vec3::X);
+                    let face = side.cross(dir);
+                    tf.rotation = Quat::from_mat3(&Mat3::from_cols(side, dir, face));
+                    let w = tf.scale.x;
+                    tf.scale = Vec3::new(w, w + p.vel.length() * phy::SPRAY_STREAK, 1.0);
                 }
                 let near = eye.map_or(1.0, |e| (tf.translation.distance(e) / phy::FX_NEAR_FADE).clamp(0.0, 1.0));
                 let fade = fade.max((((1.0 - near) * FADE_STEPS as f32) as usize).min(FADE_STEPS - 1));
@@ -758,4 +803,43 @@ fn emit_level_fires(
             }
         }
     }
+}
+
+/// Hull spray points for a boat def: each mesh `spray` surface's waterline edge (its lowest
+/// vertices), `Waterspray <i> Subdivisions` points spaced along it, raised by `OffsetY`, thrown
+/// along the surface's outward horizontal normal at `tan(Angle)` upward slope.
+fn hull_spray_points(lux: &riptide_assets::lux::LuxArchive, def: &crate::sheets::H2BoatdefsRow) -> Vec<SprayPoint> {
+    let Some(blob) = lux.get(&format!("mesh32.{}", def.mesh_name_local)) else { return Vec::new() };
+    let table = [
+        (def.waterspray_0_angle, def.waterspray_0_intensity, def.waterspray_0_offsety, def.waterspray_0_subdivisions),
+        (def.waterspray_1_angle, def.waterspray_1_intensity, def.waterspray_1_offsety, def.waterspray_1_subdivisions),
+        (def.waterspray_2_angle, def.waterspray_2_intensity, def.waterspray_2_offsety, def.waterspray_2_subdivisions),
+        (def.waterspray_3_angle, def.waterspray_3_intensity, def.waterspray_3_offsety, def.waterspray_3_subdivisions),
+    ];
+    let lines = riptide_assets::h2mesh::spray_lines(blob);
+    // Heights from the hull's waterline (its lowest spray vertex), which rides at the water surface.
+    let waterline = lines.iter().flat_map(|l| l.triangles.iter().flatten()).map(|p| p[1]).fold(f32::MAX, f32::min);
+    let mut out = Vec::new();
+    for line in lines {
+        let Some(&(angle, intensity, offset_y, subdiv)) = table.get(line.index as usize) else { continue };
+        let n = subdiv.round() as usize;
+        if n == 0 || line.triangles.is_empty() {
+            continue;
+        }
+        let verts: Vec<Vec3> = line.triangles.iter().flatten().map(|p| Vec3::from(*p)).collect();
+        let low = verts.iter().map(|v| v.y).fold(f32::MAX, f32::min);
+        let mut edge: Vec<Vec3> = verts.into_iter().filter(|v| v.y < low + 1.0).collect();
+        let normal = line.normals.iter().map(|n| Vec3::new(n[0], 0.0, n[2])).sum::<Vec3>().normalize_or(Vec3::Z);
+        // Order the waterline points along the strip and drop duplicates.
+        let axis = Vec3::Y.cross(normal).normalize_or(Vec3::X);
+        edge.sort_by(|a, b| a.dot(axis).total_cmp(&b.dot(axis)));
+        edge.dedup_by(|a, b| a.distance(*b) < 0.01);
+        let (Some(&first), Some(&last)) = (edge.first(), edge.last()) else { continue };
+        for k in 0..n {
+            let f = if n == 1 { 0.5 } else { k as f32 / (n - 1) as f32 };
+            let pos = first.lerp(last, f) + Vec3::Y * (offset_y - waterline + phy::HULL_SPRAY_LIFT);
+            out.push(SprayPoint { pos, out: normal, slope: angle.clamp(0.0, 80.0).to_radians().tan(), intensity, due: 0.0 });
+        }
+    }
+    out
 }
