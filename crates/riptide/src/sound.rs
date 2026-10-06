@@ -231,9 +231,23 @@ impl Sfx<'_, '_> {
         if let Some(src) = self.source(sample) {
             let settings = PlaybackSettings { mode: PlaybackMode::Loop, volume: Volume::Linear(volume), ..default() };
             if !muted() {
-                self.commands.spawn((AudioPlayer(src), settings, scope));
+                self.commands.spawn((AudioPlayer(src), settings, scope, Music));
             }
         }
+    }
+
+    /// Start a sound def (first variant) as the course music, silent: [`MusicFade`] brings it in.
+    pub fn music_def(&mut self, def: usize, scope: impl Bundle) -> Option<Entity> {
+        let v = variant(&H2_SOUNDDEFS[def], 0)?;
+        let src = self.source(v.sample)?;
+        if std::env::var_os("RIPTIDE_DEBUG").is_some() {
+            info!("sound: music {}", H2_SOUNDDEFS[def].id);
+        }
+        if muted() {
+            return None;
+        }
+        let settings = PlaybackSettings { mode: PlaybackMode::Loop, volume: Volume::Linear(0.0), ..default() };
+        Some(self.commands.spawn((AudioPlayer(src), settings, scope, Music)).id())
     }
 
     /// Start a looping sound def (first variant), silent until [`EngineLayer`] drives it.
@@ -334,5 +348,30 @@ pub fn drive_engines(rpm: impl Fn(Entity) -> Option<f32>, layers: &mut Query<(&E
         let (vol, pitch) = layer.at(u.clamp(0.0, 1.2));
         sink.set_volume(Volume::Linear(vol));
         sink.set_speed(pitch.max(0.05));
+    }
+}
+
+/// The course music playing (crate::levelsound switches it at CSMusicTripwire gates).
+#[derive(Component)]
+pub struct Music;
+
+/// Fade a music track toward `target` volume at `rate` per second; despawned once faded out.
+#[derive(Component)]
+pub struct MusicFade {
+    pub target: f32,
+    pub rate: f32,
+}
+
+pub fn fade_music(mut commands: Commands, time: Res<Time>, mut q: Query<(Entity, &MusicFade, &mut AudioSink)>) {
+    let dt = time.delta_secs();
+    for (e, f, mut sink) in &mut q {
+        let v = sink.volume().to_linear();
+        let next = if v < f.target { (v + f.rate * dt).min(f.target) } else { (v - f.rate * dt).max(f.target) };
+        sink.set_volume(Volume::Linear(next));
+        if next <= 0.0 && f.target <= 0.0 {
+            commands.entity(e).try_despawn();
+        } else if (next - f.target).abs() < 1e-4 {
+            commands.entity(e).remove::<MusicFade>();
+        }
     }
 }

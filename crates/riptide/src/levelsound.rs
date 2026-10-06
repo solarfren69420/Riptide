@@ -26,6 +26,8 @@ pub struct LevelGate {
     gain: f32,
     done: bool,
     radius: f32,
+    /// Switches the course music (crossfade) instead of playing once.
+    music: bool,
 }
 
 /// Spawn the level's sounds (race setup).
@@ -33,10 +35,8 @@ pub fn spawn(commands: &mut Commands, level: &riptide_assets::h2level::H2Level, 
     let mut n = 0;
     for s in &level.sounds {
         let Some(def) = crate::sound::Sfx::def_id(&s.sound) else { continue };
-        // Music tripwires (`wa_mus2`) switch the score: not one-shots over the race music.
-        if s.radii.is_none() && s.sound.to_ascii_lowercase().contains("_mus") {
-            continue;
-        }
+        // Music tripwires (`wa_mus2`) switch the score: a crossfade, not a one-shot over it.
+        let music = s.radii.is_none() && s.sound.to_ascii_lowercase().contains("_mus");
         let at = Vec3::from(s.position);
         match s.radii {
             Some((inner, outer)) => {
@@ -44,7 +44,7 @@ pub fn spawn(commands: &mut Commands, level: &riptide_assets::h2level::H2Level, 
             }
             None => {
                 let normal = track.locate_anywhere(at).forward;
-                commands.spawn((LevelGate { def, point: at.xz(), normal, gain: s.volume.min(1.0), done: false, radius: if s.voice { phy::VOICE_GATE_RADIUS } else { phy::SOUND_GATE_RADIUS } }, scope.clone()));
+                commands.spawn((LevelGate { def, point: at.xz(), normal, gain: s.volume.min(1.0), done: false, music, radius: if s.voice { phy::VOICE_GATE_RADIUS } else { phy::SOUND_GATE_RADIUS } }, scope.clone()));
             }
         }
         n += 1;
@@ -61,6 +61,7 @@ pub fn level_sounds(
     mut loops: Query<(&Transform, &mut LevelLoop)>,
     mut gates: Query<&mut LevelGate>,
     mut sinks: Query<&mut AudioSink>,
+    playing: Query<Entity, With<crate::sound::Music>>,
 ) {
     let Some(b) = boats.iter().find(|b| b.player) else { return };
     let dt = time.delta_secs().min(1.0 / 20.0);
@@ -74,7 +75,17 @@ pub fn level_sounds(
             let across = (now - g.point).perp_dot(g.normal).abs();
             if d0 < 0.0 && d1 >= 0.0 && across < g.radius {
                 g.done = true;
-                sfx.def(g.def, g.gain);
+                if g.music {
+                    let rate = phy::MUSIC_VOLUME / phy::MUSIC_CROSSFADE.max(0.05);
+                    for e in &playing {
+                        commands.entity(e).insert(crate::sound::MusicFade { target: 0.0, rate });
+                    }
+                    if let Some(e) = sfx.music_def(g.def, DespawnOnExit(crate::Screen::Race)) {
+                        commands.entity(e).insert(crate::sound::MusicFade { target: phy::MUSIC_VOLUME, rate });
+                    }
+                } else {
+                    sfx.def(g.def, g.gain);
+                }
             }
         }
     }

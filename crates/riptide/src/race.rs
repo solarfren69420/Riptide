@@ -58,7 +58,7 @@ impl Plugin for RacePlugin {
                     .chain()
                     .run_if(in_state(Screen::Race)),
             );
-        app.add_systems(Update, (race_audio, engine_audio).run_if(in_state(Screen::Race)));
+        app.add_systems(Update, (race_audio, engine_audio, crate::sound::fade_music).run_if(in_state(Screen::Race)));
     }
 }
 

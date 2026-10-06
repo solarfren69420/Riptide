@@ -225,3 +225,4 @@ bungee_resistance,f32,0.2,x,riptide design: share of the floating-object speed l
 spray_sink,f32,4,units,riptide design: a falling spray droplet this far below the water it was thrown from is gone (FX_Waterspray fades streaks under the wave surface)
 spray_tint,f32,0.5,0..1,riptide design: how far spray takes the course water whitewash colour (0 white and 1 the whitewash colour; FX_Waterspray colours spray with the water tint ramp)
 voice_gate_radius,f32,700,units,riptide design: an announcer voice-over (CVoiceOver) plays when the player crosses its plane this close to it (a secret's line only on the secret)
+music_crossfade,f32,2,s,riptide design: a level music tripwire (CSMusicTripwire with a *_mus* sound) crossfades the course music over this long
